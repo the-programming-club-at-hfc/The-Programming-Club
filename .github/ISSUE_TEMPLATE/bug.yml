@@ -1,0 +1,18 @@
+name: Bug
+description: Something on the site is broken
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Page
+      placeholder: https://programmingclub.dev/hello-world/join
+  - type: input
+    attributes:
+      label: Device and browser
+      placeholder: iPhone, Safari

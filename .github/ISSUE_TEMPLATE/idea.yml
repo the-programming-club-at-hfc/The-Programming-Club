@@ -1,0 +1,10 @@
+name: Idea
+description: Suggest a feature, page, or game
+labels: [idea]
+body:
+  - type: textarea
+    attributes:
+      label: What's the idea?
+      description: What it is, and who it helps.
+    validations:
+      required: true

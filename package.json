@@ -1,0 +1,14 @@
+{
+  "name": "programming-club",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter @programming-club/web dev",
+    "build": "bun run --filter @programming-club/web build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "bun run --filter '*' lint"
+  }
+}

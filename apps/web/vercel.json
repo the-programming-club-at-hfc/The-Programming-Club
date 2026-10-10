@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "tanstack-start",
+  "buildCommand": "if [ -n \"$CONVEX_DEPLOY_KEY\" ]; then bunx convex deploy --cmd 'bun run build' --cmd-url-env-var-name VITE_CONVEX_URL; else bun run build; fi",
+  "redirects": [
+    { "source": "/join", "destination": "/hello-world/join", "permanent": false },
+    { "source": "/tv", "destination": "/hello-world/tv", "permanent": false },
+    { "source": "/host", "destination": "/hello-world/host", "permanent": false },
+    { "source": "/schedule", "destination": "/hello-world/schedule", "permanent": false },
+    { "source": "/season", "destination": "/hello-world/season", "permanent": false },
+    { "source": "/rules", "destination": "/hello-world/rules", "permanent": false },
+    { "source": "/cup", "destination": "/hello-world/cup", "permanent": false },
+    { "source": "/scores", "destination": "/hello-world/scores", "permanent": false },
+    { "source": "/kickoff", "destination": "/hello-world/kickoff", "permanent": false },
+    { "source": "/kit", "destination": "/hello-world/kit", "permanent": false }
+  ]
+}

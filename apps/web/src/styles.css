@@ -1,0 +1,910 @@
+@import "tailwindcss";
+
+/*
+ * An event identity in the Munich '72 tradition: white ground, flat color fields,
+ * pictograms, lowercase type. Gold belongs to the Golden Keycap; signal red is only
+ * for urgent moments. `.theme-pine` re-points the tokens for the TV and the slides.
+ */
+@theme {
+  --color-paper: #ffffff;
+  --color-mist: #eef3f1;
+  --color-ink: #12332b;
+  --color-dim: #4f6862;
+  --color-line: #d6dfdb;
+  --color-sky: #7ec3eb;
+  --color-meadow: #5db760;
+  --color-sun: #f49a1d;
+  --color-silver: #c7ced0;
+  --color-pine: #1f6b52;
+  --color-gold: #efc12c;
+  --color-signal: #e0472f;
+
+  --font-sans: "Mona Sans", system-ui, sans-serif;
+  --font-code: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
+}
+
+@layer base {
+  .theme-pine {
+    --color-paper: #0f2b24;
+    --color-mist: #173a31;
+    --color-ink: #ffffff;
+    --color-dim: #a9c2ba;
+    --color-line: #2c5146;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    color-scheme: dark;
+  }
+
+  /* The club's own pages: navy ink and school blue instead of the event's pine. */
+  .theme-club {
+    --color-ink: #0f1f3d;
+    --color-dim: #4d5b78;
+    --color-line: #d5dbe7;
+    --color-mist: #eef2f9;
+    color: var(--color-ink);
+  }
+
+  html {
+    font-size: clamp(16px, 0.45vw + 12px, 20px);
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--color-sky);
+    color: #12332b;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-sun);
+    outline-offset: 3px;
+  }
+  h1,
+  h2,
+  h3 {
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  code {
+    font-family: var(--font-code);
+  }
+}
+
+@layer utilities {
+  /* Mona Sans at 75% width: scoreboards, clocks, dates. */
+  .narrow {
+    font-stretch: 75%;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    font: 650 1rem/1 var(--font-sans);
+    padding: 0.85em 1.25em;
+    min-height: 2.9rem;
+    border-radius: 6px;
+    color: var(--color-ink);
+    background: var(--color-mist);
+    box-shadow: inset 0 0 0 1.5px var(--color-line);
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 120ms,
+      transform 60ms;
+  }
+  .btn:hover {
+    background: var(--color-line);
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  /* Primary action. (btn-coin is the old name, kept for the officer console.) */
+  .btn-primary,
+  .btn-coin {
+    color: var(--color-paper);
+    background: var(--color-ink);
+    box-shadow: none;
+  }
+  .btn-primary:hover,
+  .btn-coin:hover {
+    background: var(--color-pine);
+  }
+  .theme-pine :is(.btn-primary, .btn-coin) {
+    color: #12332b;
+    background: #ffffff;
+  }
+  .theme-pine :is(.btn-primary, .btn-coin):hover {
+    background: var(--color-sky);
+  }
+  .btn-neon {
+    color: #fff;
+    background: var(--color-signal);
+    box-shadow: none;
+  }
+  .btn-neon:hover {
+    background: #c43a24;
+  }
+  .btn-on,
+  .btn-on:hover {
+    color: #fff;
+    background: var(--color-pine);
+    box-shadow: none;
+  }
+  .btn-sm {
+    font-size: 0.85rem;
+    padding: 0.55em 0.8em;
+    min-height: 2.2rem;
+    border-radius: 5px;
+  }
+
+  /* A plain container. (px is the old name, kept for the officer console.) */
+  .card,
+  .px {
+    background: var(--color-paper);
+    border-radius: 10px;
+    box-shadow: inset 0 0 0 1.5px var(--color-line);
+  }
+  .px-coin {
+    box-shadow: inset 0 0 0 2.5px var(--color-gold);
+  }
+
+  /* A flat color field that holds a pictogram. */
+  .tile {
+    position: relative;
+    overflow: hidden;
+    color: #12332b;
+  }
+  .tile-sky {
+    background: var(--color-sky);
+  }
+  .tile-meadow {
+    background: var(--color-meadow);
+  }
+  .tile-sun {
+    background: var(--color-sun);
+  }
+  .tile-silver {
+    background: var(--color-silver);
+  }
+  .tile-gold {
+    background: var(--color-gold);
+  }
+  .tile-pine {
+    background: var(--color-pine);
+    color: #fff;
+  }
+
+  .field {
+    width: 100%;
+    font: inherit;
+    color: var(--color-ink);
+    background: var(--color-paper);
+    border: 1.5px solid var(--color-line);
+    border-radius: 6px;
+    padding: 0.7rem 0.85rem;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 3px var(--color-sky);
+  }
+
+  .chip {
+    display: inline-block;
+    padding: 0.15em 0.5em;
+    font-size: 0.78rem;
+    font-weight: 650;
+    background: var(--color-mist);
+    border-radius: 4px;
+  }
+
+  .link {
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+    text-decoration-color: var(--color-sky);
+  }
+  .link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .blink {
+    animation: blink 1.1s steps(1) infinite;
+  }
+
+  /* Code sits on deep pine everywhere so the syntax colors stay readable. */
+  .code {
+    font: 400 1.1rem/1.65 var(--font-code);
+    color: #f2f7f5;
+    background: #0f2b24;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    tab-size: 4;
+  }
+  .code .cl {
+    display: block;
+    white-space: pre;
+  }
+  .code .ln {
+    display: inline-block;
+    width: 2em;
+    color: #7d9a92;
+    user-select: none;
+  }
+  .t-kw {
+    color: #ffab70;
+    font-weight: 700;
+  }
+  .t-str {
+    color: #a6e3a1;
+  }
+  .t-num {
+    color: #f6d36b;
+  }
+  .t-com {
+    color: #86a39b;
+    font-style: italic;
+  }
+  .t-fn {
+    color: #9fd3f5;
+  }
+
+  .prose-list {
+    padding-left: 1.15em;
+    list-style: disc;
+  }
+  .prose-list li {
+    margin-bottom: 0.45em;
+    padding-left: 0.2em;
+  }
+  .prose-list li::marker {
+    color: var(--color-dim);
+  }
+  .steps {
+    padding-left: 1.6em;
+    list-style: decimal;
+  }
+  .steps li {
+    margin-bottom: 0.5em;
+    padding-left: 0.3em;
+  }
+  .steps li::marker {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* The one page-load moment: the pictogram wall fills in, tile by tile. */
+@keyframes tile-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.tile-in {
+  animation: tile-in 520ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+/* Club desktop (components/desktop). White sheets with layered depth on deep school blue; frosted glass for the system chrome. */
+.desk-wallpaper {
+  background: #0a2a5e;
+}
+/* The flat painting: shown while the layers load, and on its own with reduced motion. */
+.desk-aerial {
+  position: absolute;
+  inset: 0;
+  background: url("/wallpaper/desk.webp") center / cover no-repeat;
+}
+.desk-wallpaper[data-october] .desk-aerial {
+  background-image: url("/wallpaper/desk-october.webp");
+}
+
+/* Layered wallpaper (components/desktop/scene.tsx). A 16:9 stage covers the screen, keeping the moon and
+   shore (about 62% across) in view when the sides get cropped. Phones get their own portrait stage. If the
+   screen is shorter than the stage, the low layers (sky glow, cliffs, sea, shore) shift up to stay in view. */
+.desk-wallpaper {
+  container-type: size;
+}
+.scene {
+  --W: max(100cqw, 100cqh * 16 / 9);
+  --H: calc(var(--W) * 9 / 16);
+  position: absolute;
+  width: var(--W);
+  height: var(--H);
+  left: clamp(100cqw - var(--W), 50cqw - var(--W) * 0.62, 0px);
+  top: 0;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.scene-ready {
+  opacity: 1;
+}
+/* The camera sways side to side; each layer travels in proportion to how near it is. */
+.scene-layer {
+  position: absolute;
+  left: var(--l);
+  top: var(--t);
+  width: var(--w);
+  height: var(--h);
+  animation: scene-sway 24s ease-in-out -12s infinite alternate;
+  will-change: transform;
+}
+/* How far each layer rises when the screen is shorter than the stage: water layers all the way, the sky
+   layers halfway on desktop (so the moon stays above the horizon) and not at all on phones. */
+.scene {
+  --top-lift: 0.5;
+}
+.scene-layer {
+  --lift: var(--top-lift);
+  --dy: calc(min(0px, 100cqh - var(--H)) * var(--lift));
+}
+.scene-low {
+  --lift: 1;
+}
+@keyframes scene-sway {
+  from {
+    transform: translate3d(calc(var(--W) * var(--depth) * -0.035), var(--dy, 0px), 0);
+  }
+  to {
+    transform: translate3d(calc(var(--W) * var(--depth) * 0.035), var(--dy, 0px), 0);
+  }
+}
+.scene-clouds {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 200%;
+  background-repeat: repeat-x;
+  background-size: 50% 100%;
+  animation: scene-clouds 320s linear infinite;
+}
+.scene-clouds-near {
+  animation-duration: 180s;
+}
+@keyframes scene-clouds {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+.scene-moon {
+  object-fit: contain;
+}
+.scene-shimmer {
+  transform-origin: 50% 0;
+  animation: scene-shimmer 4.5s ease-in-out infinite alternate;
+}
+@keyframes scene-shimmer {
+  from {
+    opacity: 0.65;
+    transform: scaleX(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1.05);
+  }
+}
+.scene-bats {
+  animation: scene-bats 3.2s ease-in-out infinite alternate;
+}
+@keyframes scene-bats {
+  to {
+    transform: translate3d(4%, -10%, 0);
+  }
+}
+@container (max-aspect-ratio: 5 / 8) {
+  .scene {
+    --W: max(100cqw, 100cqh * 390 / 844);
+    --H: calc(var(--W) * 844 / 390);
+    left: calc(50cqw - var(--W) / 2);
+    --top-lift: 0;
+  }
+  .scene-layer {
+    left: var(--pl);
+    top: var(--pt);
+    width: var(--pw);
+    height: var(--ph);
+  }
+}
+/* iOS paints the page background behind its toolbar, so it has to match the taskbar. */
+html:has(.desk-wallpaper) {
+  background: #0c1d42;
+}
+@media (max-width: 767px) {
+  .glass.taskbar {
+    background: #0c1d42;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+.win {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgb(6 24 56 / 0.2),
+    0 2px 4px rgb(6 24 56 / 0.14),
+    0 22px 50px -18px rgb(6 24 56 / 0.6);
+  overflow: hidden;
+}
+.win-bar {
+  color: var(--color-dim);
+  border-bottom: 1px solid var(--color-line);
+}
+.win-active {
+  box-shadow:
+    0 0 0 1px rgb(6 24 56 / 0.24),
+    0 3px 6px rgb(6 24 56 / 0.16),
+    0 34px 70px -20px rgb(6 24 56 / 0.72);
+}
+.win-active .win-bar {
+  color: var(--color-ink);
+  box-shadow: inset 0 2px 0 #1f63d6;
+}
+.win-btn {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  color: var(--color-dim);
+}
+.win-btn:hover {
+  background: var(--color-mist);
+  color: var(--color-ink);
+}
+.win-btn-close:hover {
+  background: #e5484d;
+  color: #fff;
+}
+/* Window motion, PostHog-style: quick, springy opens; closes and minimizes that get out of the way. */
+@keyframes win-opening {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+}
+.win-opening {
+  animation: win-opening 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes win-closing {
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+.win-closing {
+  animation: win-closing 150ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+/* Minimize flies the window into its taskbar button; restore flies it back out. */
+@keyframes win-minimizing {
+  to {
+    opacity: 0;
+    transform: translate(var(--fx), var(--fy)) scale(0.1);
+  }
+}
+.win-minimizing {
+  animation: win-minimizing 320ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+  pointer-events: none;
+}
+@keyframes win-restoring {
+  from {
+    opacity: 0;
+    transform: translate(var(--fx), var(--fy)) scale(0.1);
+  }
+}
+.win-restoring {
+  animation: win-restoring 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes win-zooming {
+  from {
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+}
+.win-zooming {
+  animation: win-zooming 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.win-max {
+  border-radius: 0;
+}
+@keyframes menu-open {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+.menu-open {
+  transform-origin: bottom left;
+  animation: menu-open 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes task-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.task-in {
+  animation: task-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes phone-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+.phone-in {
+  animation: phone-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* First load, like a computer starting up: the wallpaper eases in, the taskbar rises, the icons pop in
+   one by one (--i is each one's place in line), and then the windows open (their delays are in desktop.tsx). */
+@keyframes boot-wallpaper {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+.boot-wallpaper {
+  animation: boot-wallpaper 1.2s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes boot-taskbar {
+  from {
+    transform: translateY(100%);
+  }
+}
+.boot-taskbar {
+  animation: boot-taskbar 550ms cubic-bezier(0.16, 1, 0.3, 1) 250ms backwards;
+}
+@keyframes boot-icon {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+}
+.boot-icon {
+  animation: boot-icon 450ms cubic-bezier(0.16, 1, 0.3, 1) calc(350ms + var(--i, 0) * 50ms) backwards;
+}
+@keyframes heart-pop {
+  40% {
+    transform: scale(1.35);
+  }
+}
+.heart-pop {
+  animation: heart-pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Everything clickable on the desktop gives a little under the pointer. */
+.press {
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 120ms;
+}
+.press:active {
+  transform: scale(0.95);
+  transition-duration: 60ms;
+}
+.glass {
+  background: rgb(5 22 52 / 0.62);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+  color: #fff;
+}
+.desk-icon {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.1);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 0 0 1px rgb(255 255 255 / 0.1),
+    0 8px 18px -10px rgb(2 12 32 / 0.8);
+  transition: background-color 120ms;
+}
+.group:hover .desk-icon,
+.group:focus-visible .desk-icon {
+  background: rgb(255 255 255 / 0.18);
+}
+.theme-club .code {
+  background: #0a2147;
+}
+.theme-club .btn-primary {
+  background: #0f1f3d;
+}
+.theme-club .btn-primary:hover {
+  background: #0b4fa3;
+}
+
+/* Pictogram motion (components/ui.tsx). Parts rest until the pictogram is looping or hovered, then act out their game. */
+.picto .pa {
+  transform-box: view-box;
+}
+.pa-speed {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(.picto-loop, .picto:hover, .group:hover .picto, .group:focus-visible .picto) {
+    .pa-run {
+      animation: pa-bob 0.55s ease-in-out infinite;
+    }
+    .pa-swing {
+      animation: pa-swing 0.55s ease-in-out infinite;
+    }
+    .pa-speed {
+      animation: pa-speed 0.55s linear infinite;
+    }
+    .pa-scan {
+      animation: pa-scan 2.4s ease-in-out infinite;
+    }
+    .pa-scuttle {
+      animation: pa-scuttle 2.4s ease-in-out infinite;
+    }
+    .pa-legs {
+      animation: pa-legs 0.16s linear infinite alternate;
+    }
+    .pa-stride {
+      animation: pa-stride 0.7s ease-in-out infinite;
+    }
+    .pa-point {
+      animation: pa-point 1.8s ease-in-out infinite;
+    }
+    .pa-wobble {
+      animation: pa-wobble 1.8s ease-in-out infinite;
+    }
+    .pa-draw {
+      animation: pa-draw 2.8s ease-in-out infinite;
+    }
+    .pa-sketch {
+      animation: pa-sketch 0.35s ease-in-out infinite alternate;
+    }
+    .pa-blink {
+      animation: pa-blink 3s ease-in-out infinite;
+    }
+    .pa-blip {
+      animation: pa-blip 1.5s ease-in-out infinite;
+    }
+    .pa-pump {
+      animation: pa-pump 1.2s ease-in-out infinite;
+    }
+    .pa-press {
+      animation: pa-press 1.4s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+    }
+    .pa-hop {
+      animation: pa-hop 1.5s ease-in-out infinite;
+    }
+    .pa-late {
+      animation-delay: 0.275s;
+    }
+    .pa-stride.pa-late {
+      animation-delay: 0.35s;
+    }
+    .pa-later {
+      animation-delay: 0.55s;
+    }
+  }
+}
+@keyframes pa-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes pa-swing {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(16deg);
+  }
+  75% {
+    transform: rotate(-16deg);
+  }
+}
+@keyframes pa-speed {
+  0% {
+    transform: translateX(8px);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-8px);
+    opacity: 0;
+  }
+}
+@keyframes pa-scan {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  35% {
+    transform: rotate(-10deg);
+  }
+  70% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes pa-scuttle {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  35% {
+    transform: translateX(-10px);
+  }
+  70% {
+    transform: translateX(3px);
+  }
+}
+@keyframes pa-legs {
+  to {
+    transform: scaleY(0.6);
+  }
+}
+@keyframes pa-stride {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(9deg);
+  }
+  75% {
+    transform: rotate(-9deg);
+  }
+}
+@keyframes pa-point {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(-14deg);
+  }
+}
+@keyframes pa-wobble {
+  0%,
+  100% {
+    transform: rotate(0) scale(1);
+  }
+  25% {
+    transform: rotate(-9deg) scale(1.04);
+  }
+  60% {
+    transform: rotate(7deg) scale(1);
+  }
+}
+/* The dash runs past 1: a pathLength=1 dash of exactly 1 can stop a pixel short in Chrome. */
+@keyframes pa-draw {
+  0% {
+    stroke-dasharray: 1.05;
+    stroke-dashoffset: 1.05;
+  }
+  55%,
+  85% {
+    stroke-dasharray: 1.05;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dasharray: 1.05;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes pa-sketch {
+  to {
+    transform: rotate(-6deg);
+  }
+}
+@keyframes pa-blink {
+  0%,
+  88%,
+  100% {
+    transform: scaleY(1);
+  }
+  92% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes pa-blip {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.5);
+  }
+}
+@keyframes pa-pump {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(-35deg);
+  }
+}
+@keyframes pa-press {
+  0%,
+  45%,
+  100% {
+    transform: translateY(0);
+  }
+  55%,
+  70% {
+    transform: translateY(5px);
+  }
+}
+@keyframes pa-hop {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blink,
+  .tile-in,
+  .win-opening,
+  .menu-open,
+  .task-in,
+  .phone-in,
+  .boot-wallpaper,
+  .boot-taskbar,
+  .boot-icon,
+  .heart-pop {
+    animation: none;
+  }
+  .scene {
+    display: none;
+  }
+  .press:active {
+    transform: none;
+  }
+  .btn {
+    transition: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
