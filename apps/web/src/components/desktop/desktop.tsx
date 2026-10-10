@@ -49,6 +49,8 @@ const useIconApps = () => {
   return APPS.filter((a) => a.id !== "site" && (!a.officer || officer));
 };
 
+const SITE = APPS.find((a) => a.id === "site")!;
+
 function Icon({ app, size = "md" }: { app: App; size?: "md" | "lg" }) {
   return <span className={`desk-icon shrink-0 ${size === "lg" ? "size-16 p-4" : "size-14 p-3.5"}`}>{app.glyph}</span>;
 }
@@ -172,12 +174,12 @@ export function Desktop() {
           href="/site"
           onClick={(e) => {
             e.preventDefault();
-            open(APPS.find((a) => a.id === "site")!);
+            open(SITE);
           }}
           style={bootIn(iconApps.length).style}
           className={`glass absolute bottom-5 left-5 flex max-w-xs items-center gap-3 rounded-[12px] p-2 pr-4 text-xs leading-snug ${bootIn(iconApps.length).className}`}
         >
-          <ClubLogo className="h-9 w-auto rounded-[4px]" />
+          <span className="desk-icon size-9 shrink-0 rounded-[8px] p-2">{SITE.glyph}</span>
           <span className="text-white/80">
             Not an official Henry Ford College site.
             <span className="block font-semibold text-white underline decoration-white/40 underline-offset-2">About this site</span>
