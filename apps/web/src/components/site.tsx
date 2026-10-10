@@ -1,13 +1,5 @@
 import { CLUB } from "#/lib/season";
 
-/**
- * The HFC Student Clubs logo, used as supplied by the Office of Student Activities.
- * Policy: never recreate or modify it, and never use the official HFC logo or seal instead.
- */
-export const ClubsLogo = ({ className = "" }: { className?: string }) => (
-  <img src="/hfc-student-clubs.png" alt="HFC Student Clubs" width={381} height={342} className={className} />
-);
-
 /** The disclaimer HFC requires on student club channels (Student Clubs Policy Manual, social media policy). */
 export function Disclaimer({ className = "" }: { className?: string }) {
   return (

@@ -21,4 +21,4 @@ Contributions are welcome from club members and anyone else. Start with [CONTRIB
 
 ## License
 
-[MIT](LICENSE). The license covers the code, not Henry Ford College's name or logos, or the HFC Student Clubs logo in `apps/web/public/hfc-student-clubs.png`.
+[MIT](LICENSE). The license covers the code, not Henry Ford College's name or logos.

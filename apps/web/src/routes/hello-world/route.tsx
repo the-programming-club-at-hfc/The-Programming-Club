@@ -1,5 +1,5 @@
 import { Link, Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
-import { ClubsLogo, Disclaimer } from "#/components/site";
+import { Disclaimer } from "#/components/site";
 import { CLUB } from "#/lib/season";
 
 // Layout for every Hello, World Cup page. The TV and the kickoff slides run full screen without it.
@@ -121,7 +121,6 @@ function Footer() {
         </nav>
       </div>
       <div className="mx-auto flex w-[min(1240px,100%-2.5rem)] flex-wrap items-center gap-6 border-t border-line py-8">
-        <ClubsLogo className="h-16 w-auto rounded-[2px] bg-white" />
         <Disclaimer className="max-w-[90ch] flex-1 text-sm text-dim" />
       </div>
     </footer>

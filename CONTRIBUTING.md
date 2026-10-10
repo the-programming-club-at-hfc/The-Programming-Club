@@ -21,7 +21,7 @@ An officer reviews every pull request (see `.github/CODEOWNERS`). Once it's appr
 
 ## Rules from the school
 
-The site has to follow Henry Ford College's student club rules: keep the "not an official HFC site" disclaimer, never recreate or edit the HFC Student Clubs logo, never use the official HFC logo, and call the club "The Programming Club at Henry Ford College". Details are in [apps/web/README.md](apps/web/README.md#editing).
+The site has to follow Henry Ford College's student club rules: keep the "not an official HFC site" disclaimer, don't put any HFC logo on the site (including the HFC Student Clubs logo), and call the club "The Programming Club at Henry Ford College". Details are in [apps/web/README.md](apps/web/README.md#editing).
 
 ## Conduct and security
 

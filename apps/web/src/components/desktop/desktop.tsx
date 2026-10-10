@@ -6,7 +6,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useOfficer } from "#/components/officer";
-import { ClubLogo, ClubsLogo } from "#/components/site";
+import { ClubLogo } from "#/components/site";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, isHalloweenMonth } from "#/lib/season";
 import { APPS, appFor, countdown } from "./apps";
@@ -177,7 +177,7 @@ export function Desktop() {
           style={bootIn(iconApps.length).style}
           className={`glass absolute bottom-5 left-5 flex max-w-xs items-center gap-3 rounded-[12px] p-2 pr-4 text-xs leading-snug ${bootIn(iconApps.length).className}`}
         >
-          <ClubsLogo className="h-9 w-auto rounded-[4px]" />
+          <ClubLogo className="h-9 w-auto rounded-[4px]" />
           <span className="text-white/80">
             Not an official Henry Ford College site.
             <span className="block font-semibold text-white underline decoration-white/40 underline-offset-2">About this site</span>

@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { ClubsLogo, Disclaimer } from "#/components/site";
+import { Disclaimer } from "#/components/site";
 import { GAME_TILE, Picto, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
@@ -261,7 +261,6 @@ function Join() {
 function Site() {
   return (
     <div className="space-y-4">
-      <ClubsLogo className="h-20 w-auto" />
       <Disclaimer className="text-[0.95rem] leading-relaxed" />
       <p className="text-sm text-dim">
         Questions about student clubs? Office of Student Activities, M-105,{" "}
