@@ -15,6 +15,6 @@ export default [
     },
   },
   {
-    ignores: ['eslint.config.js', 'prettier.config.js', 'convex/_generated/**', '.agents/**', '.claude/**', '.output/**', '.nitro/**', '.vercel/**'],
+    ignores: ['eslint.config.js', 'prettier.config.js', 'public/**', 'convex/_generated/**', '.agents/**', '.claude/**', '.output/**', '.nitro/**', '.vercel/**'],
   },
 ]

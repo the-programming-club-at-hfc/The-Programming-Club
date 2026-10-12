@@ -1,0 +1,122 @@
+// Python in the browser for Fix it for real. Pyodide runs in a Web Worker (public/py-worker.js, which pins the
+// version and loads it from the official CDN), so a program that never ends can be stopped: after TIMEOUT_MS the
+// worker is terminated and a fresh one starts loading.
+import { useEffect, useRef, useState } from "react";
+import type { FixTest } from "./fixes";
+import { sameOutput } from "./grading";
+
+export const TIMEOUT_MS = 5000;
+
+export type PyStatus = "loading" | "ready" | "failed";
+
+export interface PyRun {
+  stdout: string;
+  /** The traceback, exactly as Python prints it, or null if the program finished. */
+  error: string | null;
+  /** Stopped after TIMEOUT_MS. */
+  timedOut: boolean;
+}
+
+type FromWorker =
+  { type: "ready" } | { type: "failed"; message: string } | { type: "result"; id: number; stdout: string; error: string | null };
+
+class Runner {
+  private worker!: Worker;
+  private ready!: Promise<void>;
+  private next = 0;
+  private pending = new Map<number, (r: PyRun) => void>();
+
+  constructor(private onStatus: (s: PyStatus) => void) {
+    this.start();
+  }
+
+  private start() {
+    this.onStatus("loading");
+    const w = new Worker("/py-worker.js");
+    this.worker = w;
+    this.ready = new Promise((resolve, reject) => {
+      const fail = () => {
+        this.onStatus("failed");
+        reject(new Error("Python didn’t load."));
+      };
+      w.onerror = fail;
+      w.onmessage = (e: MessageEvent<FromWorker>) => {
+        const m = e.data;
+        if (m.type === "ready") {
+          this.onStatus("ready");
+          resolve();
+        } else if (m.type === "failed") fail();
+        else {
+          this.pending.get(m.id)?.({ stdout: m.stdout, error: m.error, timedOut: false });
+          this.pending.delete(m.id);
+        }
+      };
+    });
+    this.ready.catch(() => {});
+  }
+
+  async run(code: string, stdin: string): Promise<PyRun> {
+    await this.ready;
+    const id = ++this.next;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        this.worker.terminate();
+        this.start();
+        resolve({ stdout: "", error: null, timedOut: true });
+      }, TIMEOUT_MS);
+      this.pending.set(id, (r) => {
+        clearTimeout(timer);
+        resolve(r);
+      });
+      this.worker.postMessage({ id, code, stdin });
+    });
+  }
+
+  dispose() {
+    this.worker.terminate();
+  }
+}
+
+export interface Python {
+  status: PyStatus;
+  run: (code: string, stdin: string) => Promise<PyRun>;
+}
+
+/** Starts loading Python as soon as `enabled` is true (the page opens), and keeps it ready for runs. */
+export function usePython(enabled = true): Python {
+  const [status, setStatus] = useState<PyStatus>("loading");
+  const runner = useRef<Runner | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    const r = new Runner(setStatus);
+    runner.current = r;
+    return () => {
+      r.dispose();
+      runner.current = null;
+    };
+  }, [enabled]);
+  return {
+    status,
+    run: (code, stdin) => (runner.current ? runner.current.run(code, stdin) : Promise.reject(new Error("Python isn’t running."))),
+  };
+}
+
+export interface TestResult {
+  /** Position in the card's test list. */
+  i: number;
+  test: FixTest;
+  run: PyRun;
+  pass: boolean;
+}
+
+/** Runs the program once per test, in order. Stops after a timeout, since Python has to load again. */
+export async function runTests(py: Python, code: string, tests: { i: number; test: FixTest }[]) {
+  const out: TestResult[] = [];
+  for (const { i, test } of tests) {
+    const run = await py.run(code, test.input);
+    out.push({ i, test, run, pass: !run.timedOut && run.error === null && sameOutput(run.stdout, test.output) });
+    if (run.timedOut) break;
+  }
+  return out;
+}

@@ -6,6 +6,7 @@
     { "source": "/join", "destination": "/hello-world/join", "permanent": false },
     { "source": "/tv", "destination": "/hello-world/tv", "permanent": false },
     { "source": "/host", "destination": "/hello-world/host", "permanent": false },
+    { "source": "/fix", "destination": "/hello-world/fix", "permanent": false },
     { "source": "/schedule", "destination": "/hello-world/schedule", "permanent": false },
     { "source": "/season", "destination": "/hello-world/season", "permanent": false },
     { "source": "/rules", "destination": "/hello-world/rules", "permanent": false },
