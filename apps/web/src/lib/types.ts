@@ -72,6 +72,8 @@ export interface LangQ {
   code: string;
   /** What gives it away, shown on reveal. */
   tell: string;
+  /** Other answers that also count, e.g. TypeScript for a snippet that is valid in both. */
+  also?: string[];
 }
 
 export interface Relay {
