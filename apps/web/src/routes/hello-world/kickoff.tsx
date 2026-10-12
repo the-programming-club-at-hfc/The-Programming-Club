@@ -157,7 +157,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           <strong>Join any week.</strong> Scan the QR code and you’re on a team.
         </li>
         <li className="border-l-[6px] border-meadow pl-6">
-          <strong>Any language for Code Relay.</strong> On-screen puzzles are short Python, and we explain every one.
+          <strong>Any language for Code Relay.</strong> Bug Hunt and Output? use short Python snippets, and we explain every answer.
         </li>
       </ul>
     </div>,

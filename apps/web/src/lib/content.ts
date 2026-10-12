@@ -260,7 +260,7 @@ export const GAMES: Game[] = [
       "Reveal the answer, and have the referee explain it in one sentence.",
     ],
     scoring:
-      "+1 for the right line, +1 for a working fix, +1 if your team turned its sheet face down (answer locked) before half the time was up.",
+      "+1 for the right line, +1 for a working fix, and +1 more if both are right and your team locked in (sheet face down) before half the time was up.",
     variants: [
       "Bug Bounty: each team writes a buggy snippet on paper and swaps with another team.",
       "Lightning: 45 seconds per snippet, easy ones only.",
@@ -981,7 +981,7 @@ export const RELAYS: Relay[] = [
   {
     name: "Palindrome check",
     level: "medium",
-    task: "Ask for a word. Print it backwards, then print “yes” if it’s a palindrome (same both ways) or “no” if not.",
+    task: "Ask for a word. Print it backwards on the first line. On the second line, print “yes” if it’s a palindrome (same both ways) or “no” if not.",
     tests: [
       ["racecar", "racecar / yes"],
       ["duck", "kcud / no"],
@@ -1089,7 +1089,7 @@ export const LANGS: LangQ[] = [
   {
     lang: "Bash",
     code: 'for f in *.txt; do\n  echo "$f"\ndone',
-    tell: "do … done, echo, and $ before variables. (Any Unix shell runs this, so accept “shell” or zsh.)",
+    tell: "do … done, echo, and $ before variables. (It also runs in sh and zsh, so accept those or “shell”.)",
   },
   {
     lang: "Swift",

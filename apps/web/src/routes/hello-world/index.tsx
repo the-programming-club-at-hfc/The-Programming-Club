@@ -198,7 +198,7 @@ function Home() {
             ["join any week", "Scan the code on the TV and you’re on a team. Late arrivals land on the smallest team."],
             [
               "any level",
-              "Code Relay takes any language you’re learning in class. On-screen puzzles are short Python, and we explain every one.",
+              "Code Relay takes any language you’re learning in class. Bug Hunt and Output? use short Python snippets, and we explain every answer.",
             ],
           ].map(([k, v]) => (
             <div key={k}>
