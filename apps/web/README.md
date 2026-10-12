@@ -45,7 +45,7 @@ Contributors run their own free Convex and Clerk dev setups; nobody needs access
    bunx convex env set OFFICER_EMAILS you@example.com
    ```
 6. Optional sample data (one finished night with three teams): `bunx convex run seed:run`
-7. `bun run dev`: app on http://localhost:3000. Sign in at `/host` with the email from step 5.
+7. `bun run dev`: app on http://localhost:3000 (and on your network, so phones can scan the TV's join QR code). Sign in at `/host` with the email from step 5.
 
 Officers with access to the club's accounts can skip steps 2–5 with `bunx vercel env pull .env.local` and the club's dev deployment.
 

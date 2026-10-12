@@ -19,7 +19,12 @@ type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 
 function useOrigin() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
-  useEffect(() => setOrigin(window.location.origin), []);
+  useEffect(() => {
+    // In dev, swap localhost for the machine's network address so phones can scan the QR code.
+    const { protocol, hostname, port } = window.location;
+    const lan = import.meta.env.VITE_LAN_HOST as string | undefined;
+    setOrigin(lan && ["localhost", "127.0.0.1"].includes(hostname) ? `${protocol}//${lan}:${port}` : window.location.origin);
+  }, []);
   return origin;
 }
 
