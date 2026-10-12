@@ -213,9 +213,9 @@ export const Wrap = ({ children, className = "", id }: { children: ReactNode; cl
 const toneOf = (r: Agenda) =>
   /Trophy/.test(r.what)
     ? "var(--color-gold)"
-    : /×2|All-In/.test(r.what)
+    : /×2/.test(r.what)
       ? "var(--color-sun)"
-      : /Round|Race|Relay|Hunt|Output/.test(r.what)
+      : /Round|Race|Relay|Hunt|Output|Puzzle/.test(r.what)
         ? "var(--color-meadow)"
         : /lesson|Opening|Meet|club is|Season 0 works/.test(r.what)
           ? "var(--color-sky)"

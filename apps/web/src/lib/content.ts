@@ -32,25 +32,31 @@ export const WEEKS: Week[] = [
   {
     kind: "cup",
     title: "Midseason Cup",
-    pitch: "The first championship. Everyone starts at zero, power-ups come into play, and the winners sign the Golden Keycap.",
-    games: ["Output? Lightning", "Wiki Race", "Code Relay", "All-In Bug Hunt"],
-    bonus: "Power-ups are earned by showing up in weeks 1–3.",
+    pitch: "The first championship. Everyone starts at zero, the last round counts double, and the winners sign the Golden Keycap.",
+    games: ["Output? Lightning", "Wiki Race", "Code Relay", "Final round ×2: Bug Hunt"],
     showXp: 3,
   },
   {
     kind: "match",
     title: "Code Relay Night",
-    pitch: "One keyboard per team. Only the driver types, and you swap every two minutes. Practice for the Final’s relay round.",
+    pitch:
+      "One keyboard per team. Only the driver types, and you swap every two minutes. A dress rehearsal for the Final’s Advent of Code–style puzzles.",
     lesson: "Pair programming (3 min): the driver types, the navigators think ahead. Real teams work this way.",
-    games: ["Whiteboard Relay (warm-up)", "Code Relay: round 1", "Code Relay: round 2", "Final round ×2: Silent Relay"],
+    games: [
+      "Whiteboard Relay (warm-up)",
+      "Code Relay: round 1",
+      "Code Relay: round 2",
+      "Final round ×2: Advent-style puzzle (Final preview)",
+    ],
     showXp: 3,
   },
   {
     kind: "cup",
     title: "The Final",
-    pitch: "The Season 0 championship. Everyone starts at zero, the Midseason champions defend the Keycap, and the winners sign it.",
-    games: ["Output? Lightning", "Wiki Race", "Code Relay", "All-In Bug Hunt"],
-    bonus: "Power-ups are earned by showing up in weeks 1–5.",
+    pitch:
+      "The Season 0 championship: two Advent of Code–style puzzles, a warm-up for the real thing in December. Everyone starts at zero, the Midseason champions defend the Keycap, and the winners sign it.",
+    games: ["Puzzle 1: easy, played as a relay", "Final round ×2: Puzzle 2, medium"],
+    bonus: "Stay to the end for an invite to the club’s Advent of Code private leaderboard. It starts Dec 1.",
     showXp: 3,
   },
   {
@@ -68,7 +74,13 @@ export const WEEKS: Week[] = [
     title: "Wrap Party & Study Hall",
     pitch:
       "No competition the week before finals. Snacks (pizza if funding comes through), the Season 0 awards, show-and-tell for anything you’ve been building, then stay to study or get help with class projects.",
-    games: ["Season 0 awards", "Show & tell: 2-minute demos", "Season 1 brainstorm", "Study hall & project help"],
+    games: [
+      "Season 0 awards",
+      "Show & tell: 2-minute demos",
+      "Season 1 brainstorm",
+      "Advent of Code together (club leaderboard)",
+      "Study hall & project help",
+    ],
     bonus: "Awards count XP through week 7, so tonight is just for celebrating.",
     showXp: 3,
   },
@@ -163,24 +175,25 @@ export const KICKOFF_AGENDA: Agenda[] = [
     detail: "First standings, Founding Members, join the club’s Teams group, and “bring a classmate next week.”",
   },
 ];
+// The Midseason Cup.
 export const CUP_AGENDA: Agenda[] = [
   {
     t: "4:45",
     len: 15,
     what: "Officers set up",
-    detail: "Open /tv on the TV and /host on an officer laptop, deal the power-up cards, set out the sign-in sheet.",
+    detail: "Open /tv on the TV, /host on an officer laptop, and an editor (or onecompiler.com) on every team computer for the Code Relay.",
   },
   {
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone, collect your power-ups, make teams in /host, then move people so the strongest players are spread out.",
+    detail: "Join on your phone, then make teams in /host.",
   },
   {
     t: "5:06",
     len: 3,
     what: "Opening",
-    detail: "Everyone starts at 0. Explain power-ups and the All-In final.",
+    detail: "Everyone starts at 0. Walk through the four rounds, and remind everyone the last one counts double.",
   },
   {
     t: "5:09",
@@ -203,8 +216,8 @@ export const CUP_AGENDA: Agenda[] = [
   {
     t: "5:43",
     len: 9,
-    what: "Round 4: All-In Bug Hunt",
-    detail: "Two normal snippets, then teams secretly wager any of their points on one hard snippet.",
+    what: "Final round ×2: Bug Hunt",
+    detail: "Three snippets, easy to hard. Every point counts double, so any team can still win.",
   },
   {
     t: "5:52",
@@ -219,10 +232,62 @@ export const CUP_AGENDA: Agenda[] = [
     detail: "Winners sign the Golden Keycap and take a team photo.",
   },
 ];
-export const FINAL_CHANGES: string[] = [
-  "The Midseason champions defend the Keycap. Introduce them before Round 1.",
-  "Power-ups count every week attended from 1 to 5, still up to 3 cards.",
-  "Season awards wait for the Wrap Party on Dec 2, so the Final runs the full agenda.",
+export const FINAL_AGENDA: Agenda[] = [
+  {
+    t: "4:45",
+    len: 15,
+    what: "Officers set up",
+    detail: "Open /tv on the TV, /host on an officer laptop, and an editor (or onecompiler.com) on every team computer.",
+  },
+  {
+    t: "5:00",
+    len: 6,
+    what: "Check-in & squad up",
+    detail: "Join on your phone, then make teams in /host.",
+  },
+  {
+    t: "5:06",
+    len: 3,
+    what: "Opening",
+    detail:
+      "Introduce the Midseason champions. Everyone starts at 0. Explain stars (one for each part you solve) and that Puzzle 2 counts double.",
+  },
+  {
+    t: "5:09",
+    len: 13,
+    what: "Puzzle 1: easy",
+    detail: "A relay: one keyboard per team, swap drivers every 2 minutes. Two short parts, and part 2 unlocks after part 1.",
+  },
+  {
+    t: "5:22",
+    len: 2,
+    what: "Standings",
+    detail: "Show the scoreboard. Puzzle 2 counts double, so anyone can still win.",
+  },
+  {
+    t: "5:24",
+    len: 26,
+    what: "Final round ×2: Puzzle 2",
+    detail: "Two parts, real code, and everyone on the team helps. A hint goes up on the TV halfway.",
+  },
+  {
+    t: "5:50",
+    len: 2,
+    what: "How we solved it",
+    detail: "An officer walks through the solution. Skip it if you’re running late.",
+  },
+  {
+    t: "5:52",
+    len: 3,
+    what: "Final standings",
+    detail: "Reveal from last place to first. If there’s a tie, play one sudden-death question.",
+  },
+  {
+    t: "5:55",
+    len: 5,
+    what: "Trophy + what’s next",
+    detail: "Winners sign the Golden Keycap. Invite everyone to the club’s Advent of Code private leaderboard, which starts Dec 1.",
+  },
 ];
 
 export const GAMES: Game[] = [
@@ -358,36 +423,11 @@ export const XP: Xp[] = [
   },
 ];
 export const COMEBACKS: string[] = [
-  "The final round of every night is worth double.",
+  "The final round of every night is worth double, championships included.",
   "Weekly results become XP by finishing place, not by margin. Winning by 1 point or by 20 is worth the same.",
   "Showing up (+3) is worth as much as winning (+3 to +1). Someone who never misses a week will outrank someone who wins twice and then stops coming.",
   "Championship nights reset everyone to 0. A first-timer can win the Golden Keycap.",
-  "All-In Bug Hunt: in the last round of a championship, teams can wager any or all of their points.",
   "Teams are reshuffled every week, so nobody is stuck on a losing team all season.",
-];
-export const POWERUPS: { name: string; does: string }[] = [
-  {
-    name: "Ctrl+Z",
-    does: "Hand in a second answer on one Bug Hunt or Output? question. The better one counts.",
-  },
-  {
-    name: "Stack Overflow",
-    does: "Ask an officer one yes-or-no question during a round.",
-  },
-  {
-    name: "Search Bar",
-    does: "Use Wikipedia search once during a Wiki Race, but not for the target article.",
-  },
-  {
-    name: "Double Down",
-    does: "Double your team’s points for one round. Play it before the round starts. Not on a ×2 round or the All-In round.",
-  },
-];
-export const POWERUP_RULES: string[] = [
-  "Each player gets one power-up card for every week attended before that Cup, up to 3. The Midseason Cup counts weeks 1–3; the Final counts weeks 1–5.",
-  "First-timers on a championship night get one Rookie card (any power-up they choose).",
-  "Teammates pool their cards, but a team can play only one card per round.",
-  "Write the power-up names on index cards. The Secretary hands them out at check-in from the sign-in sheet.",
 ];
 export const AWARDS: Award[] = [
   {
@@ -439,7 +479,6 @@ export const PREP: string[] = [
   "Open programmingclub.dev/host on an officer laptop or phone and start tonight’s week.",
   "Put out markers, paper, and the prize stash.",
   "Code Relay or Cup nights: make sure every team computer has an editor or onecompiler.com open.",
-  "Cup nights only: write out the power-up cards. /host shows how many each player gets.",
 ];
 export const NEWCOMERS: string[] = [
   "Point them at the QR code on the TV. Joining takes about 20 seconds.",
@@ -463,7 +502,7 @@ export const SUPPLIES: { tier: string; items: string[] }[] = [
     items: [
       "A giant novelty Enter key and a can of gold spray paint: this becomes the Golden Keycap trophy",
       "Blank keycaps or programming stickers for the weekly winning team",
-      "Index cards for power-ups, plus sticky notes for the kickoff feedback wall",
+      "Sticky notes for the kickoff feedback wall",
       "Sheet protectors with white paper inside: cheap reusable mini whiteboards",
     ],
   },
@@ -812,106 +851,127 @@ export const OUTPUTS: OutputQ[] = [
   {
     code: "print(3 + 4 * 2)",
     answer: "11",
+    wrong: ["14", "9", "24"],
     why: "Multiplication happens before addition.",
   },
   {
     code: 'print("ha" * 3)',
     answer: "hahaha",
+    wrong: ["ha ha ha", "haha", "hahahaha"],
     why: "Multiplying a string repeats it.",
   },
   {
     code: "print(7 // 2)",
     answer: "3",
+    wrong: ["3.5", "4", "1"],
     why: "// divides and drops the remainder.",
   },
   {
     code: "print(7 % 2)",
     answer: "1",
+    wrong: ["3", "3.5", "0"],
     why: "% gives the remainder.",
   },
   {
     code: "x = 5\nx = x + 1\nprint(x)",
     answer: "6",
+    wrong: ["5", "7", "x"],
     why: "Take the old x, add 1, store it back in x.",
   },
   {
     code: 'print(len("Hello, World!"))',
     answer: "13",
+    wrong: ["12", "11", "10"],
     why: "The comma, the space, and the ! all count.",
   },
   {
     code: 'word = "duck"\nprint(word[0] + word[-1])',
     answer: "dk",
+    wrong: ["du", "dc", "uk"],
     why: "[0] is the first letter and [-1] is the last.",
   },
   {
     code: "for i in range(3):\n    print(i)",
     answer: "0\n1\n2",
+    wrong: ["1\n2\n3", "0\n1\n2\n3", "1\n2"],
     why: "range(3) counts 0, 1, 2 and stops before 3.",
   },
   {
     code: "print(10 / 4)",
     answer: "2.5",
+    wrong: ["2", "2.0", "0.4"],
     why: "A single / always gives a decimal.",
   },
   {
     code: "nums = [1, 2, 3]\nnums.append(4)\nprint(len(nums))",
     answer: "4",
+    wrong: ["3", "5", "10"],
     why: "append adds one item to the end.",
   },
   {
     code: 'print("5" + "5")',
     answer: "55",
+    wrong: ["10", "5 5", "25"],
     why: "Those are strings, so + joins them.",
   },
   {
     code: "print(2 ** 3)",
     answer: "8",
+    wrong: ["6", "9", "5"],
     why: "** is “to the power of.”",
   },
   {
     code: "a = 3\nb = a\na = 10\nprint(b)",
     answer: "3",
+    wrong: ["10", "13", "a"],
     why: "b copied the value 3. Changing a later doesn’t change b.",
   },
   {
     code: "print(not True)",
     answer: "False",
+    wrong: ["True", "None", "false"],
     why: "not flips True and False.",
   },
   {
     code: 's = "Programming"\nprint(s[0:3])',
     answer: "Pro",
+    wrong: ["Prog", "rog", "ro"],
     why: "A slice includes the start and stops before the end: positions 0, 1, 2.",
   },
   {
     code: 'x = 10\nif x > 5:\n    print("big")\nelse:\n    print("small")',
     answer: "big",
+    wrong: ["small", "big\nsmall", "True"],
     why: "10 is greater than 5, so the if branch runs.",
   },
   {
     code: 'print("Wed".upper())',
     answer: "WED",
+    wrong: ["Wed", "wed", "W"],
     why: ".upper() makes every letter a capital.",
   },
   {
     code: "total = 0\nfor n in [1, 2, 3, 4]:\n    total += n\nprint(total)",
     answer: "10",
+    wrong: ["4", "6", "24"],
     why: "1 + 2 + 3 + 4.",
   },
   {
     code: "print(round(3.7))",
     answer: "4",
+    wrong: ["3", "3.7", "4.0"],
     why: "round goes to the nearest whole number.",
   },
   {
     code: 'x = "7"\nprint(x * 2)',
     answer: "77",
+    wrong: ["14", "7 7", "72"],
     why: "x is text, so it repeats instead of doubling.",
   },
   {
     code: "print(len([1, [2, 3], 4]))",
     answer: "3",
+    wrong: ["4", "2", "10"],
     why: "The inner list [2, 3] counts as one item.",
     tiebreak: true,
   },

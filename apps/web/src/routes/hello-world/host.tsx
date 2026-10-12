@@ -363,7 +363,7 @@ function TeamsPanel({ live }: { live: Live }) {
                 </button>
                 <button
                   className="btn btn-sm"
-                  title="Any amount, e.g. −7 for a lost All-In wager"
+                  title="Any amount, e.g. −2 to undo a mistake"
                   onClick={() => {
                     const n = Number(prompt(`Points for ${t.name} (use a minus sign to take away)`)?.replace("−", "-"));
                     if (Number.isInteger(n) && n !== 0) void run(score({ teamId: t._id, delta: n }));
@@ -802,13 +802,11 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
   const addPlayer = useMutation(api.teams.addPlayer);
   const removePlayer = useMutation(api.teams.removePlayer);
   const [form, setForm] = useState({ name: "", email: "" });
-  const cup = isCupWeek(live.week);
 
   return (
     <Panel title={`Players (${rows.length})`}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <ExportButton sessionId={sessionId} />
-        {cup && <span className="text-sm text-dim">Power-up cards: weeks attended before this Cup, max 3. First-timers get 1.</span>}
       </div>
       {rows.length === 0 ? (
         <p className="text-dim">Nobody yet. Put the join screen on the TV.</p>
@@ -820,11 +818,6 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
                 <p className="font-bold">
                   {r.name}
                   {r.firstTime && <span className="chip ml-2 text-pine">New</span>}
-                  {r.powerups !== null && (
-                    <span className="chip ml-2 text-ink">
-                      {r.powerups} power-up{r.powerups > 1 ? "s" : ""}
-                    </span>
-                  )}
                 </p>
                 <p className="text-xs text-dim">
                   {r.email}

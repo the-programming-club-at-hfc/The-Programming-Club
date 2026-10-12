@@ -56,6 +56,8 @@ export interface Bug {
 export interface OutputQ {
   code: string;
   answer: string;
+  /** Three plausible wrong answers, shown with `answer` as phone choices. */
+  wrong: [string, string, string];
   why: string;
   tiebreak?: boolean;
 }

@@ -169,7 +169,7 @@ export const timer = mutation({
   },
 });
 
-/** Officer view of tonight: emails, bonuses, and power-up counts for Cup nights. */
+/** Officer view of tonight: players, emails, teams, and bonuses. */
 export const host = query({
   args: {},
   handler: async (ctx) => {
@@ -184,22 +184,11 @@ export const host = query({
 
     const att = await sessionAttendance(ctx, s._id);
     const all = await ctx.db.query("sessions").collect();
-    const weekOf = new Map(all.map((x) => [x._id, x.week]));
     const used = [...new Set(all.flatMap((x) => x.shown ?? []))];
-    const half = s.week === 4 ? [1, 2, 3] : s.week === 6 ? [1, 2, 3, 4, 5] : null;
 
     const rows = await Promise.all(
       att.map(async (a) => {
         const p = await ctx.db.get(a.playerId);
-        let powerups: number | null = null;
-        if (half) {
-          const history = await ctx.db
-            .query("attendance")
-            .withIndex("by_player", (q) => q.eq("playerId", a.playerId))
-            .collect();
-          const n = history.filter((h) => half.includes(weekOf.get(h.sessionId) ?? 0)).length;
-          powerups = Math.max(1, Math.min(3, n));
-        }
         return {
           _id: a._id,
           name: p?.name ?? "?",
@@ -208,7 +197,6 @@ export const host = query({
           firstTime: a.firstTime,
           broughtBy: a.broughtBy ?? null,
           bonusXp: a.bonusXp,
-          powerups,
         };
       }),
     );
