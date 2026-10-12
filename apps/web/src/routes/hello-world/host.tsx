@@ -54,22 +54,25 @@ function Console() {
   const live = useQuery(api.sessions.live);
   if (!data || live === undefined) return <p className="font-bold text-dim">Loading…</p>;
   if (!data.session || !live) return <StartPanel recent={data.recent} />;
-  return <Running live={live} rows={data.rows} />;
+  return <Running live={live} rows={data.rows} used={data.used} />;
 }
 
-function Running({ live, rows }: { live: Live; rows: Row[] }) {
+function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[] }) {
   const [tab, setTab] = useState<Tab>("bug");
   const [playing, setPlaying] = useState<number | null>(null);
   const deck = useRef<HTMLDivElement>(null);
+  const setDouble = useMutation(api.sessions.setDouble);
   return (
     <>
       <Header live={live} />
       <LineupPanel
         week={live.week}
         playing={playing}
-        onPlay={(i, label) => {
+        onPlay={(i, item) => {
           setPlaying(i);
-          const id = gamesIn(label)[0];
+          // A "×2" lineup round turns double points on; any other round turns it off.
+          if (item.double !== live.double) void run(setDouble({ on: item.double }));
+          const id = gamesIn(item.label)[0];
           if (!TABS.some(([t]) => t === id)) return;
           setTab(id as Tab);
           // The game's controls are further down the page, so bring them into view.
@@ -85,7 +88,7 @@ function Running({ live, rows }: { live: Live; rows: Row[] }) {
         </div>
         <div className="space-y-6">
           <div ref={deck} className="scroll-mt-6">
-            <DeckPanel live={live} tab={tab} setTab={setTab} />
+            <DeckPanel live={live} tab={tab} setTab={setTab} used={used} />
           </div>
           <PlayersPanel live={live} rows={rows} sessionId={live._id} />
         </div>
@@ -285,8 +288,8 @@ function TimerPanel({ live }: { live: Live }) {
         </button>
       </div>
       <div className="mt-2 flex flex-wrap justify-center">
-        {[30, 60, 90, 120, 300, 720].map((s) => (
-          <button key={s} className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: s }))}>
+        {[30, 45, 60, 90, 120, 300, 720].map((s) => (
+          <button key={s} className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: s, relay: s === 720 }))}>
             {fmtClock(s * 1000)}
           </button>
         ))}
@@ -358,6 +361,16 @@ function TeamsPanel({ live }: { live: Live }) {
                   −1
                 </button>
                 <button
+                  className="btn btn-sm"
+                  title="Any amount, e.g. −7 for a lost All-In wager"
+                  onClick={() => {
+                    const n = Number(prompt(`Points for ${t.name} (use a minus sign to take away)`)?.replace("−", "-"));
+                    if (Number.isInteger(n) && n !== 0) void run(score({ teamId: t._id, delta: n }));
+                  }}
+                >
+                  ±…
+                </button>
+                <button
                   className="btn btn-sm ml-auto text-dim"
                   onClick={() => confirm(`Remove ${t.name}? Its players go back to no team.`) && run(remove({ teamId: t._id }))}
                 >
@@ -389,7 +402,7 @@ function LineupPanel({
 }: {
   week: number;
   playing?: number | null;
-  onPlay?: (i: number, label: string) => void;
+  onPlay?: (i: number, item: LineupItem) => void;
   className?: string;
 }) {
   const save = useMutation(api.schedule.save);
@@ -449,7 +462,7 @@ function LineupPanel({
                   {g.double && <span className="chip ml-2">×2</span>}
                 </span>
                 {onPlay && (
-                  <button className={`btn btn-sm ${on ? "btn-on" : "btn-coin"}`} onClick={() => onPlay(i, g.label)}>
+                  <button className={`btn btn-sm ${on ? "btn-on" : "btn-coin"}`} onClick={() => onPlay(i, g)}>
                     {on ? "Playing" : "Play"}
                   </button>
                 )}
@@ -512,7 +525,7 @@ const TABS: [Tab, string][] = [
 ];
 type Filter = "all" | "easy" | "medium" | "hard" | "spooky";
 
-function DeckPanel({ live, tab, setTab }: { live: Live; tab: Tab; setTab: (t: Tab) => void }) {
+function DeckPanel({ live, tab, setTab, used }: { live: Live; tab: Tab; setTab: (t: Tab) => void; used: string[] }) {
   return (
     <Panel title="Games" className="">
       <div className="flex flex-wrap gap-1 border-b-4 border-line pb-2">
@@ -528,39 +541,60 @@ function DeckPanel({ live, tab, setTab }: { live: Live; tab: Tab; setTab: (t: Ta
       </div>
       <div className="mt-4">
         {tab === "wiki" ? (
-          <WikiTool live={live} />
+          <WikiTool live={live} used={used} />
         ) : tab === "pictionary" ? (
           <PictionaryTool />
         ) : (
-          <CardTool key={tab} game={tab} live={live} />
+          <CardTool key={tab} game={tab} live={live} used={used} />
         )}
       </div>
     </Panel>
   );
 }
 
-function CardTool({ game, live }: { game: GameId; live: Live }) {
+/** The card numbers in a deck that match a difficulty filter. */
+function deckFor(game: GameId, filter: Filter) {
+  const all = Array.from({ length: DECKS[game].size }, (_, i) => i);
+  if (filter === "all") return all;
+  if (game === "bug") return all.filter((i) => (filter === "spooky" ? BUGS[i].spooky : BUGS[i].level === filter));
+  if (game === "relay") return all.filter((i) => RELAYS[i].level === filter);
+  return all;
+}
+
+function CardTool({ game, live, used }: { game: GameId; live: Live; used: string[] }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
-  const [filter, setFilter] = useState<Filter>("all");
-  const [pos, setPos] = useState(0);
-
-  const indexes = useMemo(() => {
-    const all = Array.from({ length: DECKS[game].size }, (_, i) => i);
-    if (filter === "all") return all;
-    if (game === "bug") return all.filter((i) => (filter === "spooky" ? BUGS[i].spooky : BUGS[i].level === filter));
-    if (game === "relay") return all.filter((i) => RELAYS[i].level === filter);
-    return all;
-  }, [game, filter]);
-  const index = indexes[Math.min(pos, indexes.length - 1)] ?? 0;
   const s = live.screen;
-  const onTv = s.mode === "card" && s.game === game && s.index === index;
+  const tvIndex = s.mode === "card" && s.game === game ? s.index : undefined;
+  const isUsed = (i: number) => used.includes(`${game}:${i}`);
+  const firstFresh = (list: number[]) =>
+    Math.max(
+      0,
+      list.findIndex((i) => !isUsed(i)),
+    );
+  const [filter, setFilter] = useState<Filter>("all");
+  // Start on the card the TV is showing, or else the first card not shown on any night yet.
+  const [pos, setPos] = useState(() => tvIndex ?? firstFresh(deckFor(game, "all")));
 
+  const indexes = useMemo(() => deckFor(game, filter), [game, filter]);
+  const index = indexes[Math.min(pos, indexes.length - 1)] ?? 0;
+  const onTv = tvIndex === index;
+
+  // Next skips cards already shown this season; Prev just steps back.
+  const step = (from: number, d: number) => {
+    const n = indexes.length;
+    if (d > 0)
+      for (let k = 1; k < n; k++) {
+        if (!isUsed(indexes[(from + k) % n])) return (from + k) % n;
+      }
+    return (from + d + n) % n;
+  };
   const go = (d: number) => {
-    const next = (pos + d + indexes.length) % indexes.length;
+    // Step from the card actually on the TV, so a reload or a second officer can't send it backwards.
+    const from = tvIndex !== undefined && indexes.includes(tvIndex) ? indexes.indexOf(tvIndex) : Math.min(pos, indexes.length - 1);
+    const next = step(from, d);
     setPos(next);
-    if (s.mode === "card" && s.game === game)
-      void run(setScreen({ screen: { mode: "card", game, index: indexes[next], revealed: false } }));
+    if (tvIndex !== undefined) void run(setScreen({ screen: { mode: "card", game, index: indexes[next], revealed: false } }));
   };
   const filters: Filter[] =
     game === "bug" ? ["all", "easy", "medium", "hard", "spooky"] : game === "relay" ? ["all", "easy", "medium"] : [];
@@ -576,7 +610,7 @@ function CardTool({ game, live }: { game: GameId; live: Live }) {
               className={`chip capitalize ${filter === f ? "bg-ink text-paper" : ""}`}
               onClick={() => {
                 setFilter(f);
-                setPos(0);
+                setPos(firstFresh(deckFor(game, f)));
               }}
             >
               {f}
@@ -590,6 +624,7 @@ function CardTool({ game, live }: { game: GameId; live: Live }) {
         </button>
         <span className="mx-2 font-bold text-dim">
           {Math.min(pos, indexes.length - 1) + 1} / {indexes.length}
+          {!onTv && isUsed(index) && <span className="chip ml-2">shown before</span>}
         </span>
         <button className="btn btn-sm" onClick={() => go(1)}>
           Next ›
@@ -631,7 +666,7 @@ function CardTool({ game, live }: { game: GameId; live: Live }) {
   );
 }
 
-function WikiTool({ live }: { live: Live }) {
+function WikiTool({ live, used }: { live: Live; used: string[] }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const [cs, setCs] = useState(false);
@@ -640,9 +675,13 @@ function WikiTool({ live }: { live: Live }) {
       ? { from: live.screen.wikiFrom, to: live.screen.wikiTo }
       : null,
   );
+  const raced = (r: { from: string; to: string }) => used.includes(`wiki:${r.from}>${r.to}`);
   const draw = () => {
     const pool = WIKI_RACES.filter((r) => !cs || r.cs);
-    setRace(pool[Math.floor(Math.random() * pool.length)]);
+    // Prefer races nobody has run yet this season, and never the one already drawn.
+    const fresh = pool.filter((r) => !raced(r) && r.from !== race?.from);
+    const from = fresh.length ? fresh : pool;
+    setRace(from[Math.floor(Math.random() * from.length)]);
   };
   const url = (t: string) => `https://en.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}`;
   return (
@@ -654,6 +693,20 @@ function WikiTool({ live }: { live: Live }) {
         <button className={`chip ml-2 ${cs ? "bg-ink text-paper" : ""}`} onClick={() => setCs(!cs)}>
           Computer science targets only
         </button>
+        <select
+          className="field mt-2 w-full py-1 text-sm"
+          value=""
+          onChange={(e) => e.target.value && setRace(WIKI_RACES[Number(e.target.value)])}
+          aria-label="Pick a race"
+        >
+          <option value="">Or pick a race…</option>
+          {WIKI_RACES.map((r, i) => (
+            <option key={i} value={i}>
+              {r.from} → {r.to}
+              {raced(r) ? " (raced before)" : ""}
+            </option>
+          ))}
+        </select>
       </div>
       {race && (
         <>
@@ -689,6 +742,13 @@ function WikiTool({ live }: { live: Live }) {
   );
 }
 
+// Words left to draw on this device. Kept outside the component so switching tabs doesn't reshuffle.
+let pictionaryLeft: string[] = [];
+const nextWord = () => {
+  if (!pictionaryLeft.length) pictionaryLeft = [...PICTIONARY].sort(() => Math.random() - 0.5);
+  return pictionaryLeft.pop()!;
+};
+
 function PictionaryTool() {
   const timer = useMutation(api.sessions.timer);
   const [word, setWord] = useState<string | null>(null);
@@ -696,7 +756,7 @@ function PictionaryTool() {
   return (
     <div>
       <div className="flex flex-wrap">
-        <button className="btn btn-sm btn-coin" onClick={() => setWord(PICTIONARY[Math.floor(Math.random() * PICTIONARY.length)])}>
+        <button className="btn btn-sm btn-coin" onClick={() => setWord(nextWord())}>
           Next word
         </button>
         <button className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: 60, relay: false, autostart: true }))}>

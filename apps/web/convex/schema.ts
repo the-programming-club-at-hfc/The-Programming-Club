@@ -56,6 +56,8 @@ export default defineSchema({
     double: v.boolean(),
     screen: screenV,
     timer: timerV,
+    // Cards put on the TV tonight, as "game:index", so later nights can skip them.
+    shown: v.optional(v.array(v.string())),
     // TV music, set from the host console. Missing means music on at 80% volume.
     sound: v.optional(v.object({ music: v.boolean(), volume: v.number() })),
   })

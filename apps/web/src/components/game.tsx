@@ -77,7 +77,7 @@ export function CardView({ game, index, answer, size = "md" }: { game: GameId; i
     return (
       <div>
         <p className={big ? "text-2xl" : "text-lg"}>
-          Find the one bug: write down the line number and the fix.
+          Find the one bug in this Python: write down the line number and the fix.
           <LevelChip level={b.level} />
         </p>
         <Code code={b.code} className={`my-3 ${codeCls}`} />
@@ -96,7 +96,7 @@ export function CardView({ game, index, answer, size = "md" }: { game: GameId; i
     const o = OUTPUTS[index];
     return (
       <div>
-        <p className={big ? "text-2xl" : "text-lg"}>What does this print?{o.tiebreak && <LevelChip level="hard" />}</p>
+        <p className={big ? "text-2xl" : "text-lg"}>What does this Python print?{o.tiebreak && <LevelChip level="hard" />}</p>
         <Code code={o.code} className={`my-3 ${codeCls}`} />
         {answer && (
           <div className="mt-4 border-t-2 border-dashed border-line pt-4">
@@ -117,24 +117,32 @@ export function CardView({ game, index, answer, size = "md" }: { game: GameId; i
         </p>
         <h3 className={`mt-3 lowercase ${big ? "text-[clamp(2.4rem,4.5vw,5rem)]" : "text-3xl"}`}>{r.name}</h3>
         <p className={`mt-2 max-w-[40ch] ${big ? "text-[clamp(1.5rem,2.4vw,2.6rem)] leading-snug" : "text-xl"}`}>{r.task}</p>
-        {answer && (
-          <table className={`mt-5 ${big ? "text-2xl" : ""}`}>
-            <thead>
-              <tr className="text-left text-dim">
-                <th className="pr-8 font-normal">Input</th>
-                <th className="font-normal">Should print</th>
+        {/* Teams need the tests to know when they're done, so they always show. */}
+        <table className={`mt-5 ${big ? "text-2xl" : ""}`}>
+          <thead>
+            <tr className="text-left text-dim">
+              <th className="pr-8 font-normal">Input</th>
+              <th className="font-normal">Should print</th>
+            </tr>
+          </thead>
+          <tbody className="font-code">
+            {r.tests.map(([i, o]) => (
+              <tr key={i + o} className="border-t border-line">
+                <td className="py-1 pr-8">{i}</td>
+                <td>
+                  {o.split(" / ").map((line, j) => (
+                    <span key={j} className="block">
+                      {line}
+                    </span>
+                  ))}
+                </td>
               </tr>
-            </thead>
-            <tbody className="font-code">
-              {r.tests.map(([i, o]) => (
-                <tr key={i + o} className="border-t border-line">
-                  <td className="py-1 pr-8">{i}</td>
-                  <td>{o}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+            ))}
+          </tbody>
+        </table>
+        <p className={`mt-2 text-dim ${big ? "text-xl" : "text-sm"}`}>
+          Commas separate inputs. Numbers pass if the value is right: 60, 60.0, and 60.00 all count.
+        </p>
       </div>
     );
   }

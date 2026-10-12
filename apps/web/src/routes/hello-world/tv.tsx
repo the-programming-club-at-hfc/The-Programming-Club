@@ -213,7 +213,7 @@ function useTvSound(live: Live, remaining: number, on: boolean) {
     if (deltas.some((d) => d > 0)) sfx.point();
     else if (deltas.some((d) => d < 0) && live.teams.some((t) => t.score !== 0)) sfx.minus();
 
-    if (live.timer.startedAt && !p.timer.startedAt && live.timer.remainingMs > 0) sfx.go();
+    if (live.timer.startedAt && live.timer.startedAt !== p.timer.startedAt && live.timer.remainingMs > 0) sfx.go();
   }, [live]);
 
   // Countdown ticks for the last ten seconds.

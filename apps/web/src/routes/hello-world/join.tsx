@@ -195,7 +195,7 @@ function JoinForm({
           />
         </label>
         <label className="block">
-          <span className="font-bold">Who brought you?</span> <span className="text-dim">Optional. You both get +2 XP.</span>
+          <span className="font-bold">Who brought you?</span> <span className="text-dim">Optional. Officers give you both +2 XP.</span>
           <input className="field mt-2" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
         </label>
         {error && (

@@ -62,7 +62,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <div className="space-y-8">
         <div className="rounded-[6px] bg-mist p-8">
           <h3 className="text-2xl">Warm-up: what does this print?</h3>
-          <Code code={'print("ha" * 3)'} numbered={false} className="mt-3 text-3xl" />
+          <Code code={'print("go" + "!" * 3)'} numbered={false} className="mt-3 text-3xl" />
         </div>
         <JoinBox />
       </div>
@@ -73,7 +73,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         Everyone here tonight is a Founding Member of {CLUB.name}.
       </p>
       <p className="chip mt-10 px-5 py-2 text-xl">
-        Warm-up answer: <code className="font-bold">hahaha</code>. Multiplying a string repeats it.
+        Warm-up answer: <code className="font-bold">go!!!</code>. Multiplying a string repeats it.
       </p>
     </div>,
     <div>
@@ -155,7 +155,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           <strong>Join any week.</strong> Scan the QR code and you’re on a team.
         </li>
         <li className="border-l-[6px] border-meadow pl-6">
-          <strong>Any language.</strong> Use whatever you’re learning in class.
+          <strong>Any language for Code Relay.</strong> On-screen puzzles are short Python, and we explain every one.
         </li>
       </ul>
     </div>,
@@ -164,7 +164,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <div className="max-w-4xl text-2xl">
         <XpTable />
       </div>
-      <p className="mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]">Showing up is worth more than winning. Every week is a fresh chance.</p>
+      <p className="mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]">Showing up is worth as much as winning. Every week is a fresh chance.</p>
     </div>,
     <div className="grid items-center gap-12 lg:grid-cols-[1.3fr_1fr]">
       <div>
