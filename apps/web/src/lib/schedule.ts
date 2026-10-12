@@ -11,7 +11,7 @@ export type LineupItem = { label: string; double: boolean };
 export type WeekPlan = Week & { week: number; start: Date; cancelled: boolean; lineup: LineupItem[]; edited: boolean };
 type Stored = FunctionReturnType<typeof api.schedule.weeks>[number];
 
-const DOUBLE = "Final round ×2: ";
+const DOUBLE = "Final round, double points: ";
 export const parseLine = (s: string): LineupItem =>
   s.startsWith(DOUBLE) ? { label: s.slice(DOUBLE.length), double: true } : { label: s, double: false };
 export const lineText = (g: LineupItem) => (g.double ? DOUBLE + g.label : g.label);
@@ -78,7 +78,7 @@ const GAME_NAMES: [RegExp, string][] = [
   [/Guess the Language/, "lang"],
 ];
 
-/** Which games a lineup entry refers to, e.g. "Final round ×2: Bug Hunt, hard" is Bug Hunt. */
+/** Which games a lineup entry refers to, e.g. "Final round, double points: Bug Hunt, hard" is Bug Hunt. */
 export const gamesIn = (line: string) => GAME_NAMES.filter(([re]) => re.test(line)).map(([, id]) => id);
 
 const PLANNED = [...DEFAULT_PLAN.flatMap((w) => w.lineup.map((g) => g.label)), ...REMIX_MENU];

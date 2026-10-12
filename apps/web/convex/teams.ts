@@ -52,7 +52,7 @@ export const remove = mutation({
   },
 });
 
-/** Positive points double while "Final round ×2" is on. */
+/** Positive points double while "Double points" is on. */
 export const score = mutation({
   args: { teamId: v.id("teams"), delta: v.number() },
   handler: async (ctx, { teamId, delta }) => {

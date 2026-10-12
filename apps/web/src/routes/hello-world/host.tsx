@@ -70,7 +70,7 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
         playing={playing}
         onPlay={(i, item) => {
           setPlaying(i);
-          // A "×2" lineup round turns double points on; any other round turns it off.
+          // A double-points lineup round turns double points on; any other round turns it off.
           if (item.double !== live.double) void run(setDouble({ on: item.double }));
           const id = gamesIn(item.label)[0];
           if (!TABS.some(([t]) => t === id)) return;
@@ -329,7 +329,7 @@ function TeamsPanel({ live }: { live: Live }) {
           Add team
         </button>
         <button className={`btn btn-sm ${live.double ? "btn-on" : ""}`} onClick={() => run(setDouble({ on: !live.double }))}>
-          {live.double ? "Final round ×2: on" : "Final round ×2"}
+          {live.double ? "Double points: on" : "Double points"}
         </button>
       </div>
       {live.teams.length === 0 ? (
@@ -460,7 +460,7 @@ function LineupPanel({
                 </span>
                 <span className="min-w-32 flex-1 font-bold">
                   {g.label}
-                  {g.double && <span className="chip ml-2">×2</span>}
+                  {g.double && <span className="chip ml-2">Double points</span>}
                 </span>
                 {onPlay && (
                   <button className={`btn btn-sm ${on ? "btn-on" : "btn-coin"}`} onClick={() => onPlay(i, g)}>
@@ -482,7 +482,7 @@ function LineupPanel({
                   aria-pressed={g.double}
                   title="Double points"
                 >
-                  ×2
+                  Double
                 </button>
                 <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
                   ↑
