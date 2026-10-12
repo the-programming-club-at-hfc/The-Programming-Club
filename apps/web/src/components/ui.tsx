@@ -162,7 +162,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const TOKEN =
   /(#.*$)|("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?)|\b(\d+(?:\.\d+)?)\b|\b(def|return|if|elif|else|for|while|in|not|and|or|True|False|None)\b|\b(print|input|len|range|int|str|round|max)\b(?=\()/g;
 
-function highlight(line: string) {
+export function highlight(line: string) {
   let out = "";
   let last = 0;
   for (const m of line.matchAll(TOKEN)) {

@@ -11,6 +11,7 @@ import type { GameId, Screen } from "#/components/game";
 import { ExportButton, OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap } from "#/components/ui";
 import { BUGS, PICTIONARY, RELAYS, WIKI_RACES } from "#/lib/content";
+import { isAnswerGame } from "#/lib/grading";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB, fmtDate, isCupWeek } from "#/lib/season";
@@ -668,9 +669,73 @@ function CardTool({ game, live, used }: { game: GameId; live: Live; used: string
             : "On the TV. The answer below is only on your screen."
           : "Preview. The answer is only on your screen."}
       </p>
+      {onTv && isAnswerGame(game) && <AnswerStatus />}
       <div className="mt-2 border-4 border-line bg-mist p-4">
         <CardView game={game} index={index} answer />
       </div>
+    </div>
+  );
+}
+
+const mark = (ok?: boolean) => (ok ? "✓" : "✗");
+
+/** Phone answers for the card on the TV: who has picked or locked, then what each team got. */
+function AnswerStatus() {
+  const data = useQuery(api.answers.host);
+  if (!data) return null;
+  const locked = data.teams.filter((t) => t.pick?.locked).length;
+  // For Output?'s sudden-death tiebreaker: the first team to lock in the right answer.
+  const firstRight = data.scored
+    ? data.teams.filter((t) => t.result?.correct && t.lockMs !== null).sort((a, b) => a.lockMs! - b.lockMs!)[0]?._id
+    : undefined;
+  return (
+    <div className="mt-3 border-4 border-line p-3">
+      <p className="font-bold">{data.scored ? "Scored from phones" : `Phone answers: ${locked} of ${data.teams.length} locked in`}</p>
+      {data.teams.length === 0 ? (
+        <p className="text-sm text-dim">No teams yet.</p>
+      ) : (
+        <ul className="mt-1 divide-y-2 divide-grid/60">
+          {data.teams.map((t) => {
+            const p = t.pick;
+            const status = p?.locked
+              ? "Locked"
+              : p?.lineLocked
+                ? "Line locked"
+                : p && (p.line !== undefined || p.choice !== undefined)
+                  ? "Picked"
+                  : "No answer";
+            const r = t.result;
+            return (
+              <li key={t._id} className="flex flex-wrap items-center gap-2 py-1.5">
+                <span className="font-bold">{t.name}</span>
+                <span className={`chip ${status === "Locked" ? "bg-pine text-white" : status === "No answer" ? "" : "bg-sun/40"}`}>
+                  {status}
+                </span>
+                {t.lockMs !== null && <span className="text-xs text-dim">at {(Math.max(0, t.lockMs) / 1000).toFixed(1)}s</span>}
+                {firstRight === t._id && <span className="chip bg-gold text-[#12332b]">First right</span>}
+                {data.scored && (
+                  <>
+                    <span className="min-w-0 truncate font-code text-sm text-dim">
+                      {p?.line !== undefined && `line ${p.line} ${mark(r?.line)} · `}
+                      {p?.choice !== undefined
+                        ? `${p.choice.replace(/\n/g, " / ")} ${mark(p.line !== undefined ? r?.fix : r?.correct)}`
+                        : p
+                          ? ""
+                          : "—"}
+                    </span>
+                    <span className="narrow ml-auto text-xl font-extrabold">+{r?.points ?? 0}</span>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-dim">
+        {data.scored
+          ? "Points went on the board when you revealed. Use the score buttons to fix anything."
+          : "Revealing adds the points automatically, once. If phones or Wi-Fi fail, teams use whiteboards and you score with the buttons."}
+      </p>
     </div>
   );
 }

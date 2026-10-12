@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import { openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { screenV } from "./schema";
+import { liveCard, scoreReveal } from "./answers";
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
 
@@ -23,6 +24,8 @@ export const live = query({
       screen: s.screen,
       timer: s.timer,
       sound: s.sound ?? { music: true, volume: 0.8 },
+      card: s.card ?? null,
+      scored: s.scored ?? [],
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
@@ -104,7 +107,13 @@ export const setScreen = mutation({
           ? `wiki:${screen.wikiFrom}>${screen.wikiTo}`
           : null;
     const shown = s.shown ?? [];
-    await ctx.db.patch(s._id, card && !shown.includes(card) ? { screen, shown: [...shown, card] } : { screen });
+    const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
+    // A new answerable card starts its clock for the early-lock bonus.
+    const up = liveCard(next);
+    if (up && s.card?.key !== up.key) next.card = { key: up.key, at: Date.now() };
+    await ctx.db.patch(s._id, { screen, shown: next.shown, card: next.card });
+    // Revealing scores phone answers, once per card.
+    await scoreReveal(ctx, next);
   },
 });
 
@@ -165,7 +174,10 @@ export const timer = mutation({
         t.relay = !t.relay;
         break;
     }
-    await ctx.db.patch(s._id, { timer: t });
+    // Starting a fresh clock on an answerable card restarts its early-lock window.
+    const card = liveCard(s);
+    const fresh = card && t.startedAt === now && t.remainingMs === t.durationMs && !(s.scored ?? []).includes(card.key);
+    await ctx.db.patch(s._id, fresh ? { timer: t, card: { key: card.key, at: now } } : { timer: t });
   },
 });
 

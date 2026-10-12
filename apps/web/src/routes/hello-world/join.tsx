@@ -4,8 +4,11 @@ import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { NO_PICK, PhoneRound } from "#/components/answer";
 import { CardView, fmtClock, useRemaining } from "#/components/game";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
+import { answersOpen, cardKey, isAnswerGame } from "#/lib/grading";
+import type { AnswerGame } from "#/lib/grading";
 import { useSchedule } from "#/lib/schedule";
 import { CLUB } from "#/lib/season";
 
@@ -61,6 +64,7 @@ function Join() {
   if (token && me) {
     return (
       <MyGame
+        token={token}
         me={me}
         live={live}
         onSwitch={() => {
@@ -214,7 +218,7 @@ function JoinForm({
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type Me = NonNullable<FunctionReturnType<typeof api.players.me>>;
 
-function MyGame({ me, live, onSwitch }: { me: Me; live: Live; onSwitch: () => void }) {
+function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Live; onSwitch: () => void }) {
   const remaining = useRemaining(live.timer);
   const s = live.screen;
   const wk = useSchedule()[live.week - 1];
@@ -261,8 +265,14 @@ function MyGame({ me, live, onSwitch }: { me: Me; live: Live; onSwitch: () => vo
       )}
 
       {s.mode === "card" && s.game && s.index !== undefined && (
-        <div className="card mt-8 p-5">
-          <CardView game={s.game} index={s.index} answer={!!s.revealed} />
+        <div className="mt-8">
+          {isAnswerGame(s.game) && me.team ? (
+            <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
+          ) : (
+            <div className="card p-5">
+              <CardView game={s.game} index={s.index} answer={!!s.revealed} />
+            </div>
+          )}
         </div>
       )}
       {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
@@ -289,5 +299,55 @@ function MyGame({ me, live, onSwitch }: { me: Me; live: Live; onSwitch: () => vo
         </button>
       </div>
     </Wrap>
+  );
+}
+
+/** The team's answer to the card on the TV: one pick per team, shared live across teammates' phones. */
+function TeamAnswer({
+  token,
+  live,
+  game,
+  index,
+  remaining,
+}: {
+  token: string;
+  live: Live;
+  game: AnswerGame;
+  index: number;
+  remaining: number;
+}) {
+  const mine = useQuery(api.answers.mine, { token });
+  const pick = useMutation(api.answers.pick);
+  const lock = useMutation(api.answers.lock);
+  const [error, setError] = useState("");
+  const key = cardKey(game, index);
+  const current = mine?.card === key ? mine : null;
+  const open = answersOpen({
+    revealed: !!live.screen.revealed,
+    scored: live.scored.includes(key),
+    cardAt: live.card?.key === key ? live.card.at : undefined,
+    timer: live.timer,
+    remaining,
+    grace: 0,
+  });
+  const send = (p: Promise<unknown>) => {
+    setError("");
+    p.catch((e: unknown) =>
+      setError(e instanceof ConvexError ? String(e.data) : "That didn’t go through. Check your connection and try again."),
+    );
+  };
+  return (
+    <PhoneRound
+      game={game}
+      index={index}
+      // Once scored, the result stays up even if an officer hides the answer again.
+      revealed={!!live.screen.revealed || live.scored.includes(key)}
+      open={open}
+      pick={current?.pick ?? NO_PICK}
+      result={current?.result ?? null}
+      error={error}
+      onPick={(p) => send(pick({ token, card: key, ...p }))}
+      onLock={(step) => send(lock({ token, card: key, step }))}
+    />
   );
 }

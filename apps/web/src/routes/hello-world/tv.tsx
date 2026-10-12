@@ -8,6 +8,7 @@ import { CardView, DECKS, fmtClock, isSwapMoment, useChimes, useRemaining } from
 import { OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
+import { cardKey, isAnswerGame } from "#/lib/grading";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/hello-world/tv")({
 });
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
+type Board = NonNullable<FunctionReturnType<typeof api.answers.board>>;
 
 function useOrigin() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
@@ -120,6 +122,10 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const wk = plan[live.week - 1];
   const wt = weekTile(wk);
   const deckTile = s.game ? GAME_TILE[s.game] : null;
+  const answerable = s.mode === "card" && isAnswerGame(s.game) && s.index !== undefined;
+  const boardData = useQuery(api.answers.board, answerable ? {} : "skip");
+  const board = answerable && s.game && s.index !== undefined && boardData?.card === cardKey(s.game, s.index) ? boardData : null;
+  useLockSound(board);
 
   return (
     <>
@@ -140,8 +146,16 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 </span>
               )}
               {DECKS[s.game].name}
+              {board && !s.revealed && board.teams > 0 && (
+                <span className="ml-auto">
+                  <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} teams locked in
+                </span>
+              )}
             </p>
-            <CardView game={s.game} index={s.index} answer={!!s.revealed} size="xl" />
+            <div className={board?.results && s.revealed ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
+              <CardView game={s.game} index={s.index} answer={!!s.revealed} size="xl" />
+              {board?.results && s.revealed && <Results results={board.results} bug={s.game === "bug"} />}
+            </div>
           </div>
         )}
         {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
@@ -195,6 +209,41 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
         </div>
       )}
     </>
+  );
+}
+
+/** A pop each time another team locks in. */
+function useLockSound(board: Board | null) {
+  const prev = useRef<{ card: string; locked: number } | null>(null);
+  useEffect(() => {
+    if (!board) return;
+    const p = prev.current;
+    prev.current = { card: board.card, locked: board.locked };
+    if (p?.card === board.card && board.locked > p.locked) sfx.join(board.locked);
+  }, [board?.card, board?.locked]);
+}
+
+/** Who got what on the revealed card. Picks stay hidden until now. */
+function Results({ results, bug }: { results: NonNullable<Board["results"]>; bug: boolean }) {
+  return (
+    <ol className="flex flex-col gap-[0.5vw]">
+      {results.map(({ _id, name, result: r }) => (
+        <li key={_id} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
+          <span className={`text-[2.4vw] leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}>
+            {r?.correct || r?.points ? "✓" : "✗"}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{name}</span>
+            {(bug || !r) && (
+              <span className="block text-[1.2vw] text-dim">
+                {!r ? "no answer" : `line ${r.line ? "✓" : "✗"} · fix ${r.fix ? "✓" : "✗"}${r.early ? " · early" : ""}`}
+              </span>
+            )}
+          </span>
+          <span className="narrow text-[2.6vw] leading-none font-extrabold">+{r?.points ?? 0}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

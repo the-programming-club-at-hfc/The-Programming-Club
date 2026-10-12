@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { BUGS, LANGS, OUTPUTS, RELAYS } from "#/lib/content";
+import { cardSeconds } from "#/lib/grading";
 import { Code } from "./ui";
 import { sfx } from "#/lib/sound";
 
@@ -9,10 +10,10 @@ export type Timer = Doc<"sessions">["timer"];
 export type GameId = NonNullable<Screen["game"]>;
 
 export const DECKS: Record<GameId, { name: string; size: number; seconds: (i: number) => number }> = {
-  bug: { name: "Bug Hunt", size: BUGS.length, seconds: (i) => (BUGS[i].level === "hard" ? 120 : 90) },
-  output: { name: "Output?", size: OUTPUTS.length, seconds: () => 30 },
-  relay: { name: "Code Relay", size: RELAYS.length, seconds: () => 720 },
-  lang: { name: "Guess the Language", size: LANGS.length, seconds: () => 45 },
+  bug: { name: "Bug Hunt", size: BUGS.length, seconds: (i) => cardSeconds("bug", i) },
+  output: { name: "Output?", size: OUTPUTS.length, seconds: (i) => cardSeconds("output", i) },
+  relay: { name: "Code Relay", size: RELAYS.length, seconds: (i) => cardSeconds("relay", i) },
+  lang: { name: "Guess the Language", size: LANGS.length, seconds: (i) => cardSeconds("lang", i) },
 };
 
 export const fmtClock = (ms: number) => {
@@ -77,7 +78,7 @@ export function CardView({ game, index, answer, size = "md" }: { game: GameId; i
     return (
       <div>
         <p className={big ? "text-2xl" : "text-lg"}>
-          Find the one bug in this Python: write down the line number and the fix.
+          Find the one bug in this Python: pick its line on a phone, then the fix.
           <LevelChip level={b.level} />
         </p>
         <Code code={b.code} className={`my-3 ${codeCls}`} />

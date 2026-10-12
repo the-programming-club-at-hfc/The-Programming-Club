@@ -60,6 +60,10 @@ export default defineSchema({
     shown: v.optional(v.array(v.string())),
     // TV music, set from the host console. Missing means music on at 80% volume.
     sound: v.optional(v.object({ music: v.boolean(), volume: v.number() })),
+    // The answerable card on the TV ("game:index") and when its clock started, for the early-lock bonus.
+    card: v.optional(v.object({ key: v.string(), at: v.number() })),
+    // Cards already scored from phone answers tonight, so revealing again never scores twice.
+    scored: v.optional(v.array(v.string())),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),
@@ -92,6 +96,33 @@ export default defineSchema({
     name: v.string(),
     score: v.number(),
   }).index("by_session", ["sessionId"]),
+
+  // A team's phone answer to one card (Bug Hunt, Output?, Guess the Language). See src/lib/grading.ts.
+  answers: defineTable({
+    sessionId: v.id("sessions"),
+    teamId: v.id("teams"),
+    card: v.string(),
+    line: v.optional(v.number()),
+    lineBy: v.optional(v.string()),
+    lineLockedAt: v.optional(v.number()),
+    lineLockedBy: v.optional(v.string()),
+    choice: v.optional(v.string()),
+    choiceBy: v.optional(v.string()),
+    lockedAt: v.optional(v.number()),
+    lockedBy: v.optional(v.string()),
+    // Set when the card is revealed. `points` includes double points.
+    result: v.optional(
+      v.object({
+        points: v.number(),
+        correct: v.boolean(),
+        early: v.boolean(),
+        line: v.optional(v.boolean()),
+        fix: v.optional(v.boolean()),
+      }),
+    ),
+  })
+    .index("by_session_card", ["sessionId", "card"])
+    .index("by_team_card", ["teamId", "card"]),
 
   // Anonymous "I'm interested" hearts on events, one per browser (a random id kept in localStorage).
   interest: defineTable({
