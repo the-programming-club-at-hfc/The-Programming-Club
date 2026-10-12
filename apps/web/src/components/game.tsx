@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { BUGS, LANGS, OUTPUTS, RELAYS } from "#/lib/content";
 import { Code } from "./ui";
+import { sfx } from "#/lib/sound";
 
 export type Screen = Doc<"sessions">["screen"];
 export type Timer = Doc<"sessions">["timer"];
@@ -32,42 +33,7 @@ export function useRemaining(t: Timer | undefined) {
   return t.startedAt ? Math.max(0, t.remainingMs - (now - t.startedAt)) : t.remainingMs;
 }
 
-let audio: AudioContext | undefined;
-/** A soft bell: a sine with a quiet inharmonic overtone, fading out over `dur` seconds. */
-function bell(freq: number, dur: number, when = 0) {
-  try {
-    audio ??= new AudioContext();
-    const t = audio.currentTime + when;
-    for (const [mult, vol] of [
-      [1, 0.25],
-      [2.76, 0.05],
-    ]) {
-      const o = audio.createOscillator();
-      const g = audio.createGain();
-      o.type = "sine";
-      o.frequency.value = freq * mult;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(audio.destination);
-      o.start(t);
-      o.stop(t + dur + 0.05);
-    }
-  } catch {
-    /* audio unavailable */
-  }
-}
-export const unlockAudio = () => {
-  audio ??= new AudioContext();
-  return audio.resume();
-};
-const chimeSwap = () => bell(880, 1.2);
-const chimeEnd = () => {
-  bell(784, 1.6);
-  bell(523, 2.2, 0.35);
-};
-
-/** Plays the relay swap chime every 2 minutes and the end chime at 0:00. Used by the TV. */
+/** Plays the relay swap chime every 2 minutes and the buzzer at 0:00. Used by the TV. */
 export function useChimes(t: Timer | undefined, remaining: number) {
   const swaps = useRef(0);
   const ended = useRef<number | undefined>(undefined);
@@ -82,12 +48,12 @@ export function useChimes(t: Timer | undefined, remaining: number) {
       const n = Math.floor((t.durationMs - remaining) / 120_000);
       if (n > swaps.current) {
         swaps.current = n;
-        chimeSwap();
+        sfx.swap();
       }
     }
     if (remaining === 0 && ended.current !== t.startedAt) {
       ended.current = t.startedAt;
-      chimeEnd();
+      sfx.timesUp();
     }
   }, [t, remaining]);
 }

@@ -22,6 +22,7 @@ export const live = query({
       double: s.double,
       screen: s.screen,
       timer: s.timer,
+      sound: s.sound ?? { music: true, volume: 0.8 },
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
@@ -97,6 +98,18 @@ export const setDouble = mutation({
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     await ctx.db.patch(s._id, { double: on });
+  },
+});
+
+export const setSound = mutation({
+  args: { music: v.optional(v.boolean()), volume: v.optional(v.number()) },
+  handler: async (ctx, { music, volume }) => {
+    await requireOfficer(ctx);
+    const s = await requireOpenSession(ctx);
+    const cur = s.sound ?? { music: true, volume: 0.8 };
+    await ctx.db.patch(s._id, {
+      sound: { music: music ?? cur.music, volume: volume === undefined ? cur.volume : Math.max(0, Math.min(1, volume)) },
+    });
   },
 });
 

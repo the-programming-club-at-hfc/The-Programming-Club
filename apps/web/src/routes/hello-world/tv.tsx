@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { CardView, DECKS, fmtClock, isSwapMoment, unlockAudio, useChimes, useRemaining } from "#/components/game";
+import { CardView, DECKS, fmtClock, isSwapMoment, useChimes, useRemaining } from "#/components/game";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
+import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
 
 export const Route = createFileRoute("/hello-world/tv")({
   head: () => ({ meta: [{ title: `TV · ${CLUB.season}` }] }),
@@ -36,7 +37,7 @@ function Tv() {
       className="theme-pine relative flex h-screen flex-col overflow-hidden"
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
-      {live ? <LiveTv live={live} /> : live === null ? <Attract /> : null}
+      {live ? <LiveTv live={live} sound={sound} /> : live === null ? <Attract /> : null}
       {!sound && (
         <button
           className="absolute top-4 right-4 z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim"
@@ -45,7 +46,7 @@ function Tv() {
             void unlockAudio().then(() => setSound(true));
           }}
         >
-          Click to turn on timer sounds
+          Click to turn on sound
         </button>
       )}
     </div>
@@ -97,9 +98,10 @@ function Attract() {
   );
 }
 
-function LiveTv({ live }: { live: Live }) {
+function LiveTv({ live, sound }: { live: Live; sound: boolean }) {
   const remaining = useRemaining(live.timer);
   useChimes(live.timer, remaining);
+  useTvSound(live, remaining, sound);
   const origin = useOrigin();
   const joinUrl = `${origin}/hello-world/join?code=${live.code}`;
   const s = live.screen;
@@ -184,6 +186,48 @@ function LiveTv({ live }: { live: Live }) {
       )}
     </>
   );
+}
+
+/** Game-show sounds and music, driven by what changes on the TV. `on` is false until someone clicks to allow sound. */
+function useTvSound(live: Live, remaining: number, on: boolean) {
+  const prev = useRef(live);
+  useEffect(() => {
+    const p = prev.current;
+    prev.current = live;
+    if (p === live) return;
+    const s = live.screen;
+    const ps = p.screen;
+
+    if (live.roster.length > p.roster.length) sfx.join(live.roster.length);
+
+    const moved = live.roster.filter((r, i) => p.roster[i] && r.teamId !== p.roster[i].teamId).length;
+    if (moved >= 3) sfx.shuffle();
+
+    if (s.mode !== ps.mode || s.game !== ps.game || s.index !== ps.index || s.wikiFrom !== ps.wikiFrom || s.message !== ps.message) {
+      if (s.mode === "scoreboard") sfx.scoreboard();
+      else if (s.mode === "card" || s.mode === "wiki" || s.mode === "message") sfx.card();
+    } else if (s.revealed && !ps.revealed) sfx.reveal();
+
+    const before = new Map(p.teams.map((t) => [t._id, t.score]));
+    const deltas = live.teams.map((t) => t.score - (before.get(t._id) ?? t.score));
+    if (deltas.some((d) => d > 0)) sfx.point();
+    else if (deltas.some((d) => d < 0) && live.teams.some((t) => t.score !== 0)) sfx.minus();
+
+    if (live.timer.startedAt && !p.timer.startedAt && live.timer.remainingMs > 0) sfx.go();
+  }, [live]);
+
+  // Countdown ticks for the last ten seconds.
+  const running = !!live.timer.startedAt;
+  const secs = Math.ceil(remaining / 1000);
+  useEffect(() => {
+    if (running && secs > 0 && secs <= 10) sfx.tick(secs <= 3);
+  }, [running, secs]);
+
+  // Lobby music while people join, thinking music while the clock runs.
+  const music = !live.sound.music ? null : live.screen.mode === "lobby" ? "lobby" : running && remaining > 0 ? "think" : null;
+  useEffect(() => playMusic(on ? music : null), [on, music]);
+  useEffect(() => () => playMusic(null), []);
+  useEffect(() => setVolume(live.sound.volume), [live.sound.volume]);
 }
 
 function BigTimer({ remaining, running, swap, size }: { remaining: number; running: boolean; swap: boolean; size: string }) {

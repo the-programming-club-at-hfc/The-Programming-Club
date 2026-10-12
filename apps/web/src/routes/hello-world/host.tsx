@@ -197,6 +197,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
 
 function ScreenPanel({ live }: { live: Live }) {
   const setScreen = useMutation(api.sessions.setScreen);
+  const setSound = useMutation(api.sessions.setSound);
   const [message, setMessage] = useState("");
   const show = (screen: Screen) => run(setScreen({ screen }));
   const modes = [
@@ -238,6 +239,27 @@ function ScreenPanel({ live }: { live: Live }) {
         />
         <button className="btn btn-sm">Show</button>
       </form>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          className={`btn btn-sm ${live.sound.music ? "btn-on" : ""}`}
+          onClick={() => run(setSound({ music: !live.sound.music }))}
+          aria-pressed={live.sound.music}
+        >
+          Music {live.sound.music ? "on" : "off"}
+        </button>
+        <label className="flex flex-1 items-center gap-2 text-sm font-bold">
+          Volume
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.1}
+            value={live.sound.volume}
+            onChange={(e) => run(setSound({ volume: Number(e.target.value) }))}
+            className="flex-1 accent-ink"
+          />
+        </label>
+      </div>
     </Panel>
   );
 }

@@ -56,6 +56,8 @@ export default defineSchema({
     double: v.boolean(),
     screen: screenV,
     timer: timerV,
+    // TV music, set from the host console. Missing means music on at 80% volume.
+    sound: v.optional(v.object({ music: v.boolean(), volume: v.number() })),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),
