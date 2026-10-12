@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { BUGS, LANGS, OUTPUTS } from "./content";
-import { LANGUAGES, answersOpen, awardsFor, choices, grade, searchLanguages } from "./grading";
+import { LANGUAGES, answersOpen, awardsFor, choices, clockLeft, grade, isFreshStart, searchLanguages, settle, showCard } from "./grading";
 
 const T0 = 1_000_000;
 const sec = (s: number) => T0 + s * 1000;
@@ -183,18 +183,84 @@ describe("scoring a reveal", () => {
 });
 
 describe("answer window", () => {
-  const live = { revealed: false, scored: false, cardAt: T0, grace: 2000 };
+  const K = "bug:0";
+  const base = { revealed: false, scored: false, endedAt: undefined, own: true, running: true, now: sec(100), grace: 2000 };
+
   test("open until the card's clock runs out, with a little grace", () => {
-    expect(answersOpen({ ...live, timer: { startedAt: sec(1) }, remaining: 5000 })).toBe(true);
-    expect(answersOpen({ ...live, timer: { startedAt: sec(1) }, remaining: -1000 })).toBe(true);
-    expect(answersOpen({ ...live, timer: { startedAt: sec(1) }, remaining: -3000 })).toBe(false);
+    expect(answersOpen({ ...base, remaining: 5000 })).toBe(true);
+    expect(answersOpen({ ...base, remaining: -1000 })).toBe(true);
+    expect(answersOpen({ ...base, remaining: -3000 })).toBe(false);
   });
   test("closed once revealed or scored", () => {
-    expect(answersOpen({ ...live, revealed: true, timer: {}, remaining: 9000 })).toBe(false);
-    expect(answersOpen({ ...live, scored: true, timer: {}, remaining: 9000 })).toBe(false);
+    expect(answersOpen({ ...base, revealed: true, remaining: 9000 })).toBe(false);
+    expect(answersOpen({ ...base, scored: true, remaining: 9000 })).toBe(false);
   });
-  test("a paused clock, or one left over from the last card, keeps answers open", () => {
-    expect(answersOpen({ ...live, timer: {}, remaining: 0 })).toBe(true);
-    expect(answersOpen({ ...live, timer: { startedAt: T0 - 60_000 }, remaining: -30_000 })).toBe(true);
+  test("a clock paused before 0:00, or one timing another screen, keeps answers open", () => {
+    expect(answersOpen({ ...base, running: false, remaining: 30_000 })).toBe(true);
+    expect(answersOpen({ ...base, own: false, remaining: -30_000 })).toBe(true);
+  });
+  test("a clock paused at 0:00 is closed", () => {
+    expect(answersOpen({ ...base, running: false, remaining: 0 })).toBe(false);
+  });
+  test("once the card's clock ran out, pausing, resetting, or a new preset can't reopen it", () => {
+    const endedAt = sec(90);
+    // Reset or a preset without autostart: a full clock that isn't running.
+    expect(answersOpen({ ...base, endedAt, running: false, remaining: 90_000 })).toBe(false);
+    // A clock started for something else.
+    expect(answersOpen({ ...base, endedAt, own: false, remaining: 720_000 })).toBe(false);
+    // Answers already on their way still land.
+    expect(answersOpen({ ...base, endedAt, now: sec(91), running: false, remaining: 0 })).toBe(true);
+  });
+
+  test("settle records when the card's own clock ran out, and only then", () => {
+    const w = { key: K, at: T0 };
+    const ran = { durationMs: 90_000, remainingMs: 90_000, startedAt: T0, card: K };
+    expect(settle([w], ran, sec(80))).toEqual([w]);
+    expect(settle([w], ran, sec(95))).toEqual([{ key: K, at: T0, endedAt: sec(90) }]);
+    expect(settle([w], { ...ran, card: "relay:0" }, sec(95))).toEqual([w]);
+    // Paused at 0:00.
+    expect(settle([w], { durationMs: 90_000, remainingMs: 0, card: K }, sec(200))).toEqual([{ key: K, at: T0, endedAt: sec(200) }]);
+    // Already recorded: kept.
+    expect(settle([{ ...w, endedAt: sec(90) }], ran, sec(300))[0].endedAt).toBe(sec(90));
+  });
+
+  test("clockLeft goes below 0 on a running clock", () => {
+    expect(clockLeft({ durationMs: 30_000, remainingMs: 30_000, startedAt: T0 }, sec(40))).toBe(-10_000);
+    expect(clockLeft({ durationMs: 30_000, remainingMs: 12_000 }, sec(40))).toBe(12_000);
+  });
+});
+
+describe("card windows across screens", () => {
+  const A = "bug:0";
+  const B = "output:3";
+
+  test("a new card gets a fresh window", () => {
+    expect(showCard({ played: [], up: A, now: T0 })).toEqual({ card: { key: A, at: T0 }, played: [] });
+  });
+  test("the same card staying up (like a reveal) keeps its window", () => {
+    const card = { key: A, at: T0 };
+    expect(showCard({ card, played: [], up: A, now: sec(50) }).card).toBe(card);
+  });
+  test("anything else going up clears the current card", () => {
+    const r = showCard({ card: { key: A, at: T0 }, played: [], up: undefined, now: sec(50) });
+    expect(r.card).toBe(undefined);
+    expect(r.played).toEqual([{ key: A, at: T0 }]);
+  });
+  test("going A, B, then back to A picks A's window up again, so it isn't reset or reopened", () => {
+    const a = { key: A, at: T0, endedAt: sec(90) };
+    const toB = showCard({ card: a, played: [], up: B, now: sec(100) });
+    expect(toB.card).toEqual({ key: B, at: sec(100) });
+    const back = showCard({ ...toB, up: A, now: sec(200) });
+    expect(back.card).toEqual(a);
+    expect(back.played.map((w) => w.key)).toEqual([A, B]);
+  });
+
+  test("only a preset with autostart or Start from full is a fresh start, never +30s", () => {
+    const full = { durationMs: 90_000, remainingMs: 90_000, startedAt: T0 };
+    expect(isFreshStart("set", full, T0)).toBe(true);
+    expect(isFreshStart("toggle", full, T0)).toBe(true);
+    expect(isFreshStart("add", full, T0)).toBe(false);
+    expect(isFreshStart("toggle", { ...full, remainingMs: 40_000 }, T0)).toBe(false);
+    expect(isFreshStart("set", { ...full, startedAt: undefined }, T0)).toBe(false);
   });
 });

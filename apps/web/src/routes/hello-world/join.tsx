@@ -326,9 +326,11 @@ function TeamAnswer({
   const open = answersOpen({
     revealed: !!live.screen.revealed,
     scored: live.scored.includes(key),
-    cardAt: live.card?.key === key ? live.card.at : undefined,
-    timer: live.timer,
+    endedAt: live.card?.key === key ? live.card.endedAt : undefined,
+    own: live.timer.card === key,
+    running: !!live.timer.startedAt,
     remaining,
+    now: Date.now(),
     grace: 0,
   });
   const send = (p: Promise<unknown>) => {

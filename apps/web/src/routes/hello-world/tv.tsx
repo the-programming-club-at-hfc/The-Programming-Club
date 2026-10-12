@@ -126,6 +126,8 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const boardData = useQuery(api.answers.board, answerable ? {} : "skip");
   const board = answerable && s.game && s.index !== undefined && boardData?.card === cardKey(s.game, s.index) ? boardData : null;
   useLockSound(board);
+  // A card already scored tonight shows as played (answer and results), like it does on phones.
+  const done = !!s.revealed || !!board?.results;
 
   return (
     <>
@@ -146,15 +148,15 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 </span>
               )}
               {DECKS[s.game].name}
-              {board && !s.revealed && board.teams > 0 && (
+              {board && board.locked !== null && !s.revealed && board.teams > 0 && (
                 <span className="ml-auto">
                   <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} teams locked in
                 </span>
               )}
             </p>
-            <div className={board?.results && s.revealed ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
-              <CardView game={s.game} index={s.index} answer={!!s.revealed} size="xl" />
-              {board?.results && s.revealed && <Results results={board.results} bug={s.game === "bug"} />}
+            <div className={board?.results ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
+              <CardView game={s.game} index={s.index} answer={done} size="xl" />
+              {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
             </div>
           </div>
         )}
@@ -215,12 +217,12 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
 
 /** A pop each time another team locks in. */
 function useLockSound(board: Board | null) {
-  const prev = useRef<{ card: string; locked: number } | null>(null);
+  const prev = useRef<{ card: string; locked: number | null } | null>(null);
   useEffect(() => {
     if (!board) return;
     const p = prev.current;
     prev.current = { card: board.card, locked: board.locked };
-    if (p?.card === board.card && board.locked > p.locked) sfx.join(board.locked);
+    if (p?.card === board.card && board.locked !== null && board.locked > (p.locked ?? 0)) sfx.join(board.locked);
   }, [board?.card, board?.locked]);
 }
 

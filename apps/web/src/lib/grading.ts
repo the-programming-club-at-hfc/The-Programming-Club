@@ -165,20 +165,67 @@ export function awardsFor<T>(o: {
 /** Server leeway after 0:00 for answers already on their way. */
 export const GRACE_MS = 2000;
 
+/** One showing of an answerable card: when its clock started (for the early bonus) and when it ran out, if it has. */
+export interface CardWindow {
+  key: string;
+  at: number;
+  endedAt?: number;
+}
+
+/** The shared clock. `card` is the card this run is timing; a clock started for another screen doesn't count. */
+export interface Clock {
+  durationMs: number;
+  remainingMs: number;
+  startedAt?: number;
+  card?: string;
+}
+
+/** Milliseconds left at `now`. Goes below 0 once a running clock has run out. */
+export const clockLeft = (t: Clock, now: number) => (t.startedAt === undefined ? t.remainingMs : t.remainingMs - (now - t.startedAt));
+
+/** Record when a card's clock ran out, so pausing, resetting, or leaving the card afterwards can't reopen it. */
+export const settle = (windows: CardWindow[], t: Clock, now: number) =>
+  windows.map((w) =>
+    w.endedAt !== undefined || t.card !== w.key || clockLeft(t, now) > 0
+      ? w
+      : { ...w, endedAt: t.startedAt !== undefined ? t.startedAt + t.remainingMs : now },
+  );
+
 /**
- * Whether teams can still pick or lock. Answers close at the reveal, or when the clock that started
- * with this card runs out (`remaining` may go below 0 on the server). A paused clock keeps them open.
+ * The windows after the screen changes. The card leaving the screen keeps its window in `played`, and a card that
+ * comes back picks its own window up again, so going away and back never restarts its early bonus or reopens it.
+ */
+export function showCard(o: { card?: CardWindow; played: CardWindow[]; up?: string; now: number }) {
+  if (o.card?.key === o.up) return { card: o.card, played: o.played };
+  const leaving = o.card;
+  const played = leaving ? [...o.played.filter((w) => w.key !== leaving.key), leaving] : o.played;
+  return { card: o.up ? (played.find((w) => w.key === o.up) ?? { key: o.up, at: o.now }) : undefined, played };
+}
+
+/** A clock that starts from full for the card on screen: a preset with autostart, or Start from full. Never +30s. */
+export const isFreshStart = (action: string, t: Clock, now: number) =>
+  (action === "set" || action === "toggle") && t.startedAt === now && t.remainingMs === t.durationMs;
+
+/**
+ * Whether teams can still pick or lock. Answers close at the reveal, or once this card's own clock runs out
+ * (`remaining` may go below 0 on the server, and `grace` covers answers already on their way). A clock paused before
+ * 0:00, or one that belongs to another screen, keeps them open; once the card's clock has run out, they stay closed.
  */
 export function answersOpen(o: {
   revealed: boolean;
   scored: boolean;
-  cardAt: number | undefined;
-  timer: { startedAt?: number };
+  /** When this card's clock ran out, if it has (kept through pauses and resets). */
+  endedAt: number | undefined;
+  /** The clock is timing this card. */
+  own: boolean;
+  running: boolean;
   remaining: number;
+  now: number;
   grace: number;
 }) {
   if (o.revealed || o.scored) return false;
-  const started = o.timer.startedAt;
-  if (started === undefined || o.cardAt === undefined || started < o.cardAt) return true;
-  return o.remaining > -o.grace;
+  if (o.endedAt !== undefined && o.now > o.endedAt + o.grace) return false;
+  if (!o.own) return true;
+  // Paused: open while time is left, or within the grace after the recorded run-out.
+  return o.running ? o.remaining > -o.grace : o.remaining > 0 || o.endedAt !== undefined;
 }

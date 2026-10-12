@@ -27,7 +27,12 @@ export const timerV = v.object({
   remainingMs: v.number(),
   startedAt: v.optional(v.number()),
   relay: v.boolean(),
+  // The answerable card ("game:index") this run is timing, so a clock started for another screen never closes it.
+  card: v.optional(v.string()),
 });
+
+// One showing of an answerable card: when its clock started (early bonus) and when it ran out (answers stay closed).
+export const cardWindowV = v.object({ key: v.string(), at: v.number(), endedAt: v.optional(v.number()) });
 
 // One entry in a week's lineup, e.g. { label: "Bug Hunt: hard", double: true } for a double-points final round.
 export const lineupItemV = v.object({ label: v.string(), double: v.boolean() });
@@ -60,8 +65,10 @@ export default defineSchema({
     shown: v.optional(v.array(v.string())),
     // TV music, set from the host console. Missing means music on at 80% volume.
     sound: v.optional(v.object({ music: v.boolean(), volume: v.number() })),
-    // The answerable card on the TV ("game:index") and when its clock started, for the early-lock bonus.
-    card: v.optional(v.object({ key: v.string(), at: v.number() })),
+    // The answerable card on the TV and its window. Cleared when anything else goes up.
+    card: v.optional(cardWindowV),
+    // Windows of answerable cards that left the screen tonight, so coming back to one picks its window up again.
+    played: v.optional(v.array(cardWindowV)),
     // Cards already scored from phone answers tonight, so revealing again never scores twice.
     scored: v.optional(v.array(v.string())),
     // A rehearsal: left out of attendance, XP, stats, and the attendance export.

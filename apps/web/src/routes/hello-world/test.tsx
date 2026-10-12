@@ -143,7 +143,7 @@ function Play({ game, index, tv }: { game: AnswerGame; index: number; tv: boolea
   }, [timed, revealed]);
 
   const remaining = timed ? Math.max(0, start + secs * 1000 - now) : secs * 1000;
-  const open = answersOpen({ revealed, scored: false, cardAt: start, timer: timed ? { startedAt: start } : {}, remaining, grace: 0 });
+  const open = answersOpen({ revealed, scored: false, endedAt: undefined, own: timed, running: timed, remaining, now, grace: 0 });
 
   const restart = (withTimer: boolean) => {
     const t = Date.now();

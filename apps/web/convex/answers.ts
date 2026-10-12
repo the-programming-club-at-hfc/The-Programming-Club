@@ -5,7 +5,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import { openSession, sessionTeams } from "./lib";
 import { BUGS } from "../src/lib/content";
-import { GRACE_MS, LANGUAGES, answersOpen, awardsFor, cardKey, choices, isAnswerGame } from "../src/lib/grading";
+import { GRACE_MS, LANGUAGES, answersOpen, awardsFor, cardKey, choices, clockLeft, isAnswerGame } from "../src/lib/grading";
 
 // Phone answers for Bug Hunt, Output?, and Guess the Language: one answer per team, scored on reveal.
 // The rules live in src/lib/grading.ts so the officer test page scores the same way.
@@ -20,14 +20,17 @@ export function liveCard(s: Doc<"sessions">) {
 /** When the card's clock started: when it went up, or when the timer was started for it. */
 export const cardStart = (s: Doc<"sessions">, key: string) => (s.card?.key === key ? s.card.at : undefined);
 
-function isOpen(s: Doc<"sessions">, key: string) {
-  const t = s.timer;
+/** Whether answers are open on a card on the TV. Shared with the other team-answered games. */
+export function isOpen(s: Doc<"sessions">, key: string) {
+  const now = Date.now();
   return answersOpen({
     revealed: !!s.screen.revealed,
     scored: (s.scored ?? []).includes(key),
-    cardAt: cardStart(s, key),
-    timer: t,
-    remaining: t.startedAt ? t.remainingMs - (Date.now() - t.startedAt) : t.remainingMs,
+    endedAt: s.card?.key === key ? s.card.endedAt : undefined,
+    own: s.timer.card === key,
+    running: s.timer.startedAt !== undefined,
+    remaining: clockLeft(s.timer, now),
+    now,
     grace: GRACE_MS,
   });
 }
@@ -127,7 +130,10 @@ export const mine = query({
   },
 });
 
-/** For the TV: how many teams have locked in, and after the reveal, who got what. Never shows picks early. */
+/**
+ * For the TV: how many teams have locked in, and once scored, who got what. Never shows picks early.
+ * A card that was already scored tonight shows its results again, never a stale locked-in count.
+ */
 export const board = query({
   args: {},
   handler: async (ctx) => {
@@ -140,7 +146,7 @@ export const board = query({
     return {
       card: c.key,
       teams: teams.length,
-      locked: teams.filter((t) => byTeam.get(t._id)?.lockedAt !== undefined).length,
+      locked: scored ? null : teams.filter((t) => byTeam.get(t._id)?.lockedAt !== undefined).length,
       results: scored
         ? teams
             .map((t) => ({ _id: t._id, name: t.name, result: byTeam.get(t._id)?.result ?? null }))
