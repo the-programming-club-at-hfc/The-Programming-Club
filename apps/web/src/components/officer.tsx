@@ -14,6 +14,12 @@ export function useOfficer() {
   return !!me?.officer;
 }
 
+/** Tonight's join code, or null until an officer is signed in and a night is running. */
+export function useJoinCode() {
+  const officer = useOfficer();
+  return useQuery(api.sessions.joinCode, officer ? {} : "skip") ?? null;
+}
+
 /** Shows its children only to a signed-in officer; everyone else gets a sign-in prompt or an explanation. */
 export function OfficerGate({ children, redirect, purpose }: { children: ReactNode; redirect: string; purpose: string }) {
   return (

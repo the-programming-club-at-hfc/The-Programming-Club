@@ -32,6 +32,7 @@ import { Route as HelloWorldRulesRouteImport } from './routes/hello-world/rules'
 import { Route as HelloWorldScheduleRouteImport } from './routes/hello-world/schedule'
 import { Route as HelloWorldScoresRouteImport } from './routes/hello-world/scores'
 import { Route as HelloWorldSeasonRouteImport } from './routes/hello-world/season'
+import { Route as HelloWorldSoundsRouteImport } from './routes/hello-world/sounds'
 import { Route as HelloWorldTvRouteImport } from './routes/hello-world/tv'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 
@@ -149,6 +150,11 @@ const HelloWorldSeasonRoute = HelloWorldSeasonRouteImport.update({
   path: '/season',
   getParentRoute: () => HelloWorldRouteRoute,
 } as any)
+const HelloWorldSoundsRoute = HelloWorldSoundsRouteImport.update({
+  id: '/sounds',
+  path: '/sounds',
+  getParentRoute: () => HelloWorldRouteRoute,
+} as any)
 const HelloWorldTvRoute = HelloWorldTvRouteImport.update({
   id: '/tv',
   path: '/tv',
@@ -182,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/hello-world/schedule': typeof HelloWorldScheduleRoute
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
+  '/hello-world/sounds': typeof HelloWorldSoundsRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/hello-world/': typeof HelloWorldIndexRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByTo {
   '/hello-world/schedule': typeof HelloWorldScheduleRoute
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
+  '/hello-world/sounds': typeof HelloWorldSoundsRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/': typeof DesktopIndexRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/hello-world/schedule': typeof HelloWorldScheduleRoute
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
+  '/hello-world/sounds': typeof HelloWorldSoundsRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/_desktop/': typeof DesktopIndexRoute
@@ -263,6 +272,7 @@ export interface FileRouteTypes {
     | '/hello-world/schedule'
     | '/hello-world/scores'
     | '/hello-world/season'
+    | '/hello-world/sounds'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/hello-world/'
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/hello-world/schedule'
     | '/hello-world/scores'
     | '/hello-world/season'
+    | '/hello-world/sounds'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/'
@@ -314,6 +325,7 @@ export interface FileRouteTypes {
     | '/hello-world/schedule'
     | '/hello-world/scores'
     | '/hello-world/season'
+    | '/hello-world/sounds'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/_desktop/'
@@ -491,6 +503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelloWorldSeasonRouteImport
       parentRoute: typeof HelloWorldRouteRoute
     }
+    '/hello-world/sounds': {
+      id: '/hello-world/sounds'
+      path: '/sounds'
+      fullPath: '/hello-world/sounds'
+      preLoaderRoute: typeof HelloWorldSoundsRouteImport
+      parentRoute: typeof HelloWorldRouteRoute
+    }
     '/hello-world/tv': {
       id: '/hello-world/tv'
       path: '/tv'
@@ -518,6 +537,7 @@ interface HelloWorldRouteRouteChildren {
   HelloWorldScheduleRoute: typeof HelloWorldScheduleRoute
   HelloWorldScoresRoute: typeof HelloWorldScoresRoute
   HelloWorldSeasonRoute: typeof HelloWorldSeasonRoute
+  HelloWorldSoundsRoute: typeof HelloWorldSoundsRoute
   HelloWorldTvRoute: typeof HelloWorldTvRoute
   HelloWorldIndexRoute: typeof HelloWorldIndexRoute
 }
@@ -532,6 +552,7 @@ const HelloWorldRouteRouteChildren: HelloWorldRouteRouteChildren = {
   HelloWorldScheduleRoute: HelloWorldScheduleRoute,
   HelloWorldScoresRoute: HelloWorldScoresRoute,
   HelloWorldSeasonRoute: HelloWorldSeasonRoute,
+  HelloWorldSoundsRoute: HelloWorldSoundsRoute,
   HelloWorldTvRoute: HelloWorldTvRoute,
   HelloWorldIndexRoute: HelloWorldIndexRoute,
 }

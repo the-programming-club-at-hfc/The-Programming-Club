@@ -56,11 +56,10 @@ export async function addToSession(ctx: MutationCtx, session: Doc<"sessions">, n
     .query("players")
     .withIndex("by_email", (q) => q.eq("email", p.email))
     .unique();
+  // An existing player keeps their name, so nobody can rename a classmate by typing their email.
   if (!player) {
     const id = await ctx.db.insert("players", { ...p, createdAt: Date.now() });
     player = (await ctx.db.get(id))!;
-  } else if (player.name !== p.name) {
-    await ctx.db.patch(player._id, { name: p.name });
   }
 
   const existing = await ctx.db

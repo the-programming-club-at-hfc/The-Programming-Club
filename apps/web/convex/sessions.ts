@@ -6,7 +6,8 @@ import { screenV } from "./schema";
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
 
-/** Everything the TV and phones need. Names only: emails never leave officer queries. */
+/** Everything the TV and phones need. Names only: emails never leave officer queries, and the join code
+ *  stays off this public query so nobody can join without seeing the TV in the room. */
 export const live = query({
   args: {},
   handler: async (ctx) => {
@@ -18,15 +19,24 @@ export const live = query({
     return {
       _id: s._id,
       week: s.week,
-      code: s.code,
       double: s.double,
       screen: s.screen,
       timer: s.timer,
+      sound: s.sound ?? { music: true, volume: 0.8 },
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
       roster,
     };
+  },
+});
+
+/** Tonight's join code, for officer screens only (the TV, /host, and the kickoff slides). */
+export const joinCode = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireOfficer(ctx);
+    return (await openSession(ctx))?.code ?? null;
   },
 });
 
@@ -87,7 +97,14 @@ export const setScreen = mutation({
   handler: async (ctx, { screen }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
-    await ctx.db.patch(s._id, { screen });
+    const card =
+      screen.mode === "card" && screen.game && screen.index !== undefined
+        ? `${screen.game}:${screen.index}`
+        : screen.mode === "wiki" && screen.wikiFrom && screen.wikiTo
+          ? `wiki:${screen.wikiFrom}>${screen.wikiTo}`
+          : null;
+    const shown = s.shown ?? [];
+    await ctx.db.patch(s._id, card && !shown.includes(card) ? { screen, shown: [...shown, card] } : { screen });
   },
 });
 
@@ -97,6 +114,18 @@ export const setDouble = mutation({
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     await ctx.db.patch(s._id, { double: on });
+  },
+});
+
+export const setSound = mutation({
+  args: { music: v.optional(v.boolean()), volume: v.optional(v.number()) },
+  handler: async (ctx, { music, volume }) => {
+    await requireOfficer(ctx);
+    const s = await requireOpenSession(ctx);
+    const cur = s.sound ?? { music: true, volume: 0.8 };
+    await ctx.db.patch(s._id, {
+      sound: { music: music ?? cur.music, volume: volume === undefined ? cur.volume : Math.max(0, Math.min(1, volume)) },
+    });
   },
 });
 
@@ -128,7 +157,8 @@ export const timer = mutation({
         Object.assign(t, { remainingMs: t.durationMs, startedAt: undefined });
         break;
       case "add":
-        Object.assign(t, t.startedAt ? { remainingMs: t.remainingMs + 30_000 } : { remainingMs: remaining + 30_000 });
+        // Restart from now so +30s also works after the clock has hit 0:00.
+        Object.assign(t, { remainingMs: remaining + 30_000, startedAt: t.startedAt ? now : undefined });
         t.durationMs = Math.max(t.durationMs, remaining + 30_000);
         break;
       case "relay":
@@ -153,7 +183,9 @@ export const host = query({
     if (!s) return { session: null, recent };
 
     const att = await sessionAttendance(ctx, s._id);
-    const weekOf = new Map((await ctx.db.query("sessions").collect()).map((x) => [x._id, x.week]));
+    const all = await ctx.db.query("sessions").collect();
+    const weekOf = new Map(all.map((x) => [x._id, x.week]));
+    const used = [...new Set(all.flatMap((x) => x.shown ?? []))];
     const half = s.week === 4 ? [1, 2, 3] : s.week === 6 ? [1, 2, 3, 4, 5] : null;
 
     const rows = await Promise.all(
@@ -181,7 +213,7 @@ export const host = query({
       }),
     );
     rows.sort((a, b) => a.name.localeCompare(b.name));
-    return { session: s, rows, recent };
+    return { session: s, rows, recent, used };
   },
 });
 

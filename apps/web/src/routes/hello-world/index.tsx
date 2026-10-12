@@ -196,7 +196,10 @@ function Home() {
           {[
             ["no homework", "Everything happens in the room, in one hour."],
             ["join any week", "Scan the code on the TV and you’re on a team. Late arrivals land on the smallest team."],
-            ["any language", "Python, Java, C++, JavaScript: use whatever you’re learning in class."],
+            [
+              "any level",
+              "Code Relay takes any language you’re learning in class. Bug Hunt and Output? use short Python snippets, and we explain every answer.",
+            ],
           ].map(([k, v]) => (
             <div key={k}>
               <dt className="text-[clamp(1.8rem,3vw,2.4rem)] leading-none font-extrabold tracking-[-0.03em]">{k}</dt>

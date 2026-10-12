@@ -2,13 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { CardView, DECKS, fmtClock, isSwapMoment, unlockAudio, useChimes, useRemaining } from "#/components/game";
+import { CardView, DECKS, fmtClock, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
+import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
 
 export const Route = createFileRoute("/hello-world/tv")({
   head: () => ({ meta: [{ title: `TV · ${CLUB.season}` }] }),
@@ -19,19 +21,33 @@ type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 
 function useOrigin() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
-  useEffect(() => setOrigin(window.location.origin), []);
+  useEffect(() => {
+    // In dev, swap localhost for the machine's network address so phones can scan the QR code.
+    const { protocol, hostname, port } = window.location;
+    const lan = import.meta.env.VITE_LAN_HOST as string | undefined;
+    setOrigin(lan && ["localhost", "127.0.0.1"].includes(hostname) ? `${protocol}//${lan}:${port}` : window.location.origin);
+  }, []);
   return origin;
 }
 
 function Tv() {
+  return (
+    <OfficerGate redirect="/hello-world/tv" purpose="put the game on the TV">
+      <TvScreen />
+    </OfficerGate>
+  );
+}
+
+function TvScreen() {
   const live = useQuery(api.sessions.live);
+  const code = useJoinCode();
   const [sound, setSound] = useState(false);
   return (
     <div
       className="theme-pine relative flex h-screen flex-col overflow-hidden"
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
-      {live ? <LiveTv live={live} /> : live === null ? <Attract /> : null}
+      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <Attract /> : null}
       {!sound && (
         <button
           className="absolute top-4 right-4 z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim"
@@ -40,7 +56,7 @@ function Tv() {
             void unlockAudio().then(() => setSound(true));
           }}
         >
-          Click to turn on timer sounds
+          Click to turn on sound
         </button>
       )}
     </div>
@@ -92,11 +108,12 @@ function Attract() {
   );
 }
 
-function LiveTv({ live }: { live: Live }) {
+function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolean }) {
   const remaining = useRemaining(live.timer);
   useChimes(live.timer, remaining);
+  useTvSound(live, remaining, sound);
   const origin = useOrigin();
-  const joinUrl = `${origin}/hello-world/join?code=${live.code}`;
+  const joinUrl = `${origin}/hello-world/join?code=${code}`;
   const s = live.screen;
   const running = !!live.timer.startedAt;
   const plan = useSchedule();
@@ -107,7 +124,7 @@ function LiveTv({ live }: { live: Live }) {
   return (
     <>
       <div className="flex-1 overflow-hidden p-[3.5vw]">
-        {s.mode === "lobby" && <Lobby live={live} joinUrl={joinUrl} />}
+        {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
         {s.mode === "scoreboard" && <Scoreboard live={live} />}
         {s.mode === "timer" && (
           <div className="grid h-full place-items-center">
@@ -163,7 +180,7 @@ function LiveTv({ live }: { live: Live }) {
         <span className="ml-auto text-dim">
           Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/hello-world/join</strong>
         </span>
-        <CodeSquares code={live.code} className="text-[2vw]" />
+        <CodeSquares code={code} className="text-[2vw]" />
         {s.mode !== "timer" && (running || remaining !== live.timer.durationMs) && (
           <span
             className={`narrow min-w-[4ch] text-right text-[2.8vw] leading-none font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}
@@ -181,6 +198,48 @@ function LiveTv({ live }: { live: Live }) {
   );
 }
 
+/** Game-show sounds and music, driven by what changes on the TV. `on` is false until someone clicks to allow sound. */
+function useTvSound(live: Live, remaining: number, on: boolean) {
+  const prev = useRef(live);
+  useEffect(() => {
+    const p = prev.current;
+    prev.current = live;
+    if (p === live) return;
+    const s = live.screen;
+    const ps = p.screen;
+
+    if (live.roster.length > p.roster.length) sfx.join(live.roster.length);
+
+    const moved = live.roster.filter((r, i) => p.roster[i] && r.teamId !== p.roster[i].teamId).length;
+    if (moved >= 3) sfx.shuffle();
+
+    if (s.mode !== ps.mode || s.game !== ps.game || s.index !== ps.index || s.wikiFrom !== ps.wikiFrom || s.message !== ps.message) {
+      if (s.mode === "scoreboard") sfx.scoreboard();
+      else if (s.mode === "card" || s.mode === "wiki" || s.mode === "message") sfx.card();
+    } else if (s.revealed && !ps.revealed) sfx.reveal();
+
+    const before = new Map(p.teams.map((t) => [t._id, t.score]));
+    const deltas = live.teams.map((t) => t.score - (before.get(t._id) ?? t.score));
+    if (deltas.some((d) => d > 0)) sfx.point();
+    else if (deltas.some((d) => d < 0) && live.teams.some((t) => t.score !== 0)) sfx.minus();
+
+    if (live.timer.startedAt && live.timer.startedAt !== p.timer.startedAt && live.timer.remainingMs > 0) sfx.go();
+  }, [live]);
+
+  // Countdown ticks for the last ten seconds.
+  const running = !!live.timer.startedAt;
+  const secs = Math.ceil(remaining / 1000);
+  useEffect(() => {
+    if (running && secs > 0 && secs <= 10) sfx.tick(secs <= 3);
+  }, [running, secs]);
+
+  // Lobby music while people join, thinking music while the clock runs.
+  const music = !live.sound.music ? null : live.screen.mode === "lobby" ? "lobby" : running && remaining > 0 ? "think" : null;
+  useEffect(() => playMusic(on ? music : null), [on, music]);
+  useEffect(() => () => playMusic(null), []);
+  useEffect(() => setVolume(live.sound.volume), [live.sound.volume]);
+}
+
 function BigTimer({ remaining, running, swap, size }: { remaining: number; running: boolean; swap: boolean; size: string }) {
   const done = running && remaining === 0;
   return (
@@ -195,7 +254,7 @@ function BigTimer({ remaining, running, swap, size }: { remaining: number; runni
   );
 }
 
-function Lobby({ live, joinUrl }: { live: Live; joinUrl: string }) {
+function Lobby({ live, code, joinUrl }: { live: Live; code: string; joinUrl: string }) {
   return (
     <div className="grid h-full grid-cols-[auto_1fr] gap-[4vw]">
       <div className="flex flex-col justify-center">
@@ -208,7 +267,7 @@ function Lobby({ live, joinUrl }: { live: Live; joinUrl: string }) {
         <p className="mt-[1.4vw] text-[1.4vw] text-dim">
           Scan, or go to <strong className="text-ink">{joinUrl.replace(/^https?:\/\//, "").split("?")[0]}</strong> and enter
         </p>
-        <CodeSquares code={live.code} className="mt-[1vw] text-[6vw]" />
+        <CodeSquares code={code} className="mt-[1vw] text-[6vw]" />
       </div>
       <div className="flex min-h-0 flex-col">
         <p className="text-[2.2vw] font-bold">

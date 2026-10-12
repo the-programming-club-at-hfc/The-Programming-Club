@@ -25,7 +25,7 @@ export const WEEKS: Week[] = [
     title: "Spooky Bugs",
     pitch: "Halloween Bug Hunt. Every snippet hides exactly one bug, and your team has 90 seconds to find it.",
     lesson: "How to read an error message (3 min): the last line tells you what went wrong, and the line number tells you where to look.",
-    games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round ×2: Bug Hunt, hard"],
+    games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round ×2: Bug Hunt, medium"],
     bonus: "Come in costume for +1 XP.",
     showXp: 3,
   },
@@ -56,7 +56,8 @@ export const WEEKS: Week[] = [
   {
     kind: "match",
     title: "Boss Battle",
-    pitch: "The Final is done, so this one is just for fun. Every team takes on the officers in the games you voted for at the kickoff. A short, relaxed night before Thanksgiving.",
+    pitch:
+      "The Final is done, so this one is just for fun. Every team takes on the officers in the games you voted for at the kickoff. A short, relaxed night before Thanksgiving.",
     games: ["Top-voted game vs. officers", "Second-voted game vs. officers", "Final round ×2: crowd’s choice"],
     bonus: "Double show-up XP (+6) for coming the night before a holiday. If nobody votes: Wiki Race, Bug Hunt, Guess the Language.",
     note: "Campus is open (the College closes Thursday and Friday for Thanksgiving), but expect a smaller crowd.",
@@ -65,7 +66,8 @@ export const WEEKS: Week[] = [
   {
     kind: "wrap",
     title: "Wrap Party & Study Hall",
-    pitch: "No competition the week before finals. Pizza, the Season 0 awards, show-and-tell for anything you’ve been building, then stay to study or get help with class projects.",
+    pitch:
+      "No competition the week before finals. Snacks (pizza if funding comes through), the Season 0 awards, show-and-tell for anything you’ve been building, then stay to study or get help with class projects.",
     games: ["Season 0 awards", "Show & tell: 2-minute demos", "Season 1 brainstorm", "Study hall & project help"],
     bonus: "Awards count XP through week 7, so tonight is just for celebrating.",
     showXp: 3,
@@ -172,7 +174,7 @@ export const CUP_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone, collect your power-ups, make teams in /host. Optional draft: the top XP players are captains.",
+    detail: "Join on your phone, collect your power-ups, make teams in /host, then move people so the strongest players are spread out.",
   },
   {
     t: "5:06",
@@ -184,7 +186,7 @@ export const CUP_AGENDA: Agenda[] = [
     t: "5:09",
     len: 8,
     what: "Round 1: Output? Lightning",
-    detail: "6 quick questions at 1 point each. Gets everyone warmed up.",
+    detail: "6 quick questions at 1 point each, and the last one is worth 3. Gets everyone warmed up.",
   },
   {
     t: "5:17",
@@ -239,7 +241,7 @@ export const GAMES: Game[] = [
     scoring:
       "1st place 5 points, 2nd 4, 3rd 3. Any other team that finishes within the cap gets 2; teams that don’t finish get 1 for playing.",
     variants: [
-      "Fewest Clicks: speed doesn’t matter. The team with the lowest click count wins (6-minute cap).",
+      "Fewest Clicks: speed doesn’t matter. The team with the lowest click count wins (6-minute cap). Write each article down as you land on it; the list is your count.",
       "Checkpoint: you must pass through a third article on the way.",
       "Reverse: swap the start and target from the last race.",
     ],
@@ -257,12 +259,13 @@ export const GAMES: Game[] = [
       "When time is up, everyone holds their answers up together.",
       "Reveal the answer, and have the referee explain it in one sentence.",
     ],
-    scoring: "+1 for the right line, +1 for a working fix, +1 for the first team to raise a correct sheet.",
+    scoring:
+      "+1 for the right line, +1 for a working fix, and +1 more if both are right and your team locked in (sheet face down) before half the time was up.",
     variants: [
       "Bug Bounty: each team writes a buggy snippet on paper and swaps with another team.",
       "Lightning: 45 seconds per snippet, easy ones only.",
     ],
-    tip: "Keep a note of the funniest wrong answer each week. It decides the “Best Bug” award at the Wrap Party.",
+    tip: "Keep a note of the best wrong answer each week, and read it out without naming the team. It decides the “Best Bug” award at the Wrap Party.",
   },
   {
     id: "relay",
@@ -276,7 +279,8 @@ export const GAMES: Game[] = [
       "The timer chimes every 2 minutes. Swap drivers right away, even mid-line.",
       "When you think you’re done, raise a hand. The referee runs the test cases.",
     ],
-    scoring: "6 points if every test passes, 3 if some do. The first three teams to solve it get +3, +2, +1.",
+    scoring:
+      "6 points if every test passes, 3 if some do. The first three teams to solve it get +3, +2, +1. Numbers count if the value is right (60, 60.0, and 60.00 all pass).",
     variants: [
       "Whiteboard Relay (no laptops): each person writes one line, then passes the marker.",
       "Silent Relay: nobody talks. Comments in the code are the only way to communicate.",
@@ -301,7 +305,7 @@ export const GAMES: Game[] = [
     need: "Whiteboard and markers",
     time: "60 sec per drawing",
     steps: [
-      "The drawer reads the word on an officer’s phone (Host → Pictionary). Never on the TV.",
+      "An officer holds their phone up and shows the drawer the word (Host → Pictionary). The drawer never takes the phone, and the word never goes on the TV.",
       "Draw it with no letters, numbers, or symbols.",
       "Your team has 60 seconds. After that, other teams get one guess each to steal.",
     ],
@@ -314,14 +318,14 @@ export const GAMES: Game[] = [
     name: "Guess the Language",
     gist: "A short snippet goes up on the screen. Name the programming language it’s written in.",
     need: "Paper or a whiteboard for each team",
-    time: "About 1 minute per snippet",
+    time: "45 sec per snippet",
     steps: [
       "The TV shows a short snippet.",
       "Teams write down which language they think it is.",
       "Reveal the answer and the tell that gives it away.",
     ],
     scoring: "1 point for a correct answer, 2 if your team locks it in within the first 15 seconds.",
-    variants: ["Line by line: reveal one line at a time. The earlier a team locks in a correct guess, the more it scores (3, 2, 1)."],
+    variants: ["Lightning: 20 seconds per snippet, and only the first correct sheet held up scores."],
     tip: "A great warm-up for beginners. The tells teach what makes each language look the way it does.",
   },
 ];
@@ -330,7 +334,7 @@ export const XP: Xp[] = [
   {
     pts: "+3",
     what: "Show up",
-    note: "Showing up is worth more than winning.",
+    note: "Showing up is worth as much as winning, and it’s the part you control.",
   },
   {
     pts: "+3 / +2 / +1",
@@ -356,7 +360,7 @@ export const XP: Xp[] = [
 export const COMEBACKS: string[] = [
   "The final round of every night is worth double.",
   "Weekly results become XP by finishing place, not by margin. Winning by 1 point or by 20 is worth the same.",
-  "Showing up (+3) is worth more than winning (+3 to +1). Someone who never misses a week will outrank someone who wins twice and then stops coming.",
+  "Showing up (+3) is worth as much as winning (+3 to +1). Someone who never misses a week will outrank someone who wins twice and then stops coming.",
   "Championship nights reset everyone to 0. A first-timer can win the Golden Keycap.",
   "All-In Bug Hunt: in the last round of a championship, teams can wager any or all of their points.",
   "Teams are reshuffled every week, so nobody is stuck on a losing team all season.",
@@ -372,11 +376,11 @@ export const POWERUPS: { name: string; does: string }[] = [
   },
   {
     name: "Search Bar",
-    does: "Use Wikipedia search once during a Wiki Race.",
+    does: "Use Wikipedia search once during a Wiki Race, but not for the target article.",
   },
   {
     name: "Double Down",
-    does: "Double your team’s points for one round. Play it before the round starts.",
+    does: "Double your team’s points for one round. Play it before the round starts. Not on a ×2 round or the All-In round.",
   },
 ];
 export const POWERUP_RULES: string[] = [
@@ -466,7 +470,7 @@ export const SUPPLIES: { tier: string; items: string[] }[] = [
   {
     tier: "If there’s funding",
     items: [
-      "Pizza on the two championship nights and the Wrap Party (ask Student Activities about event food funding)",
+      "Pizza on the two championship nights and the Wrap Party (ask Student Activities about event food funding). Order halal and vegetarian options.",
       "Candy for weekly winners and Pictionary steals",
       "Printed posters (ask whether Student Activities prints for clubs)",
     ],
@@ -756,7 +760,7 @@ export const BUGS: Bug[] = [
   {
     level: "medium",
     code: 'count = 3\nwhile count > 0:\n    print(count)\nprint("Liftoff!")',
-    line: "3 (missing line after it)",
+    line: "3 (missing line after it; accept 2)",
     fix: "    count = count - 1   ← add inside the loop",
     why: "count never changes, so the loop runs forever.",
   },
@@ -783,7 +787,7 @@ export const BUGS: Bug[] = [
     why: 'A non-empty string like "Sunday" counts as true by itself, so this prints Weekend! on a Monday.',
   },
   {
-    level: "hard",
+    level: "medium",
     code: 'scores = [90, 80, 70, 100]\ntotal = 0\nfor s in scores:\n    total += s\naverage = total / 3\nprint("Average:", average)',
     line: "5",
     fix: "average = total / len(scores)",
@@ -916,7 +920,7 @@ export const RELAYS: Relay[] = [
   {
     name: "Greeting machine",
     level: "easy",
-    task: "Ask for the user’s name, then print a welcome message.",
+    task: "Ask for the user’s name, then print exactly: Hello, <name>! Welcome to the club.",
     tests: [["Ada", "Hello, Ada! Welcome to the club."]],
   },
   {
@@ -938,7 +942,7 @@ export const RELAYS: Relay[] = [
   {
     name: "Temperature converter",
     level: "easy",
-    task: "Ask for a temperature in Fahrenheit and print it in Celsius. Formula: (F − 32) × 5 ÷ 9",
+    task: "Ask for a temperature in Fahrenheit and print it in Celsius, rounded to one decimal place. Formula: (F − 32) × 5 ÷ 9",
     tests: [
       ["32", "0.0"],
       ["212", "100.0"],
@@ -977,7 +981,7 @@ export const RELAYS: Relay[] = [
   {
     name: "Palindrome check",
     level: "medium",
-    task: "Ask for a word. Print it backwards, then print whether it’s a palindrome.",
+    task: "Ask for a word. Print it backwards on the first line. On the second line, print “yes” if it’s a palindrome (same both ways) or “no” if not.",
     tests: [
       ["racecar", "racecar / yes"],
       ["duck", "kcud / no"],
@@ -986,13 +990,13 @@ export const RELAYS: Relay[] = [
   {
     name: "FizzBuzz",
     level: "medium",
-    task: "Print 1 to 15. For multiples of 3 print Fizz, for multiples of 5 print Buzz, for both print FizzBuzz.",
+    task: "Print 1 to 15, but print Fizz for multiples of 3, Buzz for multiples of 5, and FizzBuzz for both. One line or one per line both count.",
     tests: [["(none)", "1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz"]],
   },
   {
     name: "Biggest of three",
     level: "medium",
-    task: "Ask for three numbers and print the biggest. Bonus point if you don’t use max().",
+    task: "Ask for three numbers and print the biggest.",
     tests: [
       ["3, 9, 4", "9"],
       ["-1, -7, -3", "-1"],
@@ -1006,7 +1010,7 @@ export const PICTIONARY: string[] = [
   "keyboard",
   "firewall",
   "virus",
-  "spam",
+  "smartwatch",
   "Python",
   "Java",
   "Apple",
@@ -1017,8 +1021,8 @@ export const PICTIONARY: string[] = [
   "laptop",
   "email",
   "hard drive",
-  "the internet",
-  "Bluetooth",
+  "router",
+  "webcam",
   "USB stick",
   "emoji",
   "video game",
@@ -1033,8 +1037,8 @@ export const PICTIONARY: string[] = [
   "rubber duck",
   "hacker",
   "printer jam",
-  "dark mode",
-  "game controller",
+  "touchscreen",
+  "VR headset",
   "battery low",
   "loading spinner",
   "copy and paste",
@@ -1045,22 +1049,58 @@ export const PICTIONARY: string[] = [
 ];
 export const LANGS: LangQ[] = [
   { lang: "Python", code: 'for i in range(3):\n    print("hi")', tell: "Indentation instead of braces, and range()." },
-  { lang: "JavaScript", code: "const nums = [1, 2, 3];\nconsole.log(nums.map((n) => n * 2));", tell: "console.log and the => arrow function." },
+  {
+    lang: "JavaScript",
+    code: "const nums = [1, 2, 3];\nconsole.log(nums.map((n) => n * 2));",
+    tell: "console.log and the => arrow function. (Also valid TypeScript, so accept that.)",
+  },
   {
     lang: "Java",
     code: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hi");\n  }\n}',
     tell: "public static void main and System.out.println.",
   },
-  { lang: "C", code: '#include <stdio.h>\n\nint main(void) {\n  printf("%d\\n", 42);\n  return 0;\n}', tell: "#include <stdio.h> and printf." },
-  { lang: "C++", code: '#include <iostream>\n\nint main() {\n  std::cout << "Hi" << std::endl;\n}', tell: "std::cout and the << operator." },
+  {
+    lang: "C",
+    code: '#include <stdio.h>\n\nint main(void) {\n  printf("%d\\n", 42);\n  return 0;\n}',
+    tell: "#include <stdio.h> and printf. (It also compiles as C++, so accept that.)",
+  },
+  {
+    lang: "C++",
+    code: '#include <iostream>\n\nint main() {\n  std::cout << "Hi" << std::endl;\n}',
+    tell: "std::cout and the << operator.",
+  },
   { lang: "SQL", code: "SELECT name, score\nFROM players\nWHERE score > 10\nORDER BY score DESC;", tell: "SELECT … FROM … WHERE." },
   { lang: "Ruby", code: '3.times do |i|\n  puts "Hi #{i}"\nend', tell: "do |i| … end, puts, and #{} inside a string." },
-  { lang: "Go", code: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hi")\n}', tell: "package main, func, and fmt.Println." },
-  { lang: "Rust", code: 'fn main() {\n    let name = "Ferris";\n    println!("Hi, {}!", name);\n}', tell: "fn and the println! macro (the ! gives it away)." },
-  { lang: "HTML", code: "<ul>\n  <li>Wiki Race</li>\n  <li>Bug Hunt</li>\n</ul>", tell: "Tags in angle brackets. (Is HTML a programming language? Discuss.)" },
-  { lang: "Bash", code: 'for f in *.txt; do\n  echo "$f"\ndone', tell: "do … done, echo, and $ before variables." },
-  { lang: "Swift", code: 'let names = ["Ada", "Grace"]\nfor name in names {\n    print("Hi, \\(name)")\n}', tell: "\\(name) inside a string, let, and no semicolons." },
-  { lang: "Kotlin", code: 'fun main() {\n    val langs = listOf("Kotlin", "Java")\n    println(langs.size)\n}', tell: "fun, val, and listOf." },
+  {
+    lang: "Go",
+    code: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hi")\n}',
+    tell: "package main, func, and fmt.Println.",
+  },
+  {
+    lang: "Rust",
+    code: 'fn main() {\n    let name = "Ferris";\n    println!("Hi, {}!", name);\n}',
+    tell: "fn and the println! macro (the ! gives it away).",
+  },
+  {
+    lang: "HTML",
+    code: "<ul>\n  <li>Wiki Race</li>\n  <li>Bug Hunt</li>\n</ul>",
+    tell: "Tags in angle brackets. HTML describes what’s on a page rather than giving step-by-step instructions.",
+  },
+  {
+    lang: "Bash",
+    code: 'for f in *.txt; do\n  echo "$f"\ndone',
+    tell: "do … done, echo, and $ before variables. (It also runs in sh and zsh, so accept those or “shell”.)",
+  },
+  {
+    lang: "Swift",
+    code: 'let names = ["Ada", "Grace"]\nfor name in names {\n    print("Hi, \\(name)")\n}',
+    tell: "\\(name) inside a string, let, and no semicolons.",
+  },
+  {
+    lang: "Kotlin",
+    code: 'fun main() {\n    val langs = listOf("Kotlin", "Java")\n    println(langs.size)\n}',
+    tell: "fun, val, and listOf.",
+  },
   {
     lang: "C#",
     code: 'using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hi");\n    }\n}',

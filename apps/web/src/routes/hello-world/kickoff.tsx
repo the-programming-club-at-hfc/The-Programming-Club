@@ -8,6 +8,7 @@ import { AgendaList, Code, Picto, weekTile } from "#/components/ui";
 import { FEEDBACK, GAMES, MATCH_AGENDA, REMIX_MENU, WALL_CATEGORIES } from "#/lib/content";
 import { useSchedule } from "#/lib/schedule";
 import type { WeekPlan } from "#/lib/schedule";
+import { useJoinCode } from "#/components/officer";
 import { CLUB, OFFICERS, fmtDate } from "#/lib/season";
 import { XpTable } from "./rules";
 
@@ -19,17 +20,18 @@ export const Route = createFileRoute("/hello-world/kickoff")({
 
 function JoinBox() {
   const live = useQuery(api.sessions.live);
+  const code = useJoinCode();
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
   useEffect(() => setOrigin(window.location.origin), []);
-  if (!live) return <p className="text-dim">Officers: start Week 1 in /host and the join code appears here.</p>;
+  if (!live || !code) return <p className="text-dim">Officers: start Week 1 in /host, sign in here, and the join code appears.</p>;
   return (
     <div className="flex items-center gap-6">
       <div className="bg-white p-3">
-        <QRCodeSVG value={`${origin}/hello-world/join?code=${live.code}`} size={180} marginSize={0} />
+        <QRCodeSVG value={`${origin}/hello-world/join?code=${code}`} size={180} marginSize={0} />
       </div>
       <div>
         <p className="text-dim">Scan to join, or enter code</p>
-        <p className="narrow text-8xl leading-none font-extrabold tracking-[0.12em]">{live.code}</p>
+        <p className="narrow text-8xl leading-none font-extrabold tracking-[0.12em]">{code}</p>
         <p className="text-dim">{live.roster.length} joined</p>
       </div>
     </div>
@@ -62,7 +64,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <div className="space-y-8">
         <div className="rounded-[6px] bg-mist p-8">
           <h3 className="text-2xl">Warm-up: what does this print?</h3>
-          <Code code={'print("ha" * 3)'} numbered={false} className="mt-3 text-3xl" />
+          <Code code={'print("go" + "!" * 3)'} numbered={false} className="mt-3 text-3xl" />
         </div>
         <JoinBox />
       </div>
@@ -73,7 +75,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         Everyone here tonight is a Founding Member of {CLUB.name}.
       </p>
       <p className="chip mt-10 px-5 py-2 text-xl">
-        Warm-up answer: <code className="font-bold">hahaha</code>. Multiplying a string repeats it.
+        Warm-up answer: <code className="font-bold">go!!!</code>. Multiplying a string repeats it.
       </p>
     </div>,
     <div>
@@ -155,7 +157,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           <strong>Join any week.</strong> Scan the QR code and you’re on a team.
         </li>
         <li className="border-l-[6px] border-meadow pl-6">
-          <strong>Any language.</strong> Use whatever you’re learning in class.
+          <strong>Any language for Code Relay.</strong> Bug Hunt and Output? use short Python snippets, and we explain every answer.
         </li>
       </ul>
     </div>,
@@ -164,7 +166,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <div className="max-w-4xl text-2xl">
         <XpTable />
       </div>
-      <p className="mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]">Showing up is worth more than winning. Every week is a fresh chance.</p>
+      <p className="mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]">Showing up is worth as much as winning. Every week is a fresh chance.</p>
     </div>,
     <div className="grid items-center gap-12 lg:grid-cols-[1.3fr_1fr]">
       <div>

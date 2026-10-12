@@ -15,7 +15,7 @@ export const Route = createFileRoute("/hello-world/join")({
   component: Join,
 });
 
-const tokenKey = (code: string) => `hwc.token.${code}`;
+const tokenKey = (sessionId: string) => `hwc.token.${sessionId}`;
 type Profile = { name: string; email: string };
 
 function Join() {
@@ -25,13 +25,13 @@ function Join() {
   const me = useQuery(api.players.me, token ? { token } : "skip");
 
   useEffect(() => {
-    setToken(live ? localStorage.getItem(tokenKey(live.code)) : null);
-  }, [live?.code]);
+    setToken(live ? localStorage.getItem(tokenKey(live._id)) : null);
+  }, [live?._id]);
 
   useEffect(() => {
     // An officer removed this player, or the token is stale.
     if (token && me === null && live) {
-      localStorage.removeItem(tokenKey(live.code));
+      localStorage.removeItem(tokenKey(live._id));
       setToken(null);
     }
   }, [token, me, live]);
@@ -64,13 +64,13 @@ function Join() {
         me={me}
         live={live}
         onSwitch={() => {
-          localStorage.removeItem(tokenKey(live.code));
+          localStorage.removeItem(tokenKey(live._id));
           setToken(null);
         }}
       />
     );
   }
-  return <JoinForm initialCode={codeFromQr ?? ""} liveCode={live.code} week={live.week} onJoined={setToken} />;
+  return <JoinForm initialCode={codeFromQr ?? ""} sessionId={live._id} week={live.week} onJoined={setToken} />;
 }
 
 function Center({ children }: { children: React.ReactNode }) {
@@ -83,12 +83,12 @@ function Center({ children }: { children: React.ReactNode }) {
 
 function JoinForm({
   initialCode,
-  liveCode,
+  sessionId,
   week,
   onJoined,
 }: {
   initialCode: string;
-  liveCode: string;
+  sessionId: string;
   week: number;
   onJoined: (t: string) => void;
 }) {
@@ -112,7 +112,7 @@ function JoinForm({
     try {
       const token = await join({ code, ...profile, broughtBy: broughtBy || undefined });
       localStorage.setItem("hwc.profile", JSON.stringify(profile));
-      localStorage.setItem(tokenKey(code.trim().toUpperCase() || liveCode), token);
+      localStorage.setItem(tokenKey(sessionId), token);
       onJoined(token);
     } catch (err) {
       setError(err instanceof ConvexError ? String(err.data) : "Couldn’t join. Check your connection and try again.");
@@ -195,7 +195,7 @@ function JoinForm({
           />
         </label>
         <label className="block">
-          <span className="font-bold">Who brought you?</span> <span className="text-dim">Optional. You both get +2 XP.</span>
+          <span className="font-bold">Who brought you?</span> <span className="text-dim">Optional. Officers give you both +2 XP.</span>
           <input className="field mt-2" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
         </label>
         {error && (
