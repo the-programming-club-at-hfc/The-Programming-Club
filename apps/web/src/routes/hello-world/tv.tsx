@@ -191,6 +191,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
           Week {live.week}: {wk.title}
         </span>
         {live.double && <span className="bg-sun px-[0.8vw] py-[0.2vw] font-bold text-[#12332b]">Last round counts double</span>}
+        {live.practice && <span className="bg-sky px-[0.8vw] py-[0.2vw] font-bold text-[#12332b]">Practice night</span>}
         <span className="ml-auto text-dim">
           Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/hello-world/join</strong>
         </span>

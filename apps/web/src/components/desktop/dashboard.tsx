@@ -40,7 +40,10 @@ function Overview() {
         {live ? (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[#9fd3ff]">Live now · Week {live.week}</p>
+              <p className="text-sm font-semibold text-[#9fd3ff]">
+                Live now · Week {live.week}
+                {live.practice && " · Practice (doesn’t count)"}
+              </p>
               <p className="text-xl leading-tight font-extrabold">{plan[live.week - 1]?.title}</p>
               <p className="mt-1 text-sm text-white/75">
                 {live.joined} joined · started{" "}

@@ -108,6 +108,7 @@ function Header({ live }: { live: Live }) {
         <p className="font-bold text-pine">
           Week {live.week}
           {isCupWeek(live.week) ? " · Cup night" : ""}
+          {live.practice && <span className="chip ml-2 bg-sky text-[#12332b]">Practice: doesn’t count</span>}
         </p>
         <h1 className="text-3xl">{plan[live.week - 1]?.title}</h1>
       </div>
@@ -146,6 +147,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   const reopen = useMutation(api.sessions.reopen);
   const plan = useSchedule();
   const [week, setWeek] = useState(() => likelyWeek(plan));
+  const [practice, setPractice] = useState(false);
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Panel title="Start tonight" className="ring-2 ring-gold">
@@ -161,8 +163,17 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
             ))}
           </select>
         </label>
-        <button className="btn btn-coin mt-4 text-lg" onClick={() => run(start({ week }))}>
-          Start week {week}
+        <label className="mt-4 flex items-start gap-2">
+          <input type="checkbox" className="mt-1 size-4 accent-ink" checked={practice} onChange={(e) => setPractice(e.target.checked)} />
+          <span>
+            <strong>Practice night</strong>
+            <span className="block text-sm text-dim">
+              A full rehearsal with the TV and phones. Nothing counts: no attendance, XP, stats, or cards used up.
+            </span>
+          </span>
+        </label>
+        <button className="btn btn-coin mt-4 text-lg" onClick={() => run(start({ week, practice }))}>
+          {practice ? `Start a practice of week ${week}` : `Start week ${week}`}
         </button>
         <p className="mt-4 text-sm text-dim">
           Then open{" "}
@@ -186,8 +197,9 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
               <li key={s._id} className="flex flex-wrap items-center gap-2 py-2">
                 <span className="font-bold">Week {s.week}</span>
                 <span className="text-dim">{fmtDate(new Date(s.startedAt))}</span>
+                {s.practice && <span className="chip">Practice</span>}
                 <span className="ml-auto" />
-                <ExportButton sessionId={s._id} />
+                {!s.practice && <ExportButton sessionId={s._id} />}
                 <button className="btn btn-sm" onClick={() => run(reopen({ sessionId: s._id }))}>
                   Reopen
                 </button>
@@ -870,9 +882,11 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
 
   return (
     <Panel title={`Players (${rows.length})`}>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <ExportButton sessionId={sessionId} />
-      </div>
+      {!live.practice && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <ExportButton sessionId={sessionId} />
+        </div>
+      )}
       {rows.length === 0 ? (
         <p className="text-dim">Nobody yet. Put the join screen on the TV.</p>
       ) : (

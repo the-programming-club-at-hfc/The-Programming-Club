@@ -26,6 +26,7 @@ export const live = query({
       sound: s.sound ?? { music: true, volume: 0.8 },
       card: s.card ?? null,
       scored: s.scored ?? [],
+      practice: !!s.practice,
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
@@ -44,8 +45,8 @@ export const joinCode = query({
 });
 
 export const start = mutation({
-  args: { week: v.number() },
-  handler: async (ctx, { week }) => {
+  args: { week: v.number(), practice: v.optional(v.boolean()) },
+  handler: async (ctx, { week, practice }) => {
     await requireOfficer(ctx);
     const existing = await openSession(ctx);
     if (existing) return existing._id;
@@ -66,6 +67,7 @@ export const start = mutation({
       double: false,
       screen: { mode: "lobby" },
       timer: { durationMs: 90_000, remainingMs: 90_000, relay: false },
+      practice: practice || undefined,
     });
   },
 });
@@ -195,8 +197,9 @@ export const host = query({
     if (!s) return { session: null, recent };
 
     const att = await sessionAttendance(ctx, s._id);
+    // Practice nights don't use up cards.
     const all = await ctx.db.query("sessions").collect();
-    const used = [...new Set(all.flatMap((x) => x.shown ?? []))];
+    const used = [...new Set(all.flatMap((x) => (x.practice ? [] : (x.shown ?? []))))];
 
     const rows = await Promise.all(
       att.map(async (a) => {
@@ -224,6 +227,7 @@ export const attendanceExport = query({
     await requireOfficer(ctx);
     const s = await ctx.db.get(sessionId);
     if (!s) throw new ConvexError("That night doesn’t exist.");
+    if (s.practice) throw new ConvexError("Practice nights don’t count for attendance, so there’s nothing to export.");
     const teams = new Map((await sessionTeams(ctx, sessionId)).map((t) => [t._id, t.name]));
     const att = await sessionAttendance(ctx, sessionId);
     const rows = await Promise.all(

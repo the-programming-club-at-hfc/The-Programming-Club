@@ -68,10 +68,12 @@ export async function addToSession(ctx: MutationCtx, session: Doc<"sessions">, n
     .unique();
   if (existing) return existing.token;
 
-  const prior = await ctx.db
+  // First time means no earlier real night; practice nights don't count.
+  const history = await ctx.db
     .query("attendance")
     .withIndex("by_player", (q) => q.eq("playerId", player._id))
-    .first();
+    .collect();
+  const prior = (await Promise.all(history.map((h) => ctx.db.get(h.sessionId)))).some((s) => s && !s.practice);
 
   const teams = await sessionTeams(ctx, session._id);
   let teamId: Id<"teams"> | undefined;

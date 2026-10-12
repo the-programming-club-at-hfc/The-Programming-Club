@@ -230,6 +230,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         Week {live.week}: {wk.title}
       </p>
       <h1 className="mt-1 text-[clamp(2.4rem,8vw,3.4rem)] lowercase">{me.name}</h1>
+      {me.practice && <p className="mt-2 font-semibold text-pine">Practice night: nothing tonight counts toward XP.</p>}
 
       <div className="mt-8 grid grid-cols-[auto_1fr] gap-[3px]">
         <div className={`tile ${t.tile} w-24 sm:w-32`}>

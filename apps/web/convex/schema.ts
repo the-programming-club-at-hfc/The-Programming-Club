@@ -64,6 +64,8 @@ export default defineSchema({
     card: v.optional(v.object({ key: v.string(), at: v.number() })),
     // Cards already scored from phone answers tonight, so revealing again never scores twice.
     scored: v.optional(v.array(v.string())),
+    // A rehearsal: left out of attendance, XP, stats, and the attendance export.
+    practice: v.optional(v.boolean()),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),

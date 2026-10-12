@@ -27,10 +27,13 @@ export const me = query({
     const [session, player] = await Promise.all([ctx.db.get(a.sessionId), ctx.db.get(a.playerId)]);
     if (!session || !player) return null;
 
-    const history = await ctx.db
+    // Practice nights don't count toward season XP.
+    const all = await ctx.db
       .query("attendance")
       .withIndex("by_player", (q) => q.eq("playerId", a.playerId))
       .collect();
+    const nights = await Promise.all(all.map((h) => ctx.db.get(h.sessionId)));
+    const history = all.filter((_, i) => nights[i] && !nights[i].practice);
     const seasonXp = history.reduce((n, h) => n + h.showXp + (h.placeXp ?? 0) + h.bonusXp, 0);
 
     let team = null;
@@ -57,6 +60,14 @@ export const me = query({
         };
       }
     }
-    return { name: player.name, ended: session.status === "ended", week: session.week, team, seasonXp, weeks: history.length };
+    return {
+      name: player.name,
+      ended: session.status === "ended",
+      week: session.week,
+      practice: !!session.practice,
+      team,
+      seasonXp,
+      weeks: history.length,
+    };
   },
 });
