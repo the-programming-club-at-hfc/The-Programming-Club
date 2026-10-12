@@ -33,6 +33,7 @@ import { Route as HelloWorldScheduleRouteImport } from './routes/hello-world/sch
 import { Route as HelloWorldScoresRouteImport } from './routes/hello-world/scores'
 import { Route as HelloWorldSeasonRouteImport } from './routes/hello-world/season'
 import { Route as HelloWorldSoundsRouteImport } from './routes/hello-world/sounds'
+import { Route as HelloWorldTestRouteImport } from './routes/hello-world/test'
 import { Route as HelloWorldTvRouteImport } from './routes/hello-world/tv'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 
@@ -155,6 +156,11 @@ const HelloWorldSoundsRoute = HelloWorldSoundsRouteImport.update({
   path: '/sounds',
   getParentRoute: () => HelloWorldRouteRoute,
 } as any)
+const HelloWorldTestRoute = HelloWorldTestRouteImport.update({
+  id: '/test',
+  path: '/test',
+  getParentRoute: () => HelloWorldRouteRoute,
+} as any)
 const HelloWorldTvRoute = HelloWorldTvRouteImport.update({
   id: '/tv',
   path: '/tv',
@@ -189,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
+  '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/hello-world/': typeof HelloWorldIndexRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
+  '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/': typeof DesktopIndexRoute
@@ -243,6 +251,7 @@ export interface FileRoutesById {
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
+  '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/_desktop/': typeof DesktopIndexRoute
@@ -273,6 +282,7 @@ export interface FileRouteTypes {
     | '/hello-world/scores'
     | '/hello-world/season'
     | '/hello-world/sounds'
+    | '/hello-world/test'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/hello-world/'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/hello-world/scores'
     | '/hello-world/season'
     | '/hello-world/sounds'
+    | '/hello-world/test'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/hello-world/scores'
     | '/hello-world/season'
     | '/hello-world/sounds'
+    | '/hello-world/test'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/_desktop/'
@@ -510,6 +522,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelloWorldSoundsRouteImport
       parentRoute: typeof HelloWorldRouteRoute
     }
+    '/hello-world/test': {
+      id: '/hello-world/test'
+      path: '/test'
+      fullPath: '/hello-world/test'
+      preLoaderRoute: typeof HelloWorldTestRouteImport
+      parentRoute: typeof HelloWorldRouteRoute
+    }
     '/hello-world/tv': {
       id: '/hello-world/tv'
       path: '/tv'
@@ -538,6 +557,7 @@ interface HelloWorldRouteRouteChildren {
   HelloWorldScoresRoute: typeof HelloWorldScoresRoute
   HelloWorldSeasonRoute: typeof HelloWorldSeasonRoute
   HelloWorldSoundsRoute: typeof HelloWorldSoundsRoute
+  HelloWorldTestRoute: typeof HelloWorldTestRoute
   HelloWorldTvRoute: typeof HelloWorldTvRoute
   HelloWorldIndexRoute: typeof HelloWorldIndexRoute
 }
@@ -553,6 +573,7 @@ const HelloWorldRouteRouteChildren: HelloWorldRouteRouteChildren = {
   HelloWorldScoresRoute: HelloWorldScoresRoute,
   HelloWorldSeasonRoute: HelloWorldSeasonRoute,
   HelloWorldSoundsRoute: HelloWorldSoundsRoute,
+  HelloWorldTestRoute: HelloWorldTestRoute,
   HelloWorldTvRoute: HelloWorldTvRoute,
   HelloWorldIndexRoute: HelloWorldIndexRoute,
 }

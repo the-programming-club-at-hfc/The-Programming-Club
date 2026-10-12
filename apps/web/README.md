@@ -11,9 +11,10 @@ Hello, World Cup pages, all under `/hello-world` (old addresses like `/join` and
 | Page | Who uses it | What it does |
 | --- | --- | --- |
 | `/hello-world` `/season` `/rules` `/cup` | Everyone | The season, the games, scoring, and the Cup-night agenda |
-| `/join` | Members | Scan the TV's QR code, enter a name and HawkMail. No account needed. Shows your team, score, timer, and the current challenge |
+| `/join` | Members | Scan the TV's QR code, enter a name and HawkMail. No account needed. Shows your team, score, timer, and the current challenge, and lets your team answer Bug Hunt, Output?, and Guess the Language |
 | `/tv` | The gaming-room TV | Join screen, scoreboard, timer, and challenge cards, all controlled live from `/host` |
-| `/host` | Officers | Sign in with HawkMail (Clerk) to start the night, make teams, score, run the TV, give bonus XP, and export attendance |
+| `/host` | Officers | Sign in with HawkMail (Clerk) to start the night (or a practice night that doesn’t count), make teams, score, run the TV, give bonus XP, and export attendance. Bug Hunt, Output?, and Guess the Language are answered on phones and scored when the answer is revealed |
+| `/test` | Officers | Play every Bug Hunt, Output?, and Guess the Language card as a pretend team, see the points the real scoring gives, and flag cards that are too easy, too hard, or broken |
 | `/schedule` | Officers | Season planner: change any week's lineup (picking from every game in the season), details, or date, or cancel a week |
 | `/kickoff` | Officers | Slides for the first meeting (arrow keys, **F** for full screen) |
 | `/scores` | Everyone | Season XP high scores |
@@ -50,7 +51,7 @@ Contributors run their own free Convex and Clerk dev setups; nobody needs access
 
 Officers with access to the club's accounts can skip steps 2–5 with `bunx vercel env pull .env.local` and the club's dev deployment.
 
-Checks: `bun run typecheck` and `bun run lint`.
+Checks: `bun run typecheck`, `bun run lint`, and `bun test` (scoring rules in `src/lib/grading.ts`).
 
 ## Deploying
 

@@ -128,6 +128,9 @@ function Header({ live }: { live: Live }) {
         <Link to="/hello-world/kit" className="btn btn-sm">
           Game plan
         </Link>
+        <Link to="/hello-world/test" className="btn btn-sm">
+          Test the decks
+        </Link>
         <button
           className="btn btn-sm btn-neon"
           onClick={() => confirm("End the night? Place XP goes out from the current standings.") && run(end())}
