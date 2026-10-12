@@ -68,10 +68,12 @@ export function likelyWeek(plan: WeekPlan[], now = Date.now()) {
   return n ? n.i + 1 : plan.length;
 }
 
-// How a lineup entry names each game. "Silent Relay" is Code Relay; "Bug Bounty" is a Bug Hunt variant.
+// How a lineup entry names each game. "Silent Relay" is Code Relay; "Bug Bounty" and "Fix it for real" are Bug Hunt
+// variants. Fix it for real comes first so it opens its own deck on /host and shows its own tile.
 const GAME_NAMES: [RegExp, string][] = [
+  [/Fix it for real/, "fix"],
   [/Wiki Race/, "wiki"],
-  [/Bug Hunt|Bug Bounty/, "bug"],
+  [/Bug Hunt|Bug Bounty|Fix it for real/, "bug"],
   [/Relay/, "relay"],
   [/Output\?/, "output"],
   [/Pictionary/, "pictionary"],
@@ -109,8 +111,8 @@ export const CATALOG: { id: string | null; name: string; items: string[] }[] = (
   const groups = GAMES.map((g) => ({ id: g.id, name: g.name, items: [] as string[] }));
   const other = { id: null, name: "Other", items: [] as string[] };
   for (const label of all) {
-    const id = gamesIn(label)[0];
-    (groups.find((g) => g.id === id) ?? other).items.push(label);
+    const ids = gamesIn(label);
+    (groups.find((g) => ids.includes(g.id)) ?? other).items.push(label);
   }
   return [...groups, other].filter((g) => g.items.length);
 })();

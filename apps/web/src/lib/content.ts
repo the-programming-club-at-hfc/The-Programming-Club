@@ -30,7 +30,7 @@ export const WEEKS: Week[] = [
     title: "Spooky Bugs",
     pitch: "Halloween Bug Hunt. Every snippet hides exactly one bug, and your team has 90 seconds to find it.",
     lesson: "How to read an error message (3 min): the last line tells you what went wrong, and the line number tells you where to look.",
-    games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round, double points: Bug Hunt, medium"],
+    games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round, double points: Fix it for real, spooky"],
     bonus: "Come in costume for +1 XP.",
     showXp: 3,
   },
@@ -38,7 +38,7 @@ export const WEEKS: Week[] = [
     kind: "cup",
     title: "Midseason Cup",
     pitch: "The first championship. Everyone starts at zero, the last round counts double, and the winners sign the Golden Keycap.",
-    games: ["Output? Lightning", "Wiki Race", "Code Relay", "Final round, double points: Bug Hunt"],
+    games: ["Output? Lightning", "Wiki Race", "Code Relay", "Final round, double points: Fix it for real"],
     showXp: 3,
   },
   {
@@ -186,7 +186,8 @@ export const CUP_AGENDA: Agenda[] = [
     t: "4:45",
     len: 15,
     what: "Officers set up",
-    detail: "Open /tv on the TV, /host on an officer laptop, and an editor (or onecompiler.com) on every team computer for the Code Relay.",
+    detail:
+      "Open /tv on the TV, /host on an officer laptop, and an editor (or onecompiler.com) on every team computer for the Code Relay. Then open /hello-world/fix on each team computer for the final.",
   },
   {
     t: "5:00",
@@ -221,8 +222,9 @@ export const CUP_AGENDA: Agenda[] = [
   {
     t: "5:43",
     len: 9,
-    what: "Final round, double points: Bug Hunt",
-    detail: "Three snippets, easy to hard. Every point counts double, so any team can still win.",
+    what: "Final round, double points: Fix it for real",
+    detail:
+      "One buggy Python program and 4 minutes. Teams fix it and run it on their team computer, and the first fix earns extra. Every point counts double, so any team can still win.",
   },
   {
     t: "5:52",
@@ -335,6 +337,7 @@ export const GAMES: Game[] = [
       "Bug Bounty: each team writes a buggy snippet on paper and swaps with another team.",
       "Lightning: 45 seconds per snippet, easy ones only.",
       "Paper backup: if phones or Wi-Fi act up, teams write the line and the fix, hold them up together, and officers score by hand.",
+      "Fix it for real (the double-points final on Bug Hunt nights): one buggy Python program, 4 minutes. Each team edits and runs it on its team computer at /hello-world/fix, and the site marks the team Fixed! once every test passes. +3 for a fix, +2 more for the first team to fix it, all doubled.",
     ],
     tip: "Keep a note of the best wrong answer each week, and read it out without naming the team. It decides the “Best Bug” award at the Wrap Party.",
   },
@@ -495,6 +498,7 @@ export const PREP: string[] = [
   "Open programmingclub.dev/host on an officer laptop or phone and start tonight’s week.",
   "Put out markers, paper, and the prize stash.",
   "Code Relay or Cup nights: make sure every team computer has an editor or onecompiler.com open.",
+  "Fix it for real nights (Spooky Bugs, the Midseason Cup): open programmingclub.dev/hello-world/fix on every team computer and pick the team once teams are made. Python loads by itself.",
 ];
 export const NEWCOMERS: string[] = [
   "Point them at the QR code on the TV. Joining takes about 20 seconds.",
