@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CardView, DECKS, fmtClock, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
@@ -30,14 +31,23 @@ function useOrigin() {
 }
 
 function Tv() {
+  return (
+    <OfficerGate redirect="/hello-world/tv" purpose="put the game on the TV">
+      <TvScreen />
+    </OfficerGate>
+  );
+}
+
+function TvScreen() {
   const live = useQuery(api.sessions.live);
+  const code = useJoinCode();
   const [sound, setSound] = useState(false);
   return (
     <div
       className="theme-pine relative flex h-screen flex-col overflow-hidden"
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
-      {live ? <LiveTv live={live} sound={sound} /> : live === null ? <Attract /> : null}
+      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <Attract /> : null}
       {!sound && (
         <button
           className="absolute top-4 right-4 z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim"
@@ -98,12 +108,12 @@ function Attract() {
   );
 }
 
-function LiveTv({ live, sound }: { live: Live; sound: boolean }) {
+function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolean }) {
   const remaining = useRemaining(live.timer);
   useChimes(live.timer, remaining);
   useTvSound(live, remaining, sound);
   const origin = useOrigin();
-  const joinUrl = `${origin}/hello-world/join?code=${live.code}`;
+  const joinUrl = `${origin}/hello-world/join?code=${code}`;
   const s = live.screen;
   const running = !!live.timer.startedAt;
   const plan = useSchedule();
@@ -114,7 +124,7 @@ function LiveTv({ live, sound }: { live: Live; sound: boolean }) {
   return (
     <>
       <div className="flex-1 overflow-hidden p-[3.5vw]">
-        {s.mode === "lobby" && <Lobby live={live} joinUrl={joinUrl} />}
+        {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
         {s.mode === "scoreboard" && <Scoreboard live={live} />}
         {s.mode === "timer" && (
           <div className="grid h-full place-items-center">
@@ -170,7 +180,7 @@ function LiveTv({ live, sound }: { live: Live; sound: boolean }) {
         <span className="ml-auto text-dim">
           Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/hello-world/join</strong>
         </span>
-        <CodeSquares code={live.code} className="text-[2vw]" />
+        <CodeSquares code={code} className="text-[2vw]" />
         {s.mode !== "timer" && (running || remaining !== live.timer.durationMs) && (
           <span
             className={`narrow min-w-[4ch] text-right text-[2.8vw] leading-none font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}
@@ -244,7 +254,7 @@ function BigTimer({ remaining, running, swap, size }: { remaining: number; runni
   );
 }
 
-function Lobby({ live, joinUrl }: { live: Live; joinUrl: string }) {
+function Lobby({ live, code, joinUrl }: { live: Live; code: string; joinUrl: string }) {
   return (
     <div className="grid h-full grid-cols-[auto_1fr] gap-[4vw]">
       <div className="flex flex-col justify-center">
@@ -257,7 +267,7 @@ function Lobby({ live, joinUrl }: { live: Live; joinUrl: string }) {
         <p className="mt-[1.4vw] text-[1.4vw] text-dim">
           Scan, or go to <strong className="text-ink">{joinUrl.replace(/^https?:\/\//, "").split("?")[0]}</strong> and enter
         </p>
-        <CodeSquares code={live.code} className="mt-[1vw] text-[6vw]" />
+        <CodeSquares code={code} className="mt-[1vw] text-[6vw]" />
       </div>
       <div className="flex min-h-0 flex-col">
         <p className="text-[2.2vw] font-bold">

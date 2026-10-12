@@ -6,7 +6,8 @@ import { screenV } from "./schema";
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
 
-/** Everything the TV and phones need. Names only: emails never leave officer queries. */
+/** Everything the TV and phones need. Names only: emails never leave officer queries, and the join code
+ *  stays off this public query so nobody can join without seeing the TV in the room. */
 export const live = query({
   args: {},
   handler: async (ctx) => {
@@ -18,7 +19,6 @@ export const live = query({
     return {
       _id: s._id,
       week: s.week,
-      code: s.code,
       double: s.double,
       screen: s.screen,
       timer: s.timer,
@@ -28,6 +28,15 @@ export const live = query({
         .sort((a, b) => b.score - a.score),
       roster,
     };
+  },
+});
+
+/** Tonight's join code, for officer screens only (the TV, /host, and the kickoff slides). */
+export const joinCode = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireOfficer(ctx);
+    return (await openSession(ctx))?.code ?? null;
   },
 });
 

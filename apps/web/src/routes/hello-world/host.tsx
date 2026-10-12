@@ -8,7 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, useRemaining } from "#/components/game";
 import type { GameId, Screen } from "#/components/game";
-import { ExportButton, OfficerGate } from "#/components/officer";
+import { ExportButton, OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap } from "#/components/ui";
 import { BUGS, PICTIONARY, RELAYS, WIKI_RACES } from "#/lib/content";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
@@ -100,6 +100,7 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
 function Header({ live }: { live: Live }) {
   const end = useMutation(api.sessions.end);
   const plan = useSchedule();
+  const code = useJoinCode();
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
       <div>
@@ -110,7 +111,7 @@ function Header({ live }: { live: Live }) {
         <h1 className="text-3xl">{plan[live.week - 1]?.title}</h1>
       </div>
       <p className="narrow font-extrabold text-5xl tracking-[0.2em] text-ink" title="Join code">
-        {live.code}
+        {code}
       </p>
       <nav className="ml-auto flex flex-wrap items-center gap-1">
         <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="btn btn-sm">
@@ -775,11 +776,14 @@ function PictionaryTool() {
           {peek ? (
             <span className="font-bold text-5xl text-ink">{word}</span>
           ) : (
-            <span className="text-dim">Drawer only: press and hold</span>
+            <span className="text-dim">Press and hold to show the drawer</span>
           )}
         </button>
       )}
-      <p className="mt-3 text-sm text-dim">The word stays on this device. Hand your phone to the drawer; it never goes on the TV.</p>
+      <p className="mt-3 text-sm text-dim">
+        The word stays on this device and never goes on the TV. Hold your phone up for the drawer instead of handing it over: it has the
+        score buttons.
+      </p>
     </div>
   );
 }

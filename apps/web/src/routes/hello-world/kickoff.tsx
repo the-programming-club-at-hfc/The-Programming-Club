@@ -8,6 +8,7 @@ import { AgendaList, Code, Picto, weekTile } from "#/components/ui";
 import { FEEDBACK, GAMES, MATCH_AGENDA, REMIX_MENU, WALL_CATEGORIES } from "#/lib/content";
 import { useSchedule } from "#/lib/schedule";
 import type { WeekPlan } from "#/lib/schedule";
+import { useJoinCode } from "#/components/officer";
 import { CLUB, OFFICERS, fmtDate } from "#/lib/season";
 import { XpTable } from "./rules";
 
@@ -19,17 +20,18 @@ export const Route = createFileRoute("/hello-world/kickoff")({
 
 function JoinBox() {
   const live = useQuery(api.sessions.live);
+  const code = useJoinCode();
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
   useEffect(() => setOrigin(window.location.origin), []);
-  if (!live) return <p className="text-dim">Officers: start Week 1 in /host and the join code appears here.</p>;
+  if (!live || !code) return <p className="text-dim">Officers: start Week 1 in /host, sign in here, and the join code appears.</p>;
   return (
     <div className="flex items-center gap-6">
       <div className="bg-white p-3">
-        <QRCodeSVG value={`${origin}/hello-world/join?code=${live.code}`} size={180} marginSize={0} />
+        <QRCodeSVG value={`${origin}/hello-world/join?code=${code}`} size={180} marginSize={0} />
       </div>
       <div>
         <p className="text-dim">Scan to join, or enter code</p>
-        <p className="narrow text-8xl leading-none font-extrabold tracking-[0.12em]">{live.code}</p>
+        <p className="narrow text-8xl leading-none font-extrabold tracking-[0.12em]">{code}</p>
         <p className="text-dim">{live.roster.length} joined</p>
       </div>
     </div>

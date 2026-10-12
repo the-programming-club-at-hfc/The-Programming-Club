@@ -305,7 +305,7 @@ export const GAMES: Game[] = [
     need: "Whiteboard and markers",
     time: "60 sec per drawing",
     steps: [
-      "The drawer reads the word on an officer’s phone (Host → Pictionary). Never on the TV.",
+      "An officer holds their phone up and shows the drawer the word (Host → Pictionary). The drawer never takes the phone, and the word never goes on the TV.",
       "Draw it with no letters, numbers, or symbols.",
       "Your team has 60 seconds. After that, other teams get one guess each to steal.",
     ],
