@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { BUGS, LANGS, OUTPUTS, RELAYS } from "#/lib/content";
+import { FIXES } from "#/lib/fixes";
+import type { FixCard } from "#/lib/fixes";
 import { cardSeconds } from "#/lib/grading";
 import { Code } from "./ui";
 import { sfx } from "#/lib/sound";
@@ -14,11 +16,24 @@ export const DECKS: Record<GameId, { name: string; size: number; seconds: (i: nu
   output: { name: "Output?", size: OUTPUTS.length, seconds: (i) => cardSeconds("output", i) },
   relay: { name: "Code Relay", size: RELAYS.length, seconds: (i) => cardSeconds("relay", i) },
   lang: { name: "Guess the Language", size: LANGS.length, seconds: (i) => cardSeconds("lang", i) },
+  fix: { name: "Fix it for real", size: FIXES.length, seconds: (i) => cardSeconds("fix", i) },
 };
 
 export const fmtClock = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+/** Time since a card's clock started, like "2:14". */
+export const fmtElapsed = (ms: number) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+/** The lines (1-based) of a Fix it for real card's fix that aren't in the buggy program. */
+export const fixedLines = (f: FixCard) => {
+  const before = new Set(f.code.split("\n"));
+  return f.fix.split("\n").flatMap((l, i) => (before.has(l) ? [] : [i + 1]));
 };
 
 /** Milliseconds left on the shared timer, ticking locally between server updates. */
@@ -63,16 +78,59 @@ export const isSwapMoment = (t: Timer | undefined, remaining: number) =>
   !!t?.startedAt && t.relay && remaining > 1000 && (t.durationMs - remaining) % 120_000 < 5000 && t.durationMs - remaining > 5000;
 
 const LEVEL_STYLE = { easy: "bg-meadow text-[#12332b]", medium: "bg-sun text-[#12332b]", hard: "bg-signal text-white" } as const;
+export const FixHint = ({ card, big = false }: { card: FixCard; big?: boolean }) => (
+  <p className={`rounded-[6px] bg-sun px-4 py-3 font-semibold text-[#12332b] ${big ? "text-[clamp(1.3rem,2vw,2.2rem)]" : ""}`}>
+    Hint: {card.hint}
+  </p>
+);
+
 export const LevelChip = ({ level }: { level: keyof typeof LEVEL_STYLE }) => (
   <span className={`ml-2 inline-block rounded-[3px] px-2 py-0.5 align-middle text-xs font-bold capitalize ${LEVEL_STYLE[level]}`}>
     {level}
   </span>
 );
 
-/** One challenge card. `answer` shows the solution (TV after reveal; always on the host console). */
-export function CardView({ game, index, answer, size = "md" }: { game: GameId; index: number; answer: boolean; size?: "md" | "xl" }) {
+/**
+ * One challenge card. `answer` shows the solution (TV after reveal; always on the host console).
+ * `hint` shows a Fix it for real card's hint once an officer puts it up.
+ */
+export function CardView({
+  game,
+  index,
+  answer,
+  hint = false,
+  size = "md",
+}: {
+  game: GameId;
+  index: number;
+  answer: boolean;
+  hint?: boolean;
+  size?: "md" | "xl";
+}) {
   const big = size === "xl";
   const codeCls = big ? "text-[clamp(1.4rem,2.6vw,3rem)]" : "";
+  if (game === "fix") {
+    const f = FIXES[index];
+    // The TV swaps the buggy program for the fix on reveal, so both fit; the host console shows both.
+    return (
+      <div>
+        <p className={big ? "text-[clamp(1.5rem,2.2vw,2.4rem)] leading-snug" : "text-lg"}>
+          {f.task}
+          <LevelChip level={f.level} />
+        </p>
+        {!(answer && big) && <Code code={f.code} className={`my-3 ${big ? "text-[clamp(1.2rem,2vw,2.4rem)]" : ""}`} />}
+        {hint && !answer && <FixHint card={f} big={big} />}
+        {answer && (
+          <div className={big ? "mt-4" : "mt-4 border-t-2 border-dashed border-line pt-4"}>
+            <p className={big ? "text-2xl" : ""}>
+              <strong className="font-extrabold">The fix.</strong> {f.why}
+            </p>
+            <Code code={f.fix} mark={fixedLines(f)} className={`mt-2 ${big ? "text-[clamp(1.2rem,2vw,2.4rem)]" : ""}`} />
+          </div>
+        )}
+      </div>
+    );
+  }
   if (game === "bug") {
     const b = BUGS[index];
     return (

@@ -1,6 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { BUGS, LANGS, OUTPUTS } from "./content";
-import { LANGUAGES, answersOpen, awardsFor, choices, clockLeft, grade, isFreshStart, searchLanguages, settle, showCard } from "./grading";
+import { FIXES } from "./fixes";
+import {
+  LANGUAGES,
+  answersOpen,
+  awardsFor,
+  cardSeconds,
+  choices,
+  clockLeft,
+  fixAwardsFor,
+  grade,
+  isFreshStart,
+  sameOutput,
+  searchLanguages,
+  settle,
+  showCard,
+} from "./grading";
 
 const T0 = 1_000_000;
 const sec = (s: number) => T0 + s * 1000;
@@ -262,5 +277,83 @@ describe("card windows across screens", () => {
     expect(isFreshStart("add", full, T0)).toBe(false);
     expect(isFreshStart("toggle", { ...full, remainingMs: 40_000 }, T0)).toBe(false);
     expect(isFreshStart("set", { ...full, startedAt: undefined }, T0)).toBe(false);
+  });
+});
+
+describe("Fix it for real", () => {
+  test("output comparison ignores trailing spaces and trailing blank lines, nothing else", () => {
+    expect(sameOutput("Total candy: 11\n", "Total candy: 11")).toBe(true);
+    expect(sameOutput("a  \nb\t\n\n\n", "a\nb")).toBe(true);
+    expect(sameOutput("a\r\nb\r\n", "a\nb")).toBe(true);
+    expect(sameOutput("", "")).toBe(true);
+    expect(sameOutput(" a", "a")).toBe(false);
+    expect(sameOutput("a\n\nb", "a\nb")).toBe(false);
+    expect(sameOutput("\na", "a")).toBe(false);
+    expect(sameOutput("Tip: 4.9", "Tip: 4.90")).toBe(false);
+  });
+
+  test("every card is 4 minutes, shows at least one example, and keeps at least one test hidden", () => {
+    for (let i = 0; i < FIXES.length; i++) {
+      expect(cardSeconds("fix", i)).toBe(240);
+      expect(FIXES[i].tests.some((t) => t.show)).toBe(true);
+      expect(FIXES[i].tests.some((t) => !t.show)).toBe(true);
+    }
+  });
+
+  test("+3 for each fix, +2 more for the first one in", () => {
+    const r = fixAwardsFor({
+      index: 0,
+      double: false,
+      scored: ["bug:1"],
+      fixes: [
+        { id: "a", at: sec(50) },
+        { id: "b", at: sec(20) },
+        { id: "c", at: sec(90) },
+      ],
+    })!;
+    expect(r.scored).toEqual(["bug:1", "fix:0"]);
+    expect(r.awards).toEqual([
+      { id: "a", first: false, points: 3 },
+      { id: "b", first: true, points: 5 },
+      { id: "c", first: false, points: 3 },
+    ]);
+  });
+
+  test("an exact tie goes to whoever reported first", () => {
+    const r = fixAwardsFor({
+      index: 2,
+      double: false,
+      scored: [],
+      fixes: [
+        { id: "a", at: sec(30) },
+        { id: "b", at: sec(30) },
+      ],
+    })!;
+    expect(r.awards.map((a) => a.first)).toEqual([true, false]);
+  });
+
+  test("double points doubles both", () => {
+    const r = fixAwardsFor({
+      index: 0,
+      double: true,
+      scored: [],
+      fixes: [
+        { id: "a", at: sec(10) },
+        { id: "b", at: sec(20) },
+      ],
+    })!;
+    expect(r.awards.map((a) => a.points)).toEqual([10, 6]);
+  });
+
+  test("nobody fixed it: nothing to award, but the card still counts as scored", () => {
+    const r = fixAwardsFor({ index: 1, double: true, scored: [], fixes: [] })!;
+    expect(r.awards).toEqual([]);
+    expect(r.scored).toEqual(["fix:1"]);
+  });
+
+  test("revealing twice scores once", () => {
+    const fixes = [{ id: "a", at: sec(10) }];
+    const first = fixAwardsFor({ index: 3, double: false, scored: [], fixes })!;
+    expect(fixAwardsFor({ index: 3, double: false, scored: first.scored, fixes })).toBeNull();
   });
 });

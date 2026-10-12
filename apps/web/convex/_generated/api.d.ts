@@ -10,6 +10,7 @@
 
 import type * as answers from "../answers.js";
 import type * as dashboard from "../dashboard.js";
+import type * as fixes from "../fixes.js";
 import type * as interest from "../interest.js";
 import type * as lib from "../lib.js";
 import type * as officers from "../officers.js";
@@ -30,6 +31,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   answers: typeof answers;
   dashboard: typeof dashboard;
+  fixes: typeof fixes;
   interest: typeof interest;
   lib: typeof lib;
   officers: typeof officers;

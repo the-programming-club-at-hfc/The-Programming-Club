@@ -1,18 +1,19 @@
-// Phone answers and automatic scoring for Bug Hunt, Output?, and Guess the Language.
+// Phone answers and automatic scoring for Bug Hunt, Output?, and Guess the Language, plus Fix it for real.
 // Pure functions shared by Convex (convex/answers.ts) and the officer test page, so both score the same way.
 // Keep imports relative: Convex bundles this file too.
 import { BUGS, LANGS, OUTPUTS } from "./content";
 
-export type GameId = "bug" | "output" | "relay" | "lang";
+export type GameId = "bug" | "output" | "relay" | "lang" | "fix";
 export type AnswerGame = "bug" | "output" | "lang";
 
 export const isAnswerGame = (g: string | undefined): g is AnswerGame => g === "bug" || g === "output" || g === "lang";
 
 export const cardKey = (game: GameId, index: number) => `${game}:${index}`;
 
+const SECONDS = { output: 30, relay: 720, lang: 45, fix: 240 };
+
 /** Seconds on the clock for a card. */
-export const cardSeconds = (game: GameId, index: number) =>
-  game === "bug" ? (BUGS[index].level === "hard" ? 120 : 90) : game === "output" ? 30 : game === "relay" ? 720 : 45;
+export const cardSeconds = (game: GameId, index: number) => (game === "bug" ? (BUGS[index].level === "hard" ? 120 : 90) : SECONDS[game]);
 
 /** How long after the card goes up a lock still earns the early bonus. Output? has none. */
 export const earlyMs = (game: AnswerGame, index: number) =>
@@ -161,6 +162,43 @@ export function awardsFor<T>(o: {
     }),
   };
 }
+
+// ---- Fix it for real ------------------------------------------------------
+
+/** Program output as the tests compare it: trailing spaces on each line and trailing blank lines don't matter. */
+export const tidyOutput = (s: string) =>
+  s
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .join("\n")
+    .replace(/\n+$/, "");
+
+export const sameOutput = (actual: string, expected: string) => tidyOutput(actual) === tidyOutput(expected);
+
+/** Points for fixing a Fix it for real card in time, and the extra for the first team to fix it. */
+export const FIX_POINTS = 3;
+export const FIRST_FIX_BONUS = 2;
+
+/**
+ * What to award when a Fix it for real card is revealed. `fixes` are the teams that fixed it before it closed, with
+ * server times, in the order they reported (so an exact tie goes to whoever reported first). +3 each, +2 more for the
+ * first, all doubled on a double-points round. Returns null if the card was already scored tonight.
+ */
+export function fixAwardsFor<T>(o: { index: number; double: boolean; scored: string[]; fixes: { id: T; at: number }[] }) {
+  const key = cardKey("fix", o.index);
+  if (o.scored.includes(key)) return null;
+  const first = o.fixes.reduce((best, f, i) => (f.at < o.fixes[best].at ? i : best), 0);
+  return {
+    scored: [...o.scored, key],
+    awards: o.fixes.map(({ id }, i) => {
+      const points = FIX_POINTS + (i === first ? FIRST_FIX_BONUS : 0);
+      return { id, first: i === first, points: o.double ? points * 2 : points };
+    }),
+  };
+}
+
+// ---- The answer window, shared by every team-answered game ----------------
 
 /** Server leeway after 0:00 for answers already on their way. */
 export const GRACE_MS = 2000;

@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-export const gameV = v.union(v.literal("bug"), v.literal("output"), v.literal("relay"), v.literal("lang"));
+export const gameV = v.union(v.literal("bug"), v.literal("output"), v.literal("relay"), v.literal("lang"), v.literal("fix"));
 
 // What the TV is showing. Cards are referenced by index into lib/content.ts.
 export const screenV = v.object({
@@ -16,6 +16,8 @@ export const screenV = v.object({
   game: v.optional(gameV),
   index: v.optional(v.number()),
   revealed: v.optional(v.boolean()),
+  // Fix it for real: the card's hint is up on the TV, phones, and team computers.
+  hint: v.optional(v.boolean()),
   wikiFrom: v.optional(v.string()),
   wikiTo: v.optional(v.string()),
   message: v.optional(v.string()),
@@ -129,6 +131,20 @@ export default defineSchema({
         fix: v.optional(v.boolean()),
       }),
     ),
+  })
+    .index("by_session_card", ["sessionId", "card"])
+    .index("by_team_card", ["teamId", "card"]),
+
+  // Fix it for real: a team's working fix, reported by its team computer once every test passed. See convex/fixes.ts.
+  fixes: defineTable({
+    sessionId: v.id("sessions"),
+    teamId: v.id("teams"),
+    card: v.string(),
+    // Server time the fix came in.
+    at: v.number(),
+    code: v.string(),
+    // Set when the card is revealed. `points` includes double points.
+    result: v.optional(v.object({ points: v.number(), first: v.boolean() })),
   })
     .index("by_session_card", ["sessionId", "card"])
     .index("by_team_card", ["teamId", "card"]),

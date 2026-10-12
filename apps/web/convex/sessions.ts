@@ -3,7 +3,8 @@ import { mutation, query } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import { openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { screenV } from "./schema";
-import { liveCard, scoreReveal } from "./answers";
+import { scoreReveal } from "./answers";
+import { scoreFixReveal, timedCard } from "./fixes";
 import type { Doc } from "./_generated/dataModel";
 import { clockLeft, isFreshStart, settle, showCard } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
@@ -120,11 +121,12 @@ export const setScreen = mutation({
     const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
     // Each answerable card keeps its own window; anything else going up clears the current one.
     const now = Date.now();
-    const w = showCard({ ...settled(s, now), up: liveCard(next)?.key, now });
+    const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now });
     Object.assign(next, { card: w.card, played: w.played });
     await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
-    // Revealing scores phone answers, once per card.
+    // Revealing scores phone answers or Fix it for real fixes, once per card.
     await scoreReveal(ctx, next);
+    await scoreFixReveal(ctx, next);
   },
 });
 
@@ -162,7 +164,7 @@ export const timer = mutation({
     const now = Date.now();
     const t = { ...s.timer };
     const remaining = Math.max(0, clockLeft(t, now));
-    const card = liveCard(s)?.key;
+    const card = timedCard(s)?.key;
     let { card: w, played } = settled(s, now);
     switch (action) {
       case "set": {

@@ -88,6 +88,17 @@ const PICTOS = {
       </g>
     </>
   ),
+  fix: (
+    <>
+      {/* At the keyboard: the screen's check mark draws itself in when the tests pass. */}
+      <circle cx="20" cy="22" r="8" {...F} />
+      <path {...S} strokeWidth="10" d="M20 35v24M20 59l-7 27M20 59l7 27" />
+      <path {...S} strokeWidth="10" d="M20 42l20 14" className="pa pa-point" style={at(20, 42)} />
+      <rect x="48" y="16" width="40" height="32" rx="3" {...S} strokeWidth="6" />
+      <path {...S} strokeWidth="6" d="M42 62h50M68 48v14" />
+      <path {...S} strokeWidth="6" d="M58 32l7 7 13-13" pathLength={1} className="pa pa-draw" />
+    </>
+  ),
   keycap: (
     <>
       <path {...F} d="M22 16h52c3 0 5 2 5 5l9 58c1 4-2 7-6 7H14c-4 0-7-3-6-7l9-58c0-3 2-5 5-5Z" />
@@ -147,6 +158,7 @@ export const GAME_TILE: Record<string, { picto: PictoId; tile: string }> = {
   output: { picto: "output", tile: "tile-silver" },
   pictionary: { picto: "pictionary", tile: "tile-pine" },
   lang: { picto: "lang", tile: "tile-sky" },
+  fix: { picto: "fix", tile: "tile-meadow" },
 };
 
 /** The pictogram and color that stand for a week: its final-round game, or the keycap on Cup nights. */
@@ -173,12 +185,23 @@ export function highlight(line: string) {
   return out + esc(line.slice(last));
 }
 
-export function Code({ code, numbered = true, className = "" }: { code: string; numbered?: boolean; className?: string }) {
+/** Highlighted Python. `mark` lists 1-based lines to call out, like the lines a fix changed. */
+export function Code({
+  code,
+  numbered = true,
+  mark = [],
+  className = "",
+}: {
+  code: string;
+  numbered?: boolean;
+  mark?: number[];
+  className?: string;
+}) {
   return (
     <pre className={`code ${className}`}>
       <code>
         {code.split("\n").map((l, i) => (
-          <span className="cl" key={i}>
+          <span className={`cl ${mark.includes(i + 1) ? "-mx-2 bg-sun/20 px-2" : ""}`} key={i}>
             {numbered && <span className="ln">{i + 1}</span>}
             <span dangerouslySetInnerHTML={{ __html: highlight(l) || " " }} />
           </span>
