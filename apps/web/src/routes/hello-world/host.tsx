@@ -3,7 +3,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, useRemaining } from "#/components/game";
@@ -59,17 +59,21 @@ function Console() {
 
 function Running({ live, rows }: { live: Live; rows: Row[] }) {
   const [tab, setTab] = useState<Tab>("bug");
-  const [playing, setPlaying] = useState<string | null>(null);
+  const [playing, setPlaying] = useState<number | null>(null);
+  const deck = useRef<HTMLDivElement>(null);
   return (
     <>
       <Header live={live} />
       <LineupPanel
         week={live.week}
         playing={playing}
-        onPlay={(label) => {
-          setPlaying(label);
+        onPlay={(i, label) => {
+          setPlaying(i);
           const id = gamesIn(label)[0];
-          if (TABS.some(([t]) => t === id)) setTab(id as Tab);
+          if (!TABS.some(([t]) => t === id)) return;
+          setTab(id as Tab);
+          // The game's controls are further down the page, so bring them into view.
+          deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
         className="mt-6"
       />
@@ -80,7 +84,9 @@ function Running({ live, rows }: { live: Live; rows: Row[] }) {
           <TeamsPanel live={live} />
         </div>
         <div className="space-y-6">
-          <DeckPanel live={live} tab={tab} setTab={setTab} />
+          <div ref={deck} className="scroll-mt-6">
+            <DeckPanel live={live} tab={tab} setTab={setTab} />
+          </div>
           <PlayersPanel live={live} rows={rows} sessionId={live._id} />
         </div>
       </div>
@@ -360,8 +366,8 @@ function LineupPanel({
   className = "",
 }: {
   week: number;
-  playing?: string | null;
-  onPlay?: (label: string) => void;
+  playing?: number | null;
+  onPlay?: (i: number, label: string) => void;
   className?: string;
 }) {
   const save = useMutation(api.schedule.save);
@@ -409,7 +415,7 @@ function LineupPanel({
           {lineup.map((g, i) => {
             const id = gamesIn(g.label)[0];
             const gt = id ? GAME_TILE[id] : null;
-            const on = playing === g.label;
+            const on = playing === i;
             return (
               <li key={`${i}-${g.label}`} className={`flex flex-wrap items-center gap-2 p-2 ${on ? "bg-sun/30" : "bg-mist"}`}>
                 <span className="narrow w-6 text-center text-lg font-extrabold">{i + 1}</span>
@@ -421,7 +427,7 @@ function LineupPanel({
                   {g.double && <span className="chip ml-2">×2</span>}
                 </span>
                 {onPlay && (
-                  <button className={`btn btn-sm ${on ? "btn-on" : "btn-coin"}`} onClick={() => onPlay(g.label)}>
+                  <button className={`btn btn-sm ${on ? "btn-on" : "btn-coin"}`} onClick={() => onPlay(i, g.label)}>
                     {on ? "Playing" : "Play"}
                   </button>
                 )}
