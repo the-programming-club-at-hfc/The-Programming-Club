@@ -6,11 +6,12 @@ import { ConvexError } from "convex/values";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { CardView, DECKS, fmtClock, useRemaining } from "#/components/game";
+import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import type { GameId, Screen } from "#/components/game";
 import { ExportButton, OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap } from "#/components/ui";
 import { BUGS, PICTIONARY, RELAYS, WIKI_RACES } from "#/lib/content";
+import { FIXES } from "#/lib/fixes";
 import { isAnswerGame } from "#/lib/grading";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
@@ -60,6 +61,8 @@ function Console() {
 
 function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[] }) {
   const [tab, setTab] = useState<Tab>("bug");
+  // The lineup round being played picks the deck's filter, e.g. spooky cards for "Fix it for real, spooky".
+  const [start, setStart] = useState<{ tab: Tab; filter: Filter } | null>(null);
   const [playing, setPlaying] = useState<number | null>(null);
   const deck = useRef<HTMLDivElement>(null);
   const setDouble = useMutation(api.sessions.setDouble);
@@ -76,6 +79,7 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
           const id = gamesIn(item.label)[0];
           if (!TABS.some(([t]) => t === id)) return;
           setTab(id as Tab);
+          setStart({ tab: id as Tab, filter: filterFor(item.label) });
           // The game's controls are further down the page, so bring them into view.
           deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
@@ -89,7 +93,7 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
         </div>
         <div className="space-y-6">
           <div ref={deck} className="scroll-mt-6">
-            <DeckPanel live={live} tab={tab} setTab={setTab} used={used} />
+            <DeckPanel live={live} tab={tab} setTab={setTab} used={used} filter={start?.tab === tab ? start.filter : "all"} />
           </div>
           <PlayersPanel live={live} rows={rows} sessionId={live._id} />
         </div>
@@ -534,6 +538,7 @@ function LineupPanel({
 type Tab = GameId | "wiki" | "pictionary";
 const TABS: [Tab, string][] = [
   ["bug", "Bug Hunt"],
+  ["fix", "Fix it for real"],
   ["output", "Output?"],
   ["relay", "Code Relay"],
   ["wiki", "Wiki Race"],
@@ -541,8 +546,22 @@ const TABS: [Tab, string][] = [
   ["lang", "Guess the Language"],
 ];
 type Filter = "all" | "easy" | "medium" | "hard" | "spooky";
+const filterFor = (label: string): Filter =>
+  (["spooky", "easy", "medium", "hard"] as const).find((f) => label.toLowerCase().includes(f)) ?? "all";
 
-function DeckPanel({ live, tab, setTab, used }: { live: Live; tab: Tab; setTab: (t: Tab) => void; used: string[] }) {
+function DeckPanel({
+  live,
+  tab,
+  setTab,
+  used,
+  filter,
+}: {
+  live: Live;
+  tab: Tab;
+  setTab: (t: Tab) => void;
+  used: string[];
+  filter: Filter;
+}) {
   return (
     <Panel title="Games" className="">
       <div className="flex flex-wrap gap-1 border-b-4 border-line pb-2">
@@ -562,7 +581,7 @@ function DeckPanel({ live, tab, setTab, used }: { live: Live; tab: Tab; setTab: 
         ) : tab === "pictionary" ? (
           <PictionaryTool />
         ) : (
-          <CardTool key={tab} game={tab} live={live} used={used} />
+          <CardTool key={`${tab}:${filter}`} game={tab} live={live} used={used} initial={filter} />
         )}
       </div>
     </Panel>
@@ -574,11 +593,12 @@ function deckFor(game: GameId, filter: Filter) {
   const all = Array.from({ length: DECKS[game].size }, (_, i) => i);
   if (filter === "all") return all;
   if (game === "bug") return all.filter((i) => (filter === "spooky" ? BUGS[i].spooky : BUGS[i].level === filter));
+  if (game === "fix") return all.filter((i) => (filter === "spooky" ? FIXES[i].spooky : FIXES[i].level === filter));
   if (game === "relay") return all.filter((i) => RELAYS[i].level === filter);
   return all;
 }
 
-function CardTool({ game, live, used }: { game: GameId; live: Live; used: string[] }) {
+function CardTool({ game, live, used, initial }: { game: GameId; live: Live; used: string[]; initial: Filter }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const s = live.screen;
@@ -589,9 +609,15 @@ function CardTool({ game, live, used }: { game: GameId; live: Live; used: string
       0,
       list.findIndex((i) => !isUsed(i)),
     );
-  const [filter, setFilter] = useState<Filter>("all");
+  const filters: Filter[] =
+    game === "bug" || game === "fix" ? ["all", "easy", "medium", "hard", "spooky"] : game === "relay" ? ["all", "easy", "medium"] : [];
+  const [filter, setFilter] = useState<Filter>(() =>
+    filters.includes(initial) && (tvIndex === undefined || deckFor(game, initial).includes(tvIndex)) ? initial : "all",
+  );
   // Start on the card the TV is showing, or else the first card not shown on any night yet.
-  const [pos, setPos] = useState(() => tvIndex ?? firstFresh(deckFor(game, "all")));
+  const [pos, setPos] = useState(() =>
+    tvIndex !== undefined ? deckFor(game, filter).indexOf(tvIndex) : firstFresh(deckFor(game, filter)),
+  );
 
   const indexes = useMemo(() => deckFor(game, filter), [game, filter]);
   const index = indexes[Math.min(pos, indexes.length - 1)] ?? 0;
@@ -621,8 +647,6 @@ function CardTool({ game, live, used }: { game: GameId; live: Live; used: string
     setPos(next);
     if (tvIndex !== undefined) void run(setScreen({ screen: { mode: "card", game, index: indexes[next], revealed: false } }));
   };
-  const filters: Filter[] =
-    game === "bug" ? ["all", "easy", "medium", "hard", "spooky"] : game === "relay" ? ["all", "easy", "medium"] : [];
   const secs = DECKS[game].seconds(index);
 
   return (
@@ -685,6 +709,7 @@ function CardTool({ game, live, used }: { game: GameId; live: Live; used: string
           : "Preview. The answer is only on your screen."}
       </p>
       {onTv && isAnswerGame(game) && <AnswerStatus />}
+      {onTv && game === "fix" && <FixStatus live={live} />}
       <div className="mt-2 border-4 border-line bg-mist p-4">
         <CardView game={game} index={index} answer />
       </div>
@@ -750,6 +775,62 @@ function AnswerStatus() {
         {data.scored
           ? "Points went on the board when you revealed. Use the score buttons to fix anything."
           : "Revealing adds the points automatically, once. If phones or Wi-Fi fail, teams use whiteboards and you score with the buttons."}
+      </p>
+    </div>
+  );
+}
+
+/** Fix it for real on the TV: each team's status and the code that passed, the hint button, then the points. */
+function FixStatus({ live }: { live: Live }) {
+  const data = useQuery(api.fixes.host);
+  const setScreen = useMutation(api.sessions.setScreen);
+  if (!data) return null;
+  const s = live.screen;
+  const fixedCount = data.teams.filter((t) => t.fixed).length;
+  return (
+    <div className="mt-3 border-4 border-line p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-bold">
+          {data.scored ? "Scored" : `Fixed: ${fixedCount} of ${data.teams.length} teams`} · team computers at /hello-world/fix
+        </p>
+        {!s.revealed && !data.scored && (
+          <button
+            className={`btn btn-sm ml-auto ${s.hint ? "btn-on" : ""}`}
+            onClick={() => run(setScreen({ screen: { ...s, hint: !s.hint } }))}
+            aria-pressed={!!s.hint}
+          >
+            {s.hint ? "Hide hint" : "Show hint"}
+          </button>
+        )}
+      </div>
+      {data.teams.length === 0 ? (
+        <p className="text-sm text-dim">No teams yet.</p>
+      ) : (
+        <ul className="mt-1 divide-y-2 divide-grid/60">
+          {data.teams.map((t) => (
+            <li key={t._id} className="py-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold">{t.name}</span>
+                <span className={`chip ${t.fixed ? "bg-pine text-white" : ""}`}>
+                  {t.fixed ? `Fixed${t.ms === null ? "" : ` at ${fmtElapsed(t.ms)}`}` : "Not fixed yet"}
+                </span>
+                {t.first && <span className="chip bg-gold text-[#12332b]">First</span>}
+                {data.scored && <span className="narrow ml-auto text-xl font-extrabold">+{t.result?.points ?? 0}</span>}
+              </div>
+              {t.code !== null && (
+                <details className="mt-1 text-sm">
+                  <summary className="cursor-pointer text-dim">Their code</summary>
+                  <pre className="code mt-1 text-sm">{t.code}</pre>
+                </details>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-dim">
+        {data.scored
+          ? "Points went on the board when you revealed. Use the score buttons to fix anything."
+          : "Team computers mark a team fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points."}
       </p>
     </div>
   );

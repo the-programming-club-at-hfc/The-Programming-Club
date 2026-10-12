@@ -1,24 +1,29 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { NO_PICK, PhoneRound } from "#/components/answer";
+import { FixRound } from "#/components/fix";
 import type { PickArgs, TeamPick } from "#/components/answer";
 import { CardView, DECKS, LevelChip, fmtClock } from "#/components/game";
 import { OfficerGate } from "#/components/officer";
 import { Wrap } from "#/components/ui";
 import { BUGS, OUTPUTS } from "#/lib/content";
-import { answersOpen, awardsFor, cardKey, cardSeconds, earlyMs } from "#/lib/grading";
+import { FIXES } from "#/lib/fixes";
+import { FIRST_FIX_BONUS, FIX_POINTS, answersOpen, awardsFor, cardKey, cardSeconds, earlyMs, fixAwardsFor } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
+import { usePython } from "#/lib/python";
+import type { Python } from "#/lib/python";
 import { CLUB } from "#/lib/season";
 import { sfx, unlockAudio } from "#/lib/sound";
 
-// Officers play every phone-answered card as a fake team, with the real answer components and scoring,
-// and flag cards that are too easy, too hard, or broken. Nothing here writes to the database.
+// Officers play every phone-answered card (and every Fix it for real card, with real Python) as a fake team, with the
+// real components and scoring, and flag cards that are too easy, too hard, or broken. Nothing here writes to the database.
 export const Route = createFileRoute("/hello-world/test")({
   head: () => ({ meta: [{ title: `Test the decks · ${CLUB.season}` }, { name: "robots", content: "noindex" }] }),
   component: TestPage,
 });
 
-const GAMES: AnswerGame[] = ["bug", "output", "lang"];
+type TestGame = AnswerGame | "fix";
+const GAMES: TestGame[] = ["bug", "fix", "output", "lang"];
 const FLAGS = ["too easy", "too hard", "broken"] as const;
 type Flag = { flag: (typeof FLAGS)[number]; note: string };
 const FLAGS_KEY = "hwc.flags";
@@ -46,17 +51,27 @@ function useFlags() {
   return [flags, save] as const;
 }
 
-const levelOf = (game: AnswerGame, i: number) =>
-  game === "bug" ? <LevelChip level={BUGS[i].level} /> : game === "output" && OUTPUTS[i].tiebreak ? <LevelChip level="hard" /> : null;
+const levelName = (game: TestGame, i: number) =>
+  game === "bug" ? BUGS[i].level : game === "fix" ? FIXES[i].level : game === "output" && OUTPUTS[i].tiebreak ? "hard" : null;
+const levelOf = (game: TestGame, i: number) => {
+  const l = levelName(game, i);
+  return l && <LevelChip level={l} />;
+};
 
 function Tester() {
-  const [game, setGame] = useState<AnswerGame>("bug");
+  const [game, setGame] = useState<TestGame>("bug");
   const [index, setIndex] = useState(0);
   const [tv, setTv] = useState(true);
   const [flags, saveFlags] = useFlags();
   const size = DECKS[game].size;
   const go = (d: number) => setIndex((index + d + size) % size);
   const flag = flags[cardKey(game, index)] as Flag | undefined;
+  // Python loads the first time someone opens the Fix it for real deck, then stays ready.
+  const [pyOn, setPyOn] = useState(false);
+  useEffect(() => {
+    if (game === "fix") setPyOn(true);
+  }, [game]);
+  const py = usePython(pyOn);
 
   return (
     <>
@@ -65,8 +80,8 @@ function Tester() {
           <p className="font-bold text-pine">Officers</p>
           <h1 className="text-[clamp(2.4rem,6vw,3.6rem)] lowercase">test the decks</h1>
           <p className="mt-2 max-w-[60ch] text-dim">
-            Play every card the way a team does on a phone, then reveal to see what the real scoring gives. Flag cards that are too easy,
-            too hard, or broken. Nothing here touches tonight’s game.
+            Play every card the way a team does on a phone (or, for Fix it for real, on a team computer), then reveal to see what the real
+            scoring gives. Flag cards that are too easy, too hard, or broken. Nothing here touches tonight’s game.
           </p>
         </div>
         <Link to="/hello-world/host" className="btn btn-sm ml-auto">
@@ -108,7 +123,11 @@ function Tester() {
       </div>
 
       <div className="mt-6 flex flex-wrap items-start gap-6">
-        <Play key={cardKey(game, index)} game={game} index={index} tv={tv} />
+        {game === "fix" ? (
+          <FixPlay key={cardKey(game, index)} index={index} tv={tv} py={py} />
+        ) : (
+          <Play key={cardKey(game, index)} game={game} index={index} tv={tv} />
+        )}
       </div>
 
       <FlagPanel
@@ -243,6 +262,104 @@ function Play({ game, index, tv }: { game: AnswerGame; index: number; tv: boolea
   );
 }
 
+/** One Fix it for real card on a pretend team computer, with real Python and the same scoring Convex uses. */
+function FixPlay({ index, tv, py }: { index: number; tv: boolean; py: Python }) {
+  const secs = cardSeconds("fix", index);
+  const [start, setStart] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  const [timed, setTimed] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [hint, setHint] = useState(false);
+  const [double, setDouble] = useState(false);
+  const [fixedAt, setFixedAt] = useState<number | null>(null);
+  const [round, setRound] = useState(0);
+
+  useEffect(() => {
+    if (!timed || revealed) return;
+    const id = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(id);
+  }, [timed, revealed]);
+
+  const remaining = timed ? Math.max(0, start + secs * 1000 - now) : secs * 1000;
+  const open = answersOpen({ revealed, scored: false, endedAt: undefined, own: timed, running: timed, remaining, now, grace: 0 });
+  const award = fixAwardsFor({ index, double, scored: [], fixes: fixedAt === null ? [] : [{ id: 0, at: fixedAt }] })?.awards[0];
+  const result = revealed && award ? { points: award.points, first: award.first } : null;
+
+  const restart = (withTimer: boolean) => {
+    const t = Date.now();
+    setStart(t);
+    setNow(t);
+    setTimed(withTimer);
+    setRevealed(false);
+    setHint(false);
+    setFixedAt(null);
+    setRound((r) => r + 1);
+  };
+
+  return (
+    <>
+      <div className="w-full">
+        {timed && !revealed && (
+          <p className={`narrow mb-3 text-6xl leading-none font-extrabold ${remaining <= 10_000 ? "text-signal" : ""}`}>
+            {remaining === 0 ? "time" : fmtClock(remaining)}
+          </p>
+        )}
+        <FixRound
+          key={round}
+          index={index}
+          py={py}
+          revealed={revealed}
+          hint={hint}
+          open={open}
+          fixed={fixedAt === null ? null : { ms: fixedAt - start }}
+          result={result}
+          onFixed={async () => setFixedAt((f) => f ?? Date.now())}
+        />
+        <div className="mt-4 flex flex-wrap gap-1">
+          {revealed ? (
+            <button className="btn btn-sm btn-coin" onClick={() => restart(timed)}>
+              Play again
+            </button>
+          ) : (
+            <button
+              className="btn btn-sm btn-coin"
+              onClick={() => {
+                setRevealed(true);
+                void unlockAudio().then(() => sfx.reveal());
+              }}
+            >
+              Reveal
+            </button>
+          )}
+          <button className={`btn btn-sm ${hint ? "btn-on" : ""}`} onClick={() => setHint(!hint)} aria-pressed={hint} disabled={revealed}>
+            Show hint
+          </button>
+          <button className="btn btn-sm" onClick={() => restart(true)}>
+            Start {fmtClock(secs * 1000)} timer
+          </button>
+          <button className="btn btn-sm" onClick={() => restart(false)}>
+            Reset, no timer
+          </button>
+          <button className={`btn btn-sm ${double ? "btn-on" : ""}`} onClick={() => setDouble(!double)} aria-pressed={double}>
+            Double points
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-dim">
+          +{FIX_POINTS} for a fix in time, +{FIRST_FIX_BONUS} more for the first team. You’re the only team here, so a fix is first.
+          {fixedAt !== null && ` You fixed it at ${((fixedAt - start) / 1000).toFixed(1)}s.`}
+          {revealed && ` Real scoring: +${result?.points ?? 0}.`}
+        </p>
+      </div>
+      {tv && (
+        <div className="theme-pine min-w-0 flex-1 basis-[28rem] rounded-[10px] p-6">
+          <p className="mb-3 text-sm font-bold text-dim">TV · {DECKS.fix.name}</p>
+          <CardView game="fix" index={index} answer={revealed} hint={hint} />
+        </div>
+      )}
+    </>
+  );
+}
+
 function FlagPanel({
   game,
   index,
@@ -250,11 +367,11 @@ function FlagPanel({
   save,
   jump,
 }: {
-  game: AnswerGame;
+  game: TestGame;
   index: number;
   flags: Record<string, Flag>;
   save: (f: Record<string, Flag>) => void;
-  jump: (g: AnswerGame, i: number) => void;
+  jump: (g: TestGame, i: number) => void;
 }) {
   const key = cardKey(game, index);
   const cur = flags[key] as Flag | undefined;
@@ -274,7 +391,7 @@ function FlagPanel({
   const text = list
     .map(
       ({ g, i, f }) =>
-        `${DECKS[g].name}, card ${i + 1}${g === "bug" ? ` (${BUGS[i].level})` : ""}: ${f.flag}${f.note ? `. ${f.note}` : ""}`,
+        `${DECKS[g].name}, card ${i + 1}${g === "bug" || g === "fix" ? ` (${levelName(g, i)})` : ""}: ${f.flag}${f.note ? `. ${f.note}` : ""}`,
     )
     .join("\n");
 

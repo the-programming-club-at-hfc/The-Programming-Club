@@ -52,6 +52,7 @@ export const me = query({
           mates.filter((m) => m.teamId === mine._id).map(async (m) => (await ctx.db.get(m.playerId))?.name ?? "?"),
         );
         team = {
+          _id: mine._id,
           name: mine.name,
           score: mine.score,
           rank: 1 + teams.filter((t) => t.score > mine.score).length,

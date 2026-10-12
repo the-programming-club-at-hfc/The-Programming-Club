@@ -4,7 +4,7 @@ import type { FunctionReturnType } from "convex/server";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { CardView, DECKS, fmtClock, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
 import { OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
@@ -20,6 +20,7 @@ export const Route = createFileRoute("/hello-world/tv")({
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type Board = NonNullable<FunctionReturnType<typeof api.answers.board>>;
+type FixBoard = NonNullable<FunctionReturnType<typeof api.fixes.board>>;
 
 function useOrigin() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
@@ -125,9 +126,12 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const answerable = s.mode === "card" && isAnswerGame(s.game) && s.index !== undefined;
   const boardData = useQuery(api.answers.board, answerable ? {} : "skip");
   const board = answerable && s.game && s.index !== undefined && boardData?.card === cardKey(s.game, s.index) ? boardData : null;
-  useLockSound(board);
+  const isFix = s.mode === "card" && s.game === "fix" && s.index !== undefined;
+  const fixData = useQuery(api.fixes.board, isFix ? {} : "skip");
+  const fixBoard = isFix && s.index !== undefined && fixData?.card === cardKey("fix", s.index) ? fixData : null;
+  useCountSound(board ? board.card : fixBoard?.card, board ? board.locked : (fixBoard?.fixed.length ?? null));
   // A card already scored tonight shows as played (answer and results), like it does on phones.
-  const done = !!s.revealed || !!board?.results;
+  const done = !!s.revealed || !!board?.results || !!fixBoard?.scored;
 
   return (
     <>
@@ -153,10 +157,16 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                   <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} teams locked in
                 </span>
               )}
+              {fixBoard && !done && fixBoard.teams > 0 && (
+                <span className="ml-auto">
+                  <span className="narrow text-[2.6vw] font-extrabold">{fixBoard.fixed.length}</span> of {fixBoard.teams} teams fixed it
+                </span>
+              )}
             </p>
-            <div className={board?.results ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
-              <CardView game={s.game} index={s.index} answer={done} size="xl" />
+            <div className={board?.results || fixBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
+              <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" />
               {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
+              {fixBoard && <FixList board={fixBoard} done={done} />}
             </div>
           </div>
         )}
@@ -215,15 +225,43 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   );
 }
 
-/** A pop each time another team locks in. */
-function useLockSound(board: Board | null) {
-  const prev = useRef<{ card: string; locked: number | null } | null>(null);
+/** A pop each time another team locks in (or fixes it, in Fix it for real). */
+function useCountSound(card: string | undefined, n: number | null) {
+  const prev = useRef<{ card: string; n: number | null } | null>(null);
   useEffect(() => {
-    if (!board) return;
+    if (!card) return;
     const p = prev.current;
-    prev.current = { card: board.card, locked: board.locked };
-    if (p?.card === board.card && board.locked !== null && board.locked > (p.locked ?? 0)) sfx.join(board.locked);
-  }, [board?.card, board?.locked]);
+    prev.current = { card, n };
+    if (p?.card === card && n !== null && n > (p.n ?? 0)) sfx.join(n);
+  }, [card, n]);
+}
+
+/** Fix it for real: the teams that fixed it, in order, with their times. Points join them once it's scored. No code. */
+function FixList({ board, done }: { board: FixBoard; done: boolean }) {
+  return (
+    <div>
+      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your team computer</p>}
+      {board.fixed.length === 0 ? (
+        <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
+      ) : (
+        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
+          {board.fixed.map((f, i) => (
+            <li key={f.teamId} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
+              <span className="narrow text-[2.4vw] leading-none font-extrabold text-meadow">{i + 1}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{f.name}</span>
+                <span className="block text-[1.2vw] text-dim">
+                  {f.ms === null ? "fixed" : `fixed at ${fmtElapsed(f.ms)}`}
+                  {f.result?.first ? " · first" : ""}
+                </span>
+              </span>
+              <span className="narrow text-[2.6vw] leading-none font-extrabold">{f.result ? `+${f.result.points}` : "✓"}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
 }
 
 /** Who got what on the revealed card. Picks stay hidden until now. */

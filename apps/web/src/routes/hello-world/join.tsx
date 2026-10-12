@@ -5,12 +5,13 @@ import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
-import { CardView, fmtClock, useRemaining } from "#/components/game";
+import { CardView, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { answersOpen, cardKey, isAnswerGame } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
 import { useSchedule } from "#/lib/schedule";
 import { CLUB } from "#/lib/season";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/hello-world/join")({
   validateSearch: (s: Record<string, unknown>): { code?: string } => (typeof s.code === "string" ? { code: s.code } : {}),
@@ -269,9 +270,11 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         <div className="mt-8">
           {isAnswerGame(s.game) && me.team ? (
             <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
+          ) : s.game === "fix" && me.team ? (
+            <FixStatus live={live} index={s.index} teamId={me.team._id} />
           ) : (
             <div className="card p-5">
-              <CardView game={s.game} index={s.index} answer={!!s.revealed} />
+              <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} />
             </div>
           )}
         </div>
@@ -352,5 +355,32 @@ function TeamAnswer({
       onPick={(p) => send(pick({ token, card: key, ...p }))}
       onLock={(step) => send(lock({ token, card: key, step }))}
     />
+  );
+}
+
+/** Fix it for real happens on the team computer; the phone shows the card and whether the team has fixed it. */
+function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId: Id<"teams"> }) {
+  const board = useQuery(api.fixes.board);
+  const key = cardKey("fix", index);
+  const mine = board?.card === key ? board.fixed.find((f) => f.teamId === teamId) : undefined;
+  const done = !!live.screen.revealed || live.scored.includes(key);
+  const status = mine
+    ? done && mine.result
+      ? `Fixed! +${mine.result.points}`
+      : `Fixed!${mine.ms === null ? "" : ` at ${fmtElapsed(mine.ms)}`}`
+    : done
+      ? "Not fixed this time"
+      : "Not fixed yet";
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-[10px] p-5 ${mine ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
+        <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">{status}</p>
+        {!done && <p className="mt-2 font-semibold">Fix it on your team computer. This phone keeps you posted.</p>}
+        {mine?.result?.first && <p className="mt-2 font-semibold">First team to fix it.</p>}
+      </div>
+      <div className="card p-5">
+        <CardView game="fix" index={index} answer={done} hint={!!live.screen.hint} />
+      </div>
+    </div>
   );
 }
