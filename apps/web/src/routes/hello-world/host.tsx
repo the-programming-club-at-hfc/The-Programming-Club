@@ -3,7 +3,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, useRemaining } from "#/components/game";
@@ -579,6 +579,14 @@ function CardTool({ game, live, used }: { game: GameId; live: Live; used: string
 
   const indexes = useMemo(() => deckFor(game, filter), [game, filter]);
   const index = indexes[Math.min(pos, indexes.length - 1)] ?? 0;
+
+  // Follow the TV when another officer changes the card, dropping a filter that hides it.
+  useEffect(() => {
+    if (tvIndex === undefined) return;
+    const i = deckFor(game, filter).indexOf(tvIndex);
+    if (i === -1) setFilter("all");
+    setPos(i === -1 ? tvIndex : i);
+  }, [tvIndex]);
   const onTv = tvIndex === index;
 
   // Next skips cards already shown this season; Prev just steps back.

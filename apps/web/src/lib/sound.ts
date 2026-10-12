@@ -241,6 +241,11 @@ function playSynth(song: Song) {
   let s = 0;
   let next = a.currentTime + 0.1;
   seq = setInterval(() => {
+    // If the tab stalled, skip the notes we missed instead of playing them all at once.
+    while (next < a.currentTime) {
+      s++;
+      next += len;
+    }
     while (next < a.currentTime + 0.15) {
       song.step(s++, next, len);
       next += len;
