@@ -95,6 +95,8 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     createdAt: v.number(),
+    // Joined while signed in with this email, so joining with it now takes that sign-in (nobody can type it in instead).
+    account: v.optional(v.boolean()),
     // Unused: left from the old after-join idea prompt, kept only because a few dev docs still have it set.
     ideaPrompt: v.optional(v.union(v.literal("sent"), v.literal("skipped"))),
   }).index("by_email", ["email"]),
