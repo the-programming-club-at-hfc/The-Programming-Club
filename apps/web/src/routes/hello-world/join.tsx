@@ -1,3 +1,4 @@
+import { SignInButton, SignOutButton } from "@clerk/tanstack-react-start";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -101,11 +102,13 @@ function JoinForm({
   onJoined: (t: string) => void;
 }) {
   const join = useMutation(api.players.join);
+  const joinSignedIn = useMutation(api.players.joinSignedIn);
   const checkInOfficer = useMutation(api.players.checkInOfficer);
-  // A phone signed in as an officer checks in to run the night instead of joining a team.
-  const { isAuthenticated } = useConvexAuth();
-  const account = useQuery(api.officers.me, isAuthenticated ? {} : "skip");
+  // A phone signed in to an account joins in one tap; an officer's account checks in to run the night instead.
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  const account = useQuery(api.players.account, isAuthenticated ? {} : "skip");
   const officer = !!account?.officer;
+  const member = !!account && !officer;
   const [code, setCode] = useState(initialCode.toUpperCase());
   const [profile, setProfile] = useState<Profile>({ name: "", email: "" });
   const [broughtBy, setBroughtBy] = useState("");
@@ -115,15 +118,18 @@ function JoinForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
+  // Clerk sends people back here after signing in, code and all.
+  const [here, setHere] = useState("/join");
 
   useEffect(() => {
     const saved = localStorage.getItem("hwc.profile");
     if (saved) setProfile(JSON.parse(saved) as Profile);
     setFirstPhone(!saved && !Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
+    setHere(window.location.pathname + window.location.search);
   }, []);
 
   useEffect(() => {
-    if (officer && account.email) setProfile((p) => (p.email ? p : { ...p, email: account.email ?? "" }));
+    if (officer && account.email) setProfile((p) => (p.email ? p : { ...p, email: account.email }));
   }, [officer, account?.email]);
 
   async function submit(e: { preventDefault: () => void }) {
@@ -131,10 +137,13 @@ function JoinForm({
     setError("");
     setBusy(true);
     try {
+      const extras = { broughtBy: broughtBy || undefined, idea: (firstPhone && idea) || undefined };
       const token = officer
         ? await checkInOfficer(profile)
-        : await join({ code, ...profile, broughtBy: broughtBy || undefined, idea: (firstPhone && idea) || undefined });
-      localStorage.setItem("hwc.profile", JSON.stringify(profile));
+        : member
+          ? await joinSignedIn({ code, name: account.name ? undefined : profile.name, ...extras })
+          : await join({ code, ...profile, ...extras });
+      if (!member) localStorage.setItem("hwc.profile", JSON.stringify(profile));
       localStorage.setItem(tokenKey(sessionId), token);
       onJoined(token);
     } catch (err) {
@@ -146,7 +155,15 @@ function JoinForm({
 
   const wk = useSchedule()[week - 1];
   const t = weekTile(wk);
+  // Wait for the sign-in check, so a signed-in phone never flashes the long form first.
+  if (isLoading || (isAuthenticated && account === undefined))
+    return (
+      <Center>
+        <p className="text-dim">Loading…</p>
+      </Center>
+    );
   const letters = code.padEnd(4, " ").slice(0, 4).split("");
+  const askName = !officer && !(member && account.name);
   return (
     <Wrap className="flex min-h-dvh max-w-xl flex-col py-5">
       <form onSubmit={submit} className="flex flex-1 flex-col gap-4">
@@ -165,7 +182,9 @@ function JoinForm({
           <p className="mt-2 text-dim">
             {officer
               ? "You’re signed in as an officer. You’ll be counted here and kept off the teams so you can run the night."
-              : `No account or password. Welcome to ${CLUB.name}!`}
+              : member
+                ? `Signed in as ${account.email}.`
+                : `No account or password. Welcome to ${CLUB.name}!`}
           </p>
         </div>
 
@@ -199,36 +218,41 @@ function JoinForm({
           </label>
         )}
 
-        <label className="block">
-          <span className="font-bold">Your name</span>
-          <input
-            className="field mt-1.5"
-            value={profile.name}
-            onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-            autoComplete="name"
-            required
-            maxLength={40}
-          />
-        </label>
-        <label className="block">
-          <span className="font-bold">HawkMail</span> <span className="text-sm text-dim">Keeps your XP together week to week.</span>
-          <input
-            className="field mt-1.5"
-            type="email"
-            value={profile.email}
-            onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-            autoComplete="email"
-            required
-            placeholder="jsmith@hawkmail.hfcc.edu"
-          />
-        </label>
-        {!officer && (
+        {(askName || officer) && (
+          <label className="block">
+            <span className="font-bold">Your name</span>
+            <input
+              className="field mt-1.5"
+              value={profile.name}
+              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+              autoComplete="name"
+              required
+              maxLength={40}
+            />
+          </label>
+        )}
+        {!member && (
+          <label className="block">
+            <span className="font-bold">HawkMail</span> <span className="text-sm text-dim">Keeps your XP together week to week.</span>
+            <input
+              className="field mt-1.5"
+              type="email"
+              value={profile.email}
+              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+              autoComplete="email"
+              required
+              placeholder="jsmith@hawkmail.hfcc.edu"
+            />
+          </label>
+        )}
+        {/* Signed-in members skip it after their first night, to keep joining one tap. */}
+        {!officer && (!member || firstPhone) && (
           <label className="block">
             <span className="font-bold">Who brought you?</span> <span className="text-sm text-dim">Optional. You both get +2 XP.</span>
             <input className="field mt-1.5" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
           </label>
         )}
-        {firstPhone && !officer && (
+        {!officer && firstPhone && (
           <label className="block">
             <span className="font-bold">Anything you’d like the club to do?</span> <span className="text-sm text-dim">Optional.</span>
             <textarea
@@ -254,8 +278,23 @@ function JoinForm({
         {/* Pinned to the bottom of the screen so Join is always one tap away. */}
         <div className="sticky bottom-0 mt-auto bg-paper pt-2 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <button className="btn btn-primary w-full text-lg" disabled={busy}>
-            {busy ? "Joining…" : officer ? "Check in" : "Join the game"}
+            {busy ? "Joining…" : officer ? "Check in" : member && account.name ? `Join as ${account.name}` : "Join the game"}
           </button>
+          <p className="mt-2 text-center text-sm text-dim">
+            {isAuthenticated ? (
+              <SignOutButton redirectUrl={here}>
+                <button type="button" className="link">
+                  Not you? Sign out
+                </button>
+              </SignOutButton>
+            ) : (
+              <SignInButton mode="modal" withSignUp forceRedirectUrl={here} initialValues={{ emailAddress: profile.email || undefined }}>
+                <button type="button" className="link">
+                  Sign in to join in one tap next time
+                </button>
+              </SignInButton>
+            )}
+          </p>
         </div>
       </form>
     </Wrap>
