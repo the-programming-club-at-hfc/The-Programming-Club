@@ -939,7 +939,13 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
         <button className={`chip ml-2 ${cs ? "bg-ink text-paper" : ""}`} onClick={() => setCs(!cs)}>
           Computer science targets only
         </button>
-        <button className={`chip ml-2 ${clicks ? "bg-ink text-paper" : ""}`} onClick={() => setClicks(!clicks)} aria-pressed={clicks}>
+        <button
+          className={`chip ml-2 ${clicks ? "bg-ink text-paper" : ""} disabled:opacity-50`}
+          onClick={() => setClicks(!clicks)}
+          aria-pressed={clicks}
+          // A race keeps its style once it's up, so finishes all count the same way.
+          disabled={onTv}
+        >
           Fewest Clicks
         </button>
         <select
@@ -969,7 +975,7 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
             </a>
           </div>
           <div className="mt-3 flex flex-wrap">
-            {onTv && !!s.wikiClicks === clicks ? (
+            {onTv ? (
               <button
                 className={`btn btn-sm ${s.revealed ? "" : "btn-coin"}`}
                 disabled={!!s.revealed}

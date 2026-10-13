@@ -99,7 +99,8 @@ export function NextPanel({
   const timeUp = remaining === 0;
   const ready = waiting && (allIn || timeUp);
 
-  const pause = () => (live.timer.startedAt && remaining > 0 ? timer({ action: "toggle" }) : undefined);
+  // A clock that ran out stays at "time"; one still running stops so the buzzer doesn't go off over the answer.
+  const pause = () => (live.timer.startedAt && remaining > 0 ? timer({ action: "pause" }) : undefined);
   const startRound = async (x: Round) => {
     setWord(null);
     await setRound({ round: x.index, double: x.double, title: roundTitle(x) });
@@ -181,6 +182,8 @@ export function NextPanel({
       const a = e.key === " " || e.key === "ArrowRight" ? k.primary : e.key === "n" || e.key === "N" ? k.alt : null;
       if (!a || a.keys === false) return;
       e.preventDefault();
+      // A focused button would also click on Space in some browsers, so let go of it.
+      if (t instanceof HTMLButtonElement) t.blur();
       if (!k.busy) void k.act(a);
     };
     window.addEventListener("keydown", onKey);

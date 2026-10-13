@@ -126,21 +126,14 @@ export function stepFor(o: { round: Round | null; screen: ScreenState; teams: nu
   const r = o.round;
   const s = o.screen;
   if (!r) return "start";
-  const answer = revealable(r);
-  switch (r.kind) {
-    case "deck": {
-      const mine = s.game === r.game;
-      if (s.mode === "card" && mine) return s.revealed || !answer ? "scores" : "reveal";
-      if (s.mode === "scoreboard" && mine) return s.revealed || !answer ? "choose" : "reveal";
-      return "show";
-    }
-    case "wiki":
-      if (s.mode === "wiki") return s.revealed ? "scores" : "reveal";
-      if (s.mode === "scoreboard" && s.wikiFrom) return s.revealed ? "choose" : "reveal";
-      return "show";
-    case "pictionary":
-      return s.mode === "timer" ? "scores" : s.mode === "scoreboard" ? "choose" : "show";
-    default:
-      return s.mode === "scoreboard" || o.teams === 0 ? "next" : "scores";
+  if (r.kind === "deck" || r.kind === "wiki") {
+    // The TV's screen buttons keep the card (or race) when the join screen, big timer, or scores go up, so a card
+    // that's still unrevealed always comes back for its reveal and is never skipped unscored.
+    const mine = r.kind === "deck" ? s.game === r.game : !!s.wikiFrom;
+    if (!mine) return "show";
+    if (!s.revealed && revealable(r)) return "reveal";
+    return s.mode === "scoreboard" ? "choose" : "scores";
   }
+  if (r.kind === "pictionary") return s.mode === "timer" ? "scores" : s.mode === "scoreboard" ? "choose" : "show";
+  return s.mode === "scoreboard" || o.teams === 0 ? "next" : "scores";
 }

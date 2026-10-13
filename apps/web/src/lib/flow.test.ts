@@ -86,14 +86,21 @@ describe("the big button", () => {
     expect(step(bug, { mode: "scoreboard", game: "bug", revealed: true })).toBe("choose");
   });
 
-  test("scores shown before the reveal still lead to the reveal; another game's card leads to this round's", () => {
+  test("the join screen, big timer, or scores mid-card still lead to the reveal, so nothing goes unscored", () => {
     expect(step(bug, { mode: "scoreboard", game: "bug" })).toBe("reveal");
+    expect(step(bug, { mode: "lobby", game: "bug" })).toBe("reveal");
+    expect(step(bug, { mode: "timer", game: "bug", revealed: true })).toBe("scores");
+    expect(step(round("Wiki Race"), { mode: "lobby", wikiFrom: "Pizza" })).toBe("reveal");
+  });
+
+  test("another game's card leads to this round's", () => {
     expect(step(bug, { mode: "card", game: "output", revealed: true })).toBe("show");
   });
 
   test("Code Relay has no answer to reveal", () => {
     const relay = round("Code Relay: round 1");
     expect(step(relay, { mode: "card", game: "relay" })).toBe("scores");
+    expect(step(relay, { mode: "timer", game: "relay" })).toBe("scores");
     expect(step(relay, { mode: "scoreboard", game: "relay" })).toBe("choose");
   });
 

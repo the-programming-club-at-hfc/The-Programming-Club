@@ -175,7 +175,7 @@ export const setSound = mutation({
 
 export const timer = mutation({
   args: {
-    action: v.union(v.literal("set"), v.literal("toggle"), v.literal("reset"), v.literal("add"), v.literal("relay")),
+    action: v.union(v.literal("set"), v.literal("toggle"), v.literal("pause"), v.literal("reset"), v.literal("add"), v.literal("relay")),
     seconds: v.optional(v.number()),
     relay: v.optional(v.boolean()),
     autostart: v.optional(v.boolean()),
@@ -198,6 +198,10 @@ export const timer = mutation({
       case "toggle":
         if (t.startedAt) Object.assign(t, { remainingMs: remaining, startedAt: undefined });
         else Object.assign(t, remaining > 0 ? { startedAt: now } : { remainingMs: t.durationMs, startedAt: now }, { card });
+        break;
+      // Stop a running clock, and only that (the Next button pauses at the reveal).
+      case "pause":
+        if (t.startedAt) Object.assign(t, { remainingMs: remaining, startedAt: undefined });
         break;
       case "reset":
         Object.assign(t, { remainingMs: t.durationMs, startedAt: undefined });
