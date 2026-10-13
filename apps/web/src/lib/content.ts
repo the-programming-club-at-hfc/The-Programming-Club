@@ -516,7 +516,7 @@ export const SUPPLIES: { tier: string; items: string[] }[] = [
   {
     tier: "Free",
     items: [
-      "The E-178 TV and lab computers",
+      "The TV and lab computers in Room E-178",
       "Phones for joining (anyone without one can be added from /host)",
       "Whiteboard, markers, scrap paper, pens",
       "Index cards and sticky notes, if Student Activities has a supply closet",
@@ -561,7 +561,7 @@ export const PROMO: { idea: string; how: string }[] = [
   },
   {
     idea: "Posters with a QR code",
-    how: "Put them near CIS classrooms, the library, the student center, and on the E-178 door. Point the QR code at programmingclub.dev.",
+    how: "Put them near CIS classrooms, the library, the student center, and on the door of Room E-178. Point the QR code at programmingclub.dev.",
   },
   {
     idea: "Student Activities channels",

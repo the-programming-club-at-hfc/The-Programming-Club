@@ -364,13 +364,13 @@ function Conference() {
         </div>
       </div>
       <p className="text-lg leading-relaxed">
-        A full day on how AI is changing finance and venture capital: keynotes, expert panels, coffee chats, and networking with founders
-        and industry leaders. Speakers come from Microsoft, J.P. Morgan, Bank of America, BTIG, and more.
+        A full day on how AI is changing finance and venture capital: keynotes, expert panels, coffee chats, and networking with industry
+        leaders. Speakers come from Microsoft, J.P. Morgan, Bank of America, BTIG, and more.
       </p>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 text-[0.95rem]">
         {[
           ["Cost", "$17 general admission"],
-          ["Tickets", "On sale until Thu, Oct 22, 8 a.m."],
+          ["Tickets", "On sale until Thu, Oct 22, 8 a.m. ET"],
           ["Tracks", "Finance & quant, venture capital"],
           ["Included", "Lunch, workshops, closing reception"],
         ].map(([k, v]) => (
@@ -382,7 +382,8 @@ function Conference() {
       </dl>
       <Interest event={CONF.id} />
       <p className="text-sm text-dim">
-        Hosted by the University of Michigan’s AI Business Group (ABG), not by our club. Tickets and details are on their site.
+        Hosted by the University of Michigan’s AI Business Group (ABG), not by our club. Times are from their flyer; check their site for
+        the full agenda, since it may start earlier.
       </p>
     </div>
   );
