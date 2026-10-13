@@ -7,6 +7,15 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { useSchedule } from "#/lib/schedule";
 import { CLUB } from "#/lib/season";
 
+/** Runs an officer action, with a plain alert if it fails. */
+export async function run(p: Promise<unknown>) {
+  try {
+    await p;
+  } catch (e) {
+    alert(e instanceof ConvexError ? String(e.data) : "That didn’t work. Check your connection and try again.");
+  }
+}
+
 /** True once the signed-in user is confirmed as an officer; false while loading or for everyone else. */
 export function useOfficer() {
   const { isAuthenticated } = useConvexAuth();

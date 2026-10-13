@@ -2,16 +2,17 @@ import { UserButton } from "@clerk/tanstack-react-start";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { ConvexError } from "convex/values";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import type { GameId, Screen } from "#/components/game";
-import { ExportButton, OfficerGate, useJoinCode } from "#/components/officer";
+import { NextPanel, WordPeek, nextWord } from "#/components/next";
+import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
-import { BUGS, PICTIONARY, RELAYS, WIKI_RACES } from "#/lib/content";
-import { FIXES } from "#/lib/fixes";
+import { WIKI_RACES } from "#/lib/content";
+import { deckFor, filtersFor } from "#/lib/flow";
+import type { Filter } from "#/lib/flow";
 import { isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
@@ -25,14 +26,6 @@ export const Route = createFileRoute("/hello-world/host")({
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type HostData = FunctionReturnType<typeof api.sessions.host>;
 type Row = NonNullable<HostData["rows"]>[number];
-
-async function run(p: Promise<unknown>) {
-  try {
-    await p;
-  } catch (e) {
-    alert(e instanceof ConvexError ? String(e.data) : "That didn’t work. Check your connection and try again.");
-  }
-}
 
 const Panel = ({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) => (
   <section className={`card p-5 ${className}`}>
@@ -56,30 +49,35 @@ function Console() {
   const live = useQuery(api.sessions.live);
   if (!data || live === undefined) return <p className="font-bold text-dim">Loading…</p>;
   if (!data.session || !live) return <StartPanel recent={data.recent} />;
-  return <Running live={live} rows={data.rows} used={data.used} />;
+  return <Running live={live} rows={data.rows} used={data.used} shown={data.session.shown ?? []} />;
 }
 
-function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[] }) {
-  const [tab, setTab] = useState<Tab>("bug");
-  // The lineup round being played picks the deck's filter, e.g. spooky cards for "Fix it for real, spooky".
-  const [start, setStart] = useState<{ tab: Tab; filter: Filter } | null>(null);
-  const [playing, setPlaying] = useState<number | null>(null);
+function Running({ live, rows, used, shown }: { live: Live; rows: Row[]; used: string[]; shown: string[] }) {
+  const lineup = useSchedule()[live.week - 1].lineup;
+  // The lineup round being played (from the session, so it survives a reload) opens its deck with its filter,
+  // e.g. spooky cards for "Fix it for real, spooky".
+  const playing = live.round !== null && live.round < lineup.length ? live.round : null;
+  const label = playing === null ? null : lineup[playing].label;
+  const [tab, setTab] = useState<Tab>(() => tabFor(label) ?? "bug");
+  useEffect(() => {
+    const t = tabFor(label);
+    if (t) setTab(t);
+  }, [label, playing]);
   const deck = useRef<HTMLDivElement>(null);
-  const setDouble = useMutation(api.sessions.setDouble);
+  const setRound = useMutation(api.sessions.setRound);
   return (
     <>
       <Header live={live} />
+      <NextPanel live={live} lineup={lineup} used={used} shown={shown} className="mt-6" />
       <LineupPanel
         week={live.week}
         playing={playing}
         onPlay={(i, item) => {
-          setPlaying(i);
           // A double-points lineup round turns double points on; any other round turns it off.
-          if (item.double !== live.double) void run(setDouble({ on: item.double }));
-          const id = gamesIn(item.label)[0];
-          if (!TABS.some(([t]) => t === id)) return;
-          setTab(id as Tab);
-          setStart({ tab: id as Tab, filter: filterFor(item.label) });
+          void run(setRound({ round: i, double: item.double }));
+          const t = tabFor(item.label);
+          if (!t) return;
+          setTab(t);
           // The game's controls are further down the page, so bring them into view.
           deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
@@ -93,7 +91,13 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
         </div>
         <div className="space-y-6">
           <div ref={deck} className="scroll-mt-6">
-            <DeckPanel live={live} tab={tab} setTab={setTab} used={used} filter={start?.tab === tab ? start.filter : "all"} />
+            <DeckPanel
+              live={live}
+              tab={tab}
+              setTab={setTab}
+              used={used}
+              filter={label && tabFor(label) === tab ? filterFor(label) : "all"}
+            />
           </div>
           <PlayersPanel live={live} rows={rows} sessionId={live._id} />
         </div>
@@ -545,9 +549,12 @@ const TABS: [Tab, string][] = [
   ["pictionary", "Pictionary"],
   ["lang", "Guess the Language"],
 ];
-type Filter = "all" | "easy" | "medium" | "hard" | "spooky";
-const filterFor = (label: string): Filter =>
-  (["spooky", "easy", "medium", "hard"] as const).find((f) => label.toLowerCase().includes(f)) ?? "all";
+const filterFor = (label: string): Filter => filtersFor(label)[0] ?? "all";
+/** The Games tab for a lineup entry, if it has one. */
+const tabFor = (label: string | null) => {
+  const id = label && gamesIn(label)[0];
+  return TABS.find(([t]) => t === id)?.[0];
+};
 
 function DeckPanel({
   live,
@@ -586,16 +593,6 @@ function DeckPanel({
       </div>
     </Panel>
   );
-}
-
-/** The card numbers in a deck that match a difficulty filter. */
-function deckFor(game: GameId, filter: Filter) {
-  const all = Array.from({ length: DECKS[game].size }, (_, i) => i);
-  if (filter === "all") return all;
-  if (game === "bug") return all.filter((i) => (filter === "spooky" ? BUGS[i].spooky : BUGS[i].level === filter));
-  if (game === "fix") return all.filter((i) => (filter === "spooky" ? FIXES[i].spooky : FIXES[i].level === filter));
-  if (game === "relay") return all.filter((i) => RELAYS[i].level === filter);
-  return all;
 }
 
 function CardTool({ game, live, used, initial }: { game: GameId; live: Live; used: string[]; initial: Filter }) {
@@ -1007,17 +1004,9 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
   );
 }
 
-// Words left to draw on this device. Kept outside the component so switching tabs doesn't reshuffle.
-let pictionaryLeft: string[] = [];
-const nextWord = () => {
-  if (!pictionaryLeft.length) pictionaryLeft = [...PICTIONARY].sort(() => Math.random() - 0.5);
-  return pictionaryLeft.pop()!;
-};
-
 function PictionaryTool() {
   const timer = useMutation(api.sessions.timer);
   const [word, setWord] = useState<string | null>(null);
-  const [peek, setPeek] = useState(false);
   return (
     <div>
       <div className="flex flex-wrap">
@@ -1028,22 +1017,7 @@ function PictionaryTool() {
           Start 1:00
         </button>
       </div>
-      {word && (
-        <button
-          className="mt-4 grid min-h-40 w-full place-items-center border-4 border-dashed border-gold text-center select-none"
-          onPointerDown={() => setPeek(true)}
-          onPointerUp={() => setPeek(false)}
-          onPointerLeave={() => setPeek(false)}
-          onKeyDown={(e) => (e.key === " " || e.key === "Enter") && setPeek(true)}
-          onKeyUp={() => setPeek(false)}
-        >
-          {peek ? (
-            <span className="font-bold text-5xl text-ink">{word}</span>
-          ) : (
-            <span className="text-dim">Press and hold to show the drawer</span>
-          )}
-        </button>
-      )}
+      {word && <WordPeek word={word} />}
       <p className="mt-3 text-sm text-dim">
         The word stays on this device and never goes on the TV. Hold your phone up for the drawer instead of handing it over: it has the
         score buttons.

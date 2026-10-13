@@ -38,6 +38,7 @@ export const live = query({
       card: s.card ?? null,
       scored: s.scored ?? [],
       practice: !!s.practice,
+      round: s.round ?? null,
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
@@ -134,6 +135,20 @@ export const setScreen = mutation({
   handler: async (ctx, { screen }) => {
     await requireOfficer(ctx);
     await putScreen(ctx, await requireOpenSession(ctx), screen);
+  },
+});
+
+/**
+ * Play a lineup round: double points follow the round (on for a double-points round, off otherwise). With a title,
+ * the round's name goes up on the TV too.
+ */
+export const setRound = mutation({
+  args: { round: v.number(), double: v.boolean(), title: v.optional(v.string()) },
+  handler: async (ctx, { round, double, title }) => {
+    await requireOfficer(ctx);
+    const s = await requireOpenSession(ctx);
+    await ctx.db.patch(s._id, { round, double });
+    if (title) await putScreen(ctx, { ...s, round, double }, { mode: "message", message: title.slice(0, 120) });
   },
 });
 

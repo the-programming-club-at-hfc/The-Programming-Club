@@ -77,6 +77,8 @@ export default defineSchema({
     scored: v.optional(v.array(v.string())),
     // A rehearsal: left out of attendance, XP, stats, and the attendance export.
     practice: v.optional(v.boolean()),
+    // The lineup round being played (0-based), so /host's Next button picks up where it left off.
+    round: v.optional(v.number()),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),
