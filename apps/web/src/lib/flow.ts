@@ -2,7 +2,7 @@
 // race it puts up. Pure functions of the session (screen, round, cards shown), so a reload picks up where it left off.
 import { BUGS, LANGS, OUTPUTS, RELAYS, WIKI_RACES } from "./content";
 import { FIXES } from "./fixes";
-import { PUZZLES } from "./puzzles";
+import { PUZZLES, puzzleForLabel } from "./puzzles";
 import { cardKey, isAnswerGame, wikiKey, wikiPair } from "./grading";
 import type { GameId } from "./grading";
 import { gamesIn } from "./schedule";
@@ -33,8 +33,8 @@ export function deckFor(game: GameId, filter: Filter) {
 export const filtersFor = (label: string): Filter[] =>
   (["spooky", "easy", "medium", "hard"] as const).filter((f) => label.toLowerCase().includes(f));
 
-/** How a round plays: a card deck, a Wiki Race, Tech Pictionary, or anything else (officers run it, then score). */
-export type Kind = "deck" | "wiki" | "pictionary" | "other";
+/** How a round plays: a card deck, a Wiki Race, a puzzle, Tech Pictionary, or anything else (officers run it, then score). */
+export type Kind = "deck" | "wiki" | "puzzle" | "pictionary" | "other";
 
 export interface Round {
   index: number;
@@ -44,6 +44,8 @@ export interface Round {
   /** The deck, for a card round. */
   game?: GameId;
   filters: Filter[];
+  /** The puzzle, for a puzzle round. */
+  puzzle?: number;
 }
 
 const DECK_GAMES: GameId[] = ["bug", "output", "relay", "lang", "fix"];
@@ -51,15 +53,32 @@ const DECK_GAMES: GameId[] = ["bug", "output", "relay", "lang", "fix"];
 export function roundOf(item: LineupItem, index: number): Round {
   const id = gamesIn(item.label)[0];
   const game = DECK_GAMES.find((g) => g === id);
-  const kind: Kind = game ? "deck" : id === "wiki" ? "wiki" : id === "pictionary" ? "pictionary" : "other";
-  return { index, label: item.label, double: item.double, kind, game, filters: game ? filtersFor(item.label) : [] };
+  // A puzzle round plays the puzzle its label names (Code Relay Night's preview, or the Final's Puzzle 1 or 2).
+  const puzzle = id === "puzzle" ? puzzleForLabel(item.label) : undefined;
+  const kind: Kind = game
+    ? "deck"
+    : puzzle !== undefined
+      ? "puzzle"
+      : id === "wiki"
+        ? "wiki"
+        : id === "pictionary"
+          ? "pictionary"
+          : "other";
+  return { index, label: item.label, double: item.double, kind, game, filters: game ? filtersFor(item.label) : [], puzzle };
 }
 
 /** What the TV says when a round starts. */
 export const roundTitle = (r: Round) => `Round ${r.index + 1}${r.double ? ", double points" : ""}: ${r.label}`;
 
 /** Cards with an answer to reveal (and score). Code Relay has none: the referee runs the tests. */
-export const revealable = (r: Round) => r.kind === "wiki" || (r.kind === "deck" && (isAnswerGame(r.game) || r.game === "fix"));
+export const revealable = (r: Round) =>
+  r.kind === "wiki" || r.kind === "puzzle" || (r.kind === "deck" && (isAnswerGame(r.game) || r.game === "fix"));
+
+/** A puzzle's name for the button, e.g. "Road to the Cup". */
+export const puzzleTitle = (i: number) =>
+  PUZZLES[i].name.replace(/\b\w+/g, (w, at: number) =>
+    at > 0 && ["a", "of", "the", "to"].includes(w) ? w : w[0].toUpperCase() + w.slice(1),
+  );
 
 /**
  * The next card for a round: the first one matching its difficulty that no night has used yet (practice nights
@@ -113,21 +132,36 @@ export function nextRace(r: Round, used: string[], tonight: string[]) {
 export interface ScreenState {
   mode: string;
   game?: string;
+  index?: number;
   revealed?: boolean;
+  hint?: boolean;
   wikiFrom?: string;
 }
 
 /**
  * What the big button does next:
  * start a round → show a card (race, drawing) → reveal → show scores → another one, or the next round.
+ * A puzzle round plays its one puzzle: show it → show the hint once it unlocks → reveal → show scores → next round.
  * Rounds that aren't games (like "Meet the officers") just show scores, then move on.
  */
-export type Step = "start" | "show" | "reveal" | "scores" | "choose" | "next";
+export type Step = "start" | "show" | "hint" | "reveal" | "scores" | "choose" | "next";
 
-export function stepFor(o: { round: Round | null; screen: ScreenState; teams: number }): Step {
+export function stepFor(o: {
+  round: Round | null;
+  screen: ScreenState;
+  teams: number;
+  /** A puzzle's hint has unlocked (half its time is gone) and the puzzle isn't over yet. */
+  hintReady?: boolean;
+}): Step {
   const r = o.round;
   const s = o.screen;
   if (!r) return "start";
+  if (r.kind === "puzzle") {
+    // Like a card, the puzzle comes back for its reveal after the join screen, big timer, or scores went up.
+    if (s.game !== "puzzle" || s.index !== r.puzzle) return "show";
+    if (!s.revealed) return o.hintReady && !s.hint ? "hint" : "reveal";
+    return s.mode === "scoreboard" ? "next" : "scores";
+  }
   if (r.kind === "deck" || r.kind === "wiki") {
     // The TV's screen buttons keep the card (or race) when the join screen, big timer, or scores go up, so a card
     // that's still unrevealed always comes back for its reveal and is never skipped unscored.

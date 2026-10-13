@@ -8,9 +8,10 @@ import { DECKS, fmtClock, useRemaining } from "./game";
 import { run } from "./officer";
 import { BUGS, GAMES, PICTIONARY, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
-import { freshLeft, nextCard, nextRace, roundOf, roundTitle, stepFor } from "#/lib/flow";
+import { freshLeft, nextCard, nextRace, puzzleTitle, roundOf, roundTitle, stepFor } from "#/lib/flow";
 import type { Round } from "#/lib/flow";
-import { cardSeconds, isAnswerGame, wikiSeconds } from "#/lib/grading";
+import { cardKey, cardSeconds, isAnswerGame, wikiSeconds } from "#/lib/grading";
+import { PUZZLES } from "#/lib/puzzles";
 import type { GameId } from "#/lib/grading";
 import type { LineupItem } from "#/lib/schedule";
 
@@ -77,7 +78,23 @@ export function NextPanel({
   const following = at === null ? 1 : at + 1;
   const after = following < rounds.length ? rounds[following] : null;
   const s = live.screen;
-  const step = stepFor({ round: r, screen: s, teams: live.teams.length });
+  const teams = live.teams.length;
+  const timeUp = remaining === 0;
+
+  // This round's puzzle, while it's up and unrevealed: done once every team has both stars, and its hint unlocks at half time.
+  const puzzle = r?.kind === "puzzle" ? r.puzzle : undefined;
+  const puzzleUp = puzzle !== undefined && s.game === "puzzle" && s.index === puzzle && !s.revealed;
+  const stars = useQuery(api.puzzles.board, puzzleUp ? {} : "skip");
+  const allStars =
+    puzzleUp &&
+    teams > 0 &&
+    stars?.card === cardKey("puzzle", puzzle) &&
+    stars.teams.length > 0 &&
+    stars.teams.every((t) => t.part2Ms !== null);
+  const halfway = puzzleUp && live.timer.card === cardKey("puzzle", puzzle) && remaining <= live.timer.durationMs / 2;
+  const hintReady = halfway && !timeUp && !allStars;
+
+  const step = stepFor({ round: r, screen: s, teams, hintReady });
   const card = r ? nextCard(r, used, shown) : null;
   const race = r?.kind === "wiki" ? nextRace(r, used, shown) : null;
 
@@ -86,17 +103,16 @@ export function NextPanel({
   const answers = useQuery(api.answers.board, waiting && s.mode === "card" && isAnswerGame(s.game) ? {} : "skip");
   const fixes = useQuery(api.fixes.board, waiting && s.mode === "card" && s.game === "fix" ? {} : "skip");
   const wiki = useQuery(api.wiki.board, waiting && s.mode === "wiki" ? {} : "skip");
-  const teams = live.teams.length;
   const allIn =
-    teams > 0 &&
-    (answers
-      ? answers.locked === teams
-      : fixes
-        ? fixes.fixed.length === teams
-        : wiki
-          ? wiki.finished.filter((f) => f.ok !== false).length === teams
-          : false);
-  const timeUp = remaining === 0;
+    allStars ||
+    (teams > 0 &&
+      (answers
+        ? answers.locked === teams
+        : fixes
+          ? fixes.fixed.length === teams
+          : wiki
+            ? wiki.finished.filter((f) => f.ok !== false).length === teams
+            : false));
   const ready = waiting && (allIn || timeUp);
 
   // A clock that ran out stays at "time"; one still running stops so the buzzer doesn't go off over the answer.
@@ -110,6 +126,9 @@ export function NextPanel({
       if (card === null) return alert("This deck is out of cards for tonight. Pick one by hand under Games.");
       await setScreen({ screen: { mode: "card", game: r.game, index: card, revealed: false } });
       await timer({ action: "set", seconds: cardSeconds(r.game, card), relay: r.game === "relay", autostart: true });
+    } else if (r?.kind === "puzzle" && r.puzzle !== undefined) {
+      await setScreen({ screen: { mode: "card", game: "puzzle", index: r.puzzle, revealed: false } });
+      await timer({ action: "set", seconds: cardSeconds("puzzle", r.puzzle), relay: !!PUZZLES[r.puzzle].relay, autostart: true });
     } else if (race) {
       await setScreen({ screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: race.clicks || undefined } });
       await timer({ action: "set", seconds: wikiSeconds(race.clicks), relay: false, autostart: true });
@@ -127,7 +146,23 @@ export function NextPanel({
         go: () => (confirm("End the night? Place XP goes out from the current standings.") ? end() : undefined),
       };
 
-  const thing = r?.kind === "wiki" ? "race" : r?.kind === "pictionary" ? "drawing" : r?.game === "relay" ? "problem" : "card";
+  const thing =
+    r?.kind === "wiki"
+      ? "race"
+      : r?.kind === "puzzle"
+        ? "puzzle"
+        : r?.kind === "pictionary"
+          ? "drawing"
+          : r?.game === "relay"
+            ? "problem"
+            : "card";
+  const reveal: Action = {
+    label: r?.kind === "wiki" ? "End race and score" : r?.kind === "puzzle" ? "Reveal and score" : "Reveal answer",
+    go: async () => {
+      await setScreen({ screen: { ...s, mode: r?.kind === "wiki" ? "wiki" : "card", revealed: true } });
+      await pause();
+    },
+  };
   let primary: Action | null = null;
   let alt: Action | null = null;
   if (!r) {
@@ -136,18 +171,19 @@ export function NextPanel({
     const label =
       r.kind === "wiki" && race
         ? `Show the race: ${race.from} → ${race.to}`
-        : r.kind === "pictionary"
-          ? "New drawing: start 1:00"
-          : `Show ${s.mode === "message" ? "the first" : "next"} ${thing}`;
+        : r.kind === "puzzle" && r.puzzle !== undefined
+          ? `Show the puzzle: ${puzzleTitle(r.puzzle)}`
+          : r.kind === "pictionary"
+            ? "New drawing: start 1:00"
+            : `Show ${s.mode === "message" ? "the first" : "next"} ${thing}`;
     primary = { label, go: show };
+  } else if (step === "hint") {
+    // The same hint the Puzzles deck puts up: on the TV, phones, and team computers.
+    primary = { label: "Show hint", go: () => setScreen({ screen: { ...s, mode: "card", hint: true } }) };
+    // Revealing early is a click, never a stray N.
+    alt = { ...reveal, keys: false };
   } else if (step === "reveal") {
-    primary = {
-      label: r.kind === "wiki" ? "End race and score" : "Reveal answer",
-      go: async () => {
-        await setScreen({ screen: { ...s, mode: r.kind === "wiki" ? "wiki" : "card", revealed: true } });
-        await pause();
-      },
-    };
+    primary = reveal;
   } else if (step === "scores") {
     primary = {
       label: "Show scores",
@@ -191,7 +227,9 @@ export function NextPanel({
   }, []);
 
   const manual =
-    r && (step === "scores" || step === "choose" || step === "next") && !(r.kind === "wiki" || (r.kind === "deck" && r.game !== "relay"));
+    r &&
+    (step === "scores" || step === "choose" || step === "next") &&
+    !(r.kind === "wiki" || r.kind === "puzzle" || (r.kind === "deck" && r.game !== "relay"));
   const rules = r && GAMES.find((g) => g.id === (r.game ?? r.kind));
   return (
     <section className={`card p-5 ring-2 ring-gold ${className}`}>
@@ -226,7 +264,9 @@ export function NextPanel({
           )}
         </div>
       )}
-      {ready && <p className="mt-2 font-bold text-pine">{allIn ? "Every team is in." : "Time’s up."}</p>}
+      {ready && (
+        <p className="mt-2 font-bold text-pine">{allIn ? (allStars ? "Every team has both stars." : "Every team is in.") : "Time’s up."}</p>
+      )}
       {teams === 0 && (step === "start" || step === "show") && (
         <p className="mt-2 font-semibold text-signal">No teams yet. Make teams under Teams & scores so phones can play.</p>
       )}
@@ -254,6 +294,14 @@ export function NextPanel({
             {freshLeft(r, used, shown)} fresh left
           </p>
         )}
+        {r?.kind === "puzzle" && r.puzzle !== undefined && step === "show" && (
+          <p>
+            Next puzzle: {puzzleTitle(r.puzzle)}, {fmtClock(cardSeconds("puzzle", r.puzzle) * 1000)}
+            {PUZZLES[r.puzzle].relay ? " with relay chimes every 2 minutes" : ""}
+            {" · "}team computers at /hello-world/fix
+          </p>
+        )}
+        {step === "hint" && <p>Half the time is gone, so the hint is unlocked.</p>}
         {race && (step === "show" || step === "choose") && (
           <p>
             Next race: {race.from} → {race.to}, {race.clicks ? "Fewest Clicks, " : ""}

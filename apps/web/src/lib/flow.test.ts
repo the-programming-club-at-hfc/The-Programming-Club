@@ -1,15 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { BUGS, WIKI_RACES } from "./content";
 import { DEFAULT_PLAN } from "./schedule";
-import { deckFor, freshLeft, nextCard, nextRace, roundOf, roundTitle, stepFor } from "./flow";
-import { wikiKey } from "./grading";
+import { deckFor, freshLeft, nextCard, nextRace, puzzleTitle, revealable, roundOf, roundTitle, stepFor } from "./flow";
+import { cardSeconds, wikiKey } from "./grading";
+import { PUZZLES } from "./puzzles";
 
 const round = (label: string, double = false, index = 0) => roundOf({ label, double }, index);
 
 describe("lineup rounds", () => {
   test("every round in the default plan gets a kind, and decks get their difficulty", () => {
     const kinds = DEFAULT_PLAN.flatMap((w) => w.lineup.map((g, i) => roundOf(g, i)));
-    expect(kinds.every((r) => ["deck", "wiki", "pictionary", "other"].includes(r.kind))).toBe(true);
+    expect(kinds.every((r) => ["deck", "wiki", "puzzle", "pictionary", "other"].includes(r.kind))).toBe(true);
     const spooky = round("Bug Hunt: easy & spooky");
     expect([spooky.kind, spooky.game, spooky.filters]).toEqual(["deck", "bug", ["spooky", "easy"]]);
     expect(round("Fix it for real, spooky").game).toBe("fix");
@@ -21,6 +22,41 @@ describe("lineup rounds", () => {
   test("the TV title says the round number and double points", () => {
     expect(roundTitle(round("Bug Hunt: hard", true, 3))).toBe("Round 4, double points: Bug Hunt: hard");
     expect(roundTitle(round("Output? (warm-up)"))).toBe("Round 1: Output? (warm-up)");
+  });
+});
+
+describe("puzzle rounds", () => {
+  test("each puzzle round plays the puzzle its label names", () => {
+    const preview = round("Final round, double points: Advent-style puzzle (Final preview)", true);
+    expect([preview.kind, preview.puzzle, preview.game]).toEqual(["puzzle", 0, undefined]);
+    expect(round("Puzzle 1: easy, played as a relay").puzzle).toBe(1);
+    expect(round("Final round, double points: Puzzle 2, medium").puzzle).toBe(2);
+    expect(revealable(preview)).toBe(true);
+  });
+
+  test("Code Relay Night's last round and both rounds of the Final are puzzles, with their own clocks", () => {
+    const plan = (title: string) => DEFAULT_PLAN.find((w) => w.title === title)!.lineup.map((g, i) => roundOf(g, i));
+    const relay = plan("Code Relay Night");
+    expect(relay.filter((r) => r.kind === "puzzle").map((r) => [r.index, r.puzzle])).toEqual([[relay.length - 1, 0]]);
+    const final = plan("The Final");
+    expect(final.map((r) => [r.kind, r.puzzle, r.double])).toEqual([
+      ["puzzle", 1, false],
+      ["puzzle", 2, true],
+    ]);
+    // 10:00 and 13:00 relays with chimes, then 26:00 for Puzzle 2.
+    expect([0, 1, 2].map((i) => [cardSeconds("puzzle", i), !!PUZZLES[i].relay])).toEqual([
+      [600, true],
+      [780, true],
+      [1560, false],
+    ]);
+  });
+
+  test("a puzzle label that names no puzzle is run by hand", () => {
+    expect(round("Puzzle hunt").kind).toBe("other");
+  });
+
+  test("the button names the puzzle", () => {
+    expect([0, 1, 2].map(puzzleTitle)).toEqual(["Sticker Swap", "Comeback Kings", "Road to the Cup"]);
   });
 });
 
@@ -117,6 +153,24 @@ describe("the big button", () => {
     expect(step(p, { mode: "message" })).toBe("show");
     expect(step(p, { mode: "timer" })).toBe("scores");
     expect(step(p, { mode: "scoreboard" })).toBe("choose");
+  });
+
+  test("a puzzle: show it, the hint once it unlocks, reveal and score, scores, then the next round", () => {
+    const p = round("Final round, double points: Puzzle 2, medium", true, 1);
+    const up = { mode: "card", game: "puzzle", index: 2 };
+    expect(step(p, { mode: "message" })).toBe("show");
+    expect(step(p, up)).toBe("reveal");
+    expect(stepFor({ round: p, screen: up, teams: 3, hintReady: true })).toBe("hint");
+    expect(stepFor({ round: p, screen: { ...up, hint: true }, teams: 3, hintReady: true })).toBe("reveal");
+    expect(step(p, { ...up, revealed: true })).toBe("scores");
+    expect(step(p, { ...up, mode: "scoreboard", revealed: true })).toBe("next");
+  });
+
+  test("a puzzle comes back for its reveal, and last round's puzzle leads to this one", () => {
+    const p = round("Final round, double points: Puzzle 2, medium", true, 1);
+    expect(step(p, { mode: "scoreboard", game: "puzzle", index: 2 })).toBe("reveal");
+    expect(step(p, { mode: "card", game: "puzzle", index: 1 })).toBe("show");
+    expect(step(p, { mode: "scoreboard", game: "puzzle", index: 1, revealed: true })).toBe("show");
   });
 
   test("anything else: scores, then the next round (straight on with no teams)", () => {
