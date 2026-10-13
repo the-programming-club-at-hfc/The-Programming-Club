@@ -16,6 +16,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DesktopIndexRouteImport } from './routes/_desktop/index'
 import { Route as DesktopAboutRouteImport } from './routes/_desktop/about'
+import { Route as DesktopAiBusinessConferenceRouteImport } from './routes/_desktop/ai-business-conference'
 import { Route as DesktopDashboardRouteImport } from './routes/_desktop/dashboard'
 import { Route as DesktopHackTheNestRouteImport } from './routes/_desktop/hack-the-nest'
 import { Route as DesktopHowToJoinRouteImport } from './routes/_desktop/how-to-join'
@@ -73,6 +74,12 @@ const DesktopAboutRoute = DesktopAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => DesktopRoute,
 } as any)
+const DesktopAiBusinessConferenceRoute =
+  DesktopAiBusinessConferenceRouteImport.update({
+    id: '/ai-business-conference',
+    path: '/ai-business-conference',
+    getParentRoute: () => DesktopRoute,
+  } as any)
 const DesktopDashboardRoute = DesktopDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -191,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/about': typeof DesktopAboutRoute
+  '/ai-business-conference': typeof DesktopAiBusinessConferenceRoute
   '/dashboard': typeof DesktopDashboardRoute
   '/hack-the-nest': typeof DesktopHackTheNestRoute
   '/how-to-join': typeof DesktopHowToJoinRoute
@@ -219,6 +227,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/about': typeof DesktopAboutRoute
+  '/ai-business-conference': typeof DesktopAiBusinessConferenceRoute
   '/dashboard': typeof DesktopDashboardRoute
   '/hack-the-nest': typeof DesktopHackTheNestRoute
   '/how-to-join': typeof DesktopHowToJoinRoute
@@ -251,6 +260,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/_desktop/about': typeof DesktopAboutRoute
+  '/_desktop/ai-business-conference': typeof DesktopAiBusinessConferenceRoute
   '/_desktop/dashboard': typeof DesktopDashboardRoute
   '/_desktop/hack-the-nest': typeof DesktopHackTheNestRoute
   '/_desktop/how-to-join': typeof DesktopHowToJoinRoute
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/about'
+    | '/ai-business-conference'
     | '/dashboard'
     | '/hack-the-nest'
     | '/how-to-join'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/about'
+    | '/ai-business-conference'
     | '/dashboard'
     | '/hack-the-nest'
     | '/how-to-join'
@@ -343,6 +355,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/_desktop/about'
+    | '/_desktop/ai-business-conference'
     | '/_desktop/dashboard'
     | '/_desktop/hack-the-nest'
     | '/_desktop/how-to-join'
@@ -426,6 +439,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof DesktopAboutRouteImport
+      parentRoute: typeof DesktopRoute
+    }
+    '/_desktop/ai-business-conference': {
+      id: '/_desktop/ai-business-conference'
+      path: '/ai-business-conference'
+      fullPath: '/ai-business-conference'
+      preLoaderRoute: typeof DesktopAiBusinessConferenceRouteImport
       parentRoute: typeof DesktopRoute
     }
     '/_desktop/dashboard': {
@@ -625,6 +645,7 @@ const HelloWorldRouteRouteWithChildren = HelloWorldRouteRoute._addFileChildren(
 
 interface DesktopRouteChildren {
   DesktopAboutRoute: typeof DesktopAboutRoute
+  DesktopAiBusinessConferenceRoute: typeof DesktopAiBusinessConferenceRoute
   DesktopDashboardRoute: typeof DesktopDashboardRoute
   DesktopHackTheNestRoute: typeof DesktopHackTheNestRoute
   DesktopHowToJoinRoute: typeof DesktopHowToJoinRoute
@@ -637,6 +658,7 @@ interface DesktopRouteChildren {
 
 const DesktopRouteChildren: DesktopRouteChildren = {
   DesktopAboutRoute: DesktopAboutRoute,
+  DesktopAiBusinessConferenceRoute: DesktopAiBusinessConferenceRoute,
   DesktopDashboardRoute: DesktopDashboardRoute,
   DesktopHackTheNestRoute: DesktopHackTheNestRoute,
   DesktopHowToJoinRoute: DesktopHowToJoinRoute,

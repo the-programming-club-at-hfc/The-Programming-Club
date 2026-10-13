@@ -8,14 +8,17 @@ export const overview = query({
   args: {},
   handler: async (ctx) => {
     await requireOfficer(ctx);
-    const [allSessions, allAttendance, live, hackInterest] = await Promise.all([
+    const interestIn = (event: string) =>
+      ctx.db
+        .query("interest")
+        .withIndex("by_event_voter", (q) => q.eq("event", event))
+        .collect();
+    const [allSessions, allAttendance, live, hackInterest, conferenceInterest] = await Promise.all([
       ctx.db.query("sessions").collect(),
       ctx.db.query("attendance").collect(),
       openSession(ctx),
-      ctx.db
-        .query("interest")
-        .withIndex("by_event_voter", (q) => q.eq("event", "hack-the-nest-2026"))
-        .collect(),
+      interestIn("hack-the-nest-2026"),
+      interestIn("ai-business-conference-2026"),
     ]);
 
     const sessions = allSessions.filter((s) => !s.practice);
@@ -55,6 +58,7 @@ export const overview = query({
         average: ended.length ? Math.round(ended.reduce((n, x) => n + x.headcount, 0) / ended.length) : 0,
       },
       hackInterest: hackInterest.length,
+      conferenceInterest: conferenceInterest.length,
     };
   },
 });

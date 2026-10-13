@@ -516,7 +516,7 @@ export const SUPPLIES: { tier: string; items: string[] }[] = [
   {
     tier: "Free",
     items: [
-      "The gaming-room TV and lab computers",
+      "The E-178 TV and lab computers",
       "Phones for joining (anyone without one can be added from /host)",
       "Whiteboard, markers, scrap paper, pens",
       "Index cards and sticky notes, if Student Activities has a supply closet",
@@ -561,7 +561,7 @@ export const PROMO: { idea: string; how: string }[] = [
   },
   {
     idea: "Posters with a QR code",
-    how: "Put them near CIS classrooms, the library, the student center, and on the gaming-room door. Point the QR code at programmingclub.dev.",
+    how: "Put them near CIS classrooms, the library, the student center, and on the E-178 door. Point the QR code at programmingclub.dev.",
   },
   {
     idea: "Student Activities channels",
@@ -578,11 +578,11 @@ export const POSTER_LINES: string[] = [
   "No experience. No homework. Just show up.",
 ];
 export const ANNOUNCEMENT =
-  "Hi everyone, quick announcement from the Programming Club. We meet Wednesdays from 5 to 6 in the Gaming Room, and this semester we’re running a team game league called the Hello, World Cup: Wikipedia races, bug hunts, code relays. You don’t need any experience and there’s no homework. It’s free, and you can join any week. Come play. Details are at programmingclub.dev.";
+  "Hi everyone, quick announcement from the Programming Club. We meet Wednesdays from 5 to 6 in Room E-178, and this semester we’re running a team game league called the Hello, World Cup: Wikipedia races, bug hunts, code relays. You don’t need any experience and there’s no homework. It’s free, and you can join any week. Come play. Details are at programmingclub.dev.";
 export const CAPTIONS: string[] = [
-  "Week {n} high scores are up 🕹️ Come knock them off the board Wednesday, 5–6, Gaming Room.",
+  "Week {n} high scores are up 🕹️ Come knock them off the board Wednesday, 5–6, Room E-178.",
   "Pizza → Moon in 4 clicks. Think you can beat it? Wiki Race Night, Wednesday 5–6.",
-  "Never coded before? Most of us hadn’t either. Wednesdays 5–6, Gaming Room, no experience needed.",
+  "Never coded before? Most of us hadn’t either. Wednesdays 5–6, Room E-178, no experience needed.",
 ];
 export const FEEDBACK: string[] = [
   "What brought you here tonight? (learn, build things, compete, hang out, career)",

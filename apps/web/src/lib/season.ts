@@ -7,7 +7,7 @@ export const CLUB = {
   tag: "Season 0",
   day: "Wednesdays",
   time: "5–6 p.m.",
-  room: "the Gaming Room",
+  room: "Room E-178",
   url: "programmingclub.dev",
   // Who can join, word for word as on approved club flyers (Student Clubs Policy Manual: only enrolled students participate).
   eligibility: "Open to all currently enrolled HFC students",
