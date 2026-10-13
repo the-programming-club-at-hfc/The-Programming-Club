@@ -626,16 +626,22 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
   const [filter, setFilter] = useState<Filter>(() =>
     filters.includes(initial) && (tvIndex === undefined || deckFor(game, initial).includes(tvIndex)) ? initial : "all",
   );
-  // Start on the card the TV is showing, or the lineup round's puzzle, or else the first card not shown on any night yet.
+  // Start on the lineup round's puzzle, or the card the TV is showing, or else the first card not shown on any night yet.
   const [pos, setPos] = useState(() =>
-    tvIndex !== undefined ? deckFor(game, filter).indexOf(tvIndex) : pick !== undefined ? pick : firstFresh(deckFor(game, filter)),
+    pick !== undefined ? pick : tvIndex !== undefined ? deckFor(game, filter).indexOf(tvIndex) : firstFresh(deckFor(game, filter)),
   );
 
   const indexes = useMemo(() => deckFor(game, filter), [game, filter]);
   const index = indexes[Math.min(pos, indexes.length - 1)] ?? 0;
 
-  // Follow the TV when another officer changes the card, dropping a filter that hides it.
+  // Follow the TV when another officer changes the card, dropping a filter that hides it. A lineup round's puzzle
+  // stays put at first, even while the last puzzle is still on the TV.
+  const keepPick = useRef(pick !== undefined);
   useEffect(() => {
+    if (keepPick.current) {
+      keepPick.current = false;
+      return;
+    }
     if (tvIndex === undefined) return;
     const i = deckFor(game, filter).indexOf(tvIndex);
     if (i === -1) setFilter("all");
