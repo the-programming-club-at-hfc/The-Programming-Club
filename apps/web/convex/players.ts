@@ -21,6 +21,12 @@ const playerByEmail = (ctx: QueryCtx, email: string) =>
     .withIndex("by_email", (q) => q.eq("email", email.trim().toLowerCase()))
     .unique();
 
+/** A Clerk account name we can use as a player name as is, or undefined (missing, or longer than names can be). */
+const usableName = (name: string | undefined) => {
+  const n = name?.trim().replace(/\s+/g, " ");
+  return n && n.length <= 40 ? n : undefined;
+};
+
 /** The email of the account signed in on this phone, lowercased, or null. */
 async function accountEmail(ctx: QueryCtx) {
   return (await ctx.auth.getUserIdentity())?.email?.toLowerCase() ?? null;
@@ -70,7 +76,7 @@ export const account = query({
     const email = identity?.email?.toLowerCase();
     if (!email) return null;
     const player = await playerByEmail(ctx, email);
-    return { email, name: player?.name ?? identity?.name ?? null, officer: isOfficerEmail(email) };
+    return { email, name: player?.name ?? usableName(identity?.name) ?? null, officer: isOfficerEmail(email) };
   },
 });
 
@@ -84,7 +90,7 @@ export const joinSignedIn = mutation({
     const session = await sessionByCode(ctx, code);
     // An existing player keeps their name (addToSession), so `name` only matters the first time.
     const known = (await playerByEmail(ctx, email))?.name;
-    const token = await addToSession(ctx, session, known ?? name ?? identity?.name ?? "", email, broughtBy);
+    const token = await addToSession(ctx, session, known ?? name ?? usableName(identity?.name) ?? "", email, broughtBy);
     await claimAccount(ctx, email);
     await saveIdea(ctx, token, session._id, idea);
     return token;

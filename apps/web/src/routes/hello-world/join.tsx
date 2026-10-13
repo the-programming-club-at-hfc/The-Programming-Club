@@ -105,7 +105,7 @@ function JoinForm({
   const joinSignedIn = useMutation(api.players.joinSignedIn);
   const checkInOfficer = useMutation(api.players.checkInOfficer);
   // A phone signed in to an account joins in one tap; an officer's account checks in to run the night instead.
-  const { isLoading, isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useConvexAuth();
   const account = useQuery(api.players.account, isAuthenticated ? {} : "skip");
   const officer = !!account?.officer;
   const member = !!account && !officer;
@@ -118,14 +118,11 @@ function JoinForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
-  // Clerk sends people back here after signing in, code and all.
-  const [here, setHere] = useState("/join");
 
   useEffect(() => {
     const saved = localStorage.getItem("hwc.profile");
     if (saved) setProfile(JSON.parse(saved) as Profile);
     setFirstPhone(!saved && !Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
-    setHere(window.location.pathname + window.location.search);
   }, []);
 
   useEffect(() => {
@@ -155,14 +152,16 @@ function JoinForm({
 
   const wk = useSchedule()[week - 1];
   const t = weekTile(wk);
-  // Wait for the sign-in check, so a signed-in phone never flashes the long form first.
-  if (isLoading || (isAuthenticated && account === undefined))
+  // Guests never wait on sign-in: only a phone that's already signed in waits for its account.
+  if (isAuthenticated && account === undefined)
     return (
       <Center>
         <p className="text-dim">Loading…</p>
       </Center>
     );
   const letters = code.padEnd(4, " ").slice(0, 4).split("");
+  // Clerk sends people back here after signing in, with the code typed so far.
+  const here = code ? `/join?code=${code}` : "/join";
   const askName = !officer && !(member && account.name);
   return (
     <Wrap className="flex min-h-dvh max-w-xl flex-col py-5">
@@ -289,8 +288,9 @@ function JoinForm({
               </SignOutButton>
             ) : (
               <SignInButton mode="modal" withSignUp forceRedirectUrl={here} initialValues={{ emailAddress: profile.email || undefined }}>
-                <button type="button" className="link">
-                  Sign in to join in one tap next time
+                {/* Keeps the name typed so far for after signing in. */}
+                <button type="button" className="link" onClick={() => localStorage.setItem("hwc.profile", JSON.stringify(profile))}>
+                  Sign in with your HawkMail to join in one tap next time
                 </button>
               </SignInButton>
             )}
