@@ -11,7 +11,7 @@ import { CLUB, OFFICERS, fmtDate, isHalloweenMonth } from "#/lib/season";
 import { api } from "../../../convex/_generated/api";
 import { Dashboard } from "./dashboard";
 
-export type AppId = "about" | "meetings" | "world-cup" | "hackathon" | "officers" | "join" | "site" | "dashboard";
+export type AppId = "about" | "meetings" | "world-cup" | "hackathon" | "conference" | "officers" | "join" | "site" | "dashboard";
 
 export interface App {
   id: AppId;
@@ -60,7 +60,7 @@ function About() {
           ["Experience", "None needed"],
           ["Cost", "Free. No dues."],
           ["When", `${CLUB.day}, ${CLUB.time}`],
-          ["Where", "The Gaming Room"],
+          ["Where", CLUB.room],
           ["Languages", "Any"],
         ].map(([k, v]) => (
           <div key={k}>
@@ -329,6 +329,66 @@ function Hackathon() {
   );
 }
 
+/* ---------- conference: Michigan AI Business Conference ---------- */
+
+const CONF = {
+  id: "ai-business-conference-2026",
+  url: "https://abgumich.org/conference",
+  flyer: "/events/ai-business-conference-2026.pdf",
+};
+
+function Conference() {
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[10px] bg-[#0b2a55] p-5 text-white">
+        <p className="text-sm font-semibold text-[#f5c400]">Fri, Oct 23, 2026 · 10:30 a.m.–5 p.m.</p>
+        <p className="mt-1 text-2xl leading-tight font-extrabold tracking-[-0.02em]">AI Business Conference</p>
+        <p className="mt-1 text-white/75">Ross School of Business, University of Michigan, Ann Arbor</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={CONF.url}
+            target="_blank"
+            rel="noreferrer"
+            className="press inline-flex h-9 items-center rounded-full bg-[#f5c400] px-4 text-sm font-semibold text-[#0b2a55] hover:bg-[#ffd633]"
+          >
+            Get a ticket ↗
+          </a>
+          <a
+            href={CONF.flyer}
+            target="_blank"
+            rel="noreferrer"
+            className="press inline-flex h-9 items-center rounded-full bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/20"
+          >
+            View the flyer (PDF)
+          </a>
+        </div>
+      </div>
+      <p className="text-lg leading-relaxed">
+        A full day on how AI is changing finance and venture capital: keynotes, expert panels, coffee chats, and networking with industry
+        leaders. Speakers come from Microsoft, J.P. Morgan, Bank of America, BTIG, and more.
+      </p>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 text-[0.95rem]">
+        {[
+          ["Cost", "$17 general admission"],
+          ["Tickets", "On sale until Thu, Oct 22, 8 a.m. ET"],
+          ["Tracks", "Finance & quant, venture capital"],
+          ["Included", "Lunch, workshops, closing reception"],
+        ].map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-dim">{k}</dt>
+            <dd className="font-semibold">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <Interest event={CONF.id} />
+      <p className="text-sm text-dim">
+        Hosted by the University of Michigan’s AI Business Group (ABG), not by our club. Times are from their flyer; check their site for
+        the full agenda, since it may start earlier.
+      </p>
+    </div>
+  );
+}
+
 /** One anonymous heart per browser, so officers can see how many members want to go. */
 function Interest({ event }: { event: string }) {
   const [voter, setVoter] = useState<string | null>(null);
@@ -430,6 +490,21 @@ export const APPS: App[] = [
     at: { left: 34, top: 10 },
     width: "27rem",
     Content: Hackathon,
+  },
+  {
+    id: "conference",
+    path: "/ai-business-conference",
+    title: "AI Business Conference",
+    label: "AI Business Conference",
+    glyph: (
+      <svg viewBox="0 0 24 24" {...G}>
+        <rect x="3.5" y="4" width="17" height="10" rx="1.5" />
+        <path d="M12 14v3M8 21l4-4 4 4M7.5 11l3-3 2 2 3.5-3.5" />
+      </svg>
+    ),
+    at: { left: 44, top: 12 },
+    width: "27rem",
+    Content: Conference,
   },
   {
     id: "officers",

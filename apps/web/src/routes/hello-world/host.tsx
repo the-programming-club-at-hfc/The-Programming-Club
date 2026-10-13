@@ -205,7 +205,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
           <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="underline">
             /hello-world/tv
           </a>{" "}
-          on the gaming-room TV. To change a week’s games, use the{" "}
+          on the room’s TV. To change a week’s games, use the{" "}
           <Link to="/hello-world/schedule" className="underline">
             season planner
           </Link>
