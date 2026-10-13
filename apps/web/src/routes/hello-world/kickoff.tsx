@@ -27,7 +27,7 @@ function JoinBox() {
   return (
     <div className="flex items-center gap-6">
       <div className="bg-white p-3">
-        <QRCodeSVG value={`${origin}/hello-world/join?code=${code}`} size={180} marginSize={0} />
+        <QRCodeSVG value={`${origin}/join?code=${code}`} size={180} marginSize={0} />
       </div>
       <div>
         <p className="text-dim">Scan to join, or enter code</p>

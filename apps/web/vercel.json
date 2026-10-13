@@ -3,7 +3,6 @@
   "framework": "tanstack-start",
   "buildCommand": "if [ -n \"$CONVEX_DEPLOY_KEY\" ]; then bunx convex deploy --cmd 'bun run build' --cmd-url-env-var-name VITE_CONVEX_URL; else bun run build; fi",
   "redirects": [
-    { "source": "/join", "destination": "/hello-world/join", "permanent": false },
     { "source": "/tv", "destination": "/hello-world/tv", "permanent": false },
     { "source": "/host", "destination": "/hello-world/host", "permanent": false },
     { "source": "/fix", "destination": "/hello-world/fix", "permanent": false },

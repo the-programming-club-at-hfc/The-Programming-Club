@@ -237,7 +237,7 @@ function ScreenPanel({ live }: { live: Live }) {
   ] as const;
   return (
     <Panel title="On the TV" className="">
-      <div className="flex flex-wrap">
+      <div className="flex flex-wrap gap-2">
         {modes.map(([mode, label]) => (
           <button
             key={mode}
@@ -303,7 +303,7 @@ function TimerPanel({ live }: { live: Live }) {
       <p className={`text-center narrow font-extrabold text-7xl tabular-nums ${running && remaining <= 10_000 ? "text-signal" : ""}`}>
         {running && remaining === 0 ? "TIME" : fmtClock(remaining)}
       </p>
-      <div className="mt-3 flex flex-wrap justify-center">
+      <div className="mt-3 flex flex-wrap justify-center gap-2">
         <button className="btn btn-coin" onClick={() => run(timer({ action: "toggle" }))}>
           {running ? "Pause" : "Start"}
         </button>
@@ -314,7 +314,7 @@ function TimerPanel({ live }: { live: Live }) {
           +30s
         </button>
       </div>
-      <div className="mt-2 flex flex-wrap justify-center">
+      <div className="mt-2 flex flex-wrap justify-center gap-2">
         {[30, 45, 60, 90, 120, 300, 720].map((s) => (
           <button key={s} className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: s, relay: s === 720 }))}>
             {fmtClock(s * 1000)}
@@ -344,7 +344,7 @@ function TeamsPanel({ live }: { live: Live }) {
 
   return (
     <Panel title="Teams & scores">
-      <div className="flex flex-wrap">
+      <div className="flex flex-wrap gap-2">
         <button className="btn btn-sm btn-coin" onClick={() => shuffleTeams(3)}>
           Make teams of 3
         </button>
@@ -378,7 +378,7 @@ function TeamsPanel({ live }: { live: Live }) {
                 <span className="text-sm text-dim">{t.members.join(", ") || "empty"}</span>
                 <span className="ml-auto narrow font-extrabold text-3xl text-ink tabular-nums">{t.score}</span>
               </div>
-              <div className="mt-1 flex flex-wrap">
+              <div className="mt-1 flex flex-wrap gap-2">
                 {[1, 2, 3, 5].map((n) => (
                   <button key={n} className="btn btn-sm" onClick={() => run(score({ teamId: t._id, delta: n }))}>
                     +{live.double ? n * 2 : n}
@@ -676,7 +676,7 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
           ))}
         </div>
       )}
-      <div className="flex flex-wrap items-center">
+      <div className="flex flex-wrap items-center gap-2">
         <button className="btn btn-sm" onClick={() => go(-1)}>
           ‹ Prev
         </button>
@@ -1042,7 +1042,7 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
   const url = (t: string) => `https://en.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}`;
   return (
     <div>
-      <div className="flex flex-wrap items-center">
+      <div className="flex flex-wrap items-center gap-2">
         <button className="btn btn-sm btn-coin" onClick={draw}>
           Draw a race
         </button>
@@ -1084,7 +1084,7 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
               {race.to}
             </a>
           </div>
-          <div className="mt-3 flex flex-wrap">
+          <div className="mt-3 flex flex-wrap gap-2">
             {onTv ? (
               <button
                 className={`btn btn-sm ${s.revealed ? "" : "btn-coin"}`}
@@ -1125,7 +1125,7 @@ function PictionaryTool() {
   const [word, setWord] = useState<string | null>(null);
   return (
     <div>
-      <div className="flex flex-wrap">
+      <div className="flex flex-wrap gap-2">
         <button className="btn btn-sm btn-coin" onClick={() => setWord(nextWord())}>
           Next word
         </button>
@@ -1185,7 +1185,7 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
                   </option>
                 ))}
               </select>
-              <span className="flex items-center">
+              <span className="flex items-center gap-1">
                 <button className="btn btn-sm" onClick={() => run(bonus({ attendanceId: r._id, delta: -1 }))} aria-label="Less bonus XP">
                   −
                 </button>

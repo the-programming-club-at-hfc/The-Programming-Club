@@ -118,7 +118,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   useChimes(live.timer, remaining);
   useTvSound(live, remaining, sound);
   const origin = useOrigin();
-  const joinUrl = `${origin}/hello-world/join?code=${code}`;
+  const joinUrl = `${origin}/join?code=${code}`;
   const s = live.screen;
   const running = !!live.timer.startedAt;
   const plan = useSchedule();
@@ -235,7 +235,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
         {live.double && <span className="bg-sun px-[0.8vw] py-[0.2vw] font-bold text-[#12332b]">Last round counts double</span>}
         {live.practice && <span className="bg-sky px-[0.8vw] py-[0.2vw] font-bold text-[#12332b]">Practice night</span>}
         <span className="ml-auto text-dim">
-          Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/hello-world/join</strong>
+          Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/join</strong>
         </span>
         <CodeSquares code={code} className="text-[2vw]" />
         {s.mode !== "timer" && (running || remaining !== live.timer.durationMs) && (
