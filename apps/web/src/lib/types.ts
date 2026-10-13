@@ -48,14 +48,21 @@ export interface Bug {
   level: Level;
   spooky?: boolean;
   code: string;
+  /** Shown on reveal; may mention alternatives. */
   line: string;
+  /** Line numbers (1-based) that count as a correct tap. */
+  lines: number[];
   fix: string;
+  /** Three plausible wrong fixes, shown with `fix` as phone choices. */
+  wrong: [string, string, string];
   why: string;
 }
 
 export interface OutputQ {
   code: string;
   answer: string;
+  /** Three plausible wrong answers, shown with `answer` as phone choices. */
+  wrong: [string, string, string];
   why: string;
   tiebreak?: boolean;
 }
@@ -65,6 +72,8 @@ export interface LangQ {
   code: string;
   /** What gives it away, shown on reveal. */
   tell: string;
+  /** Other answers that also count, e.g. TypeScript for a snippet that is valid in both. */
+  also?: string[];
 }
 
 export interface Relay {

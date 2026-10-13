@@ -1,25 +1,52 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { addToSession, requireOpenSession, sessionAttendance, sessionTeams, shuffle } from "./lib";
+import {
+  addToSession,
+  inTeamPool,
+  newTeamKey,
+  openSession,
+  requireOpenSession,
+  sessionAttendance,
+  sessionTeams,
+  shuffle,
+  teamByKey,
+} from "./lib";
 import { TEAM_NAMES } from "./teamNames";
 
 const unusedName = (taken: string[]) => shuffle(TEAM_NAMES).find((n) => !taken.includes(n)) ?? `Team ${taken.length + 1}`;
 
-/** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo). Resets tonight's teams. */
+/** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo). Resets tonight's teams.
+ *  Officers running the night stay off the teams. */
 export const make = mutation({
   args: { size: v.union(v.literal(2), v.literal(3)) },
   handler: async (ctx, { size }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     for (const t of await sessionTeams(ctx, s._id)) await ctx.db.delete(t._id);
-    const att = shuffle(await sessionAttendance(ctx, s._id));
+    const all = await sessionAttendance(ctx, s._id);
+    for (const a of all) if (a.teamId && !inTeamPool(a)) await ctx.db.patch(a._id, { teamId: undefined });
+    const att = shuffle(all.filter(inTeamPool));
     if (!att.length) return;
     const n = Math.max(1, size === 3 ? Math.ceil(att.length / 3) : Math.floor(att.length / 2));
     const names = shuffle(TEAM_NAMES);
     const ids = [];
-    for (let i = 0; i < n; i++) ids.push(await ctx.db.insert("teams", { sessionId: s._id, name: names[i % names.length], score: 0 }));
+    const keys: string[] = [];
+    for (let i = 0; i < n; i++) {
+      keys.push(newTeamKey(keys));
+      ids.push(await ctx.db.insert("teams", { sessionId: s._id, name: names[i % names.length], score: 0, key: keys[i] }));
+    }
     for (let i = 0; i < att.length; i++) await ctx.db.patch(att[i]._id, { teamId: ids[i % n] });
+  },
+});
+
+/** For a team computer: the team with this key tonight, or null. */
+export const byKey = query({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const s = await openSession(ctx);
+    const t = s && (await teamByKey(ctx, s._id, key));
+    return t && { _id: t._id, name: t.name };
   },
 });
 
@@ -28,8 +55,13 @@ export const add = mutation({
   handler: async (ctx) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
-    const taken = (await sessionTeams(ctx, s._id)).map((t) => t.name);
-    await ctx.db.insert("teams", { sessionId: s._id, name: unusedName(taken), score: 0 });
+    const teams = await sessionTeams(ctx, s._id);
+    await ctx.db.insert("teams", {
+      sessionId: s._id,
+      name: unusedName(teams.map((t) => t.name)),
+      score: 0,
+      key: newTeamKey(teams.map((t) => t.key)),
+    });
   },
 });
 
@@ -52,7 +84,7 @@ export const remove = mutation({
   },
 });
 
-/** Positive points double while "Final round ×2" is on. */
+/** Positive points double while "Double points" is on. */
 export const score = mutation({
   args: { teamId: v.id("teams"), delta: v.number() },
   handler: async (ctx, { teamId, delta }) => {
@@ -78,7 +110,10 @@ export const move = mutation({
   args: { attendanceId: v.id("attendance"), teamId: v.union(v.id("teams"), v.null()) },
   handler: async (ctx, { attendanceId, teamId }) => {
     await requireOfficer(ctx);
-    await ctx.db.patch(attendanceId, { teamId: teamId ?? undefined });
+    const a = await ctx.db.get(attendanceId);
+    if (!a) return;
+    // Putting an officer on a team means they're playing tonight.
+    await ctx.db.patch(attendanceId, { teamId: teamId ?? undefined, ...(a.officer && { playing: !!teamId }) });
   },
 });
 

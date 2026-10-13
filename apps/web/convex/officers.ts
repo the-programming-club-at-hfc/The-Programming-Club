@@ -12,6 +12,8 @@ const officerEmails = () =>
       .filter(Boolean),
   );
 
+export const isOfficerEmail = (email: string) => officerEmails().has(email.trim().toLowerCase());
+
 async function officerEmail(ctx: QueryCtx) {
   const identity = await ctx.auth.getUserIdentity();
   const email = identity?.email?.toLowerCase();

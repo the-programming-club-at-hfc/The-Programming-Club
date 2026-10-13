@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { WEEKS } from "../src/lib/content";
+import { isOfficerEmail } from "./officers";
 
 export const openSession = (ctx: QueryCtx) =>
   ctx.db
@@ -28,6 +29,25 @@ export const sessionAttendance = (ctx: QueryCtx, sessionId: Id<"sessions">) =>
     .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
     .collect();
 
+export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
+const randomCode = () => Array.from({ length: 4 }, () => CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)]).join("");
+
+/** A team key no other team has tonight. */
+export const newTeamKey = (taken: (string | undefined)[]) => {
+  let key = randomCode();
+  while (taken.includes(key)) key = randomCode();
+  return key;
+};
+
+/** The team a team computer speaks for, from the key on the team's phones. */
+export async function teamByKey(ctx: QueryCtx, sessionId: Id<"sessions">, key: string) {
+  const k = key.trim().toUpperCase();
+  return (await sessionTeams(ctx, sessionId)).find((t) => t.key === k) ?? null;
+}
+
+/** Whether this check-in goes into teams: everyone except officers who are running the night. */
+export const inTeamPool = (a: Doc<"attendance">) => !a.officer || !!a.playing;
+
 export const randomToken = () => Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 8)).join("");
 
 export function shuffle<T>(arr: T[]): T[] {
@@ -49,9 +69,27 @@ export function cleanPlayer(name: string, email: string) {
   return { name: n, email: e };
 }
 
-/** Add a player to the session (or return their existing spot). Late joiners go on the smallest team. */
-export async function addToSession(ctx: MutationCtx, session: Doc<"sessions">, name: string, email: string, broughtBy?: string) {
+/** The team with the fewest players tonight, for late joiners. */
+export async function smallestTeam(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  const teams = await sessionTeams(ctx, sessionId);
+  if (!teams.length) return undefined;
+  const att = await sessionAttendance(ctx, sessionId);
+  const size = (t: Id<"teams">) => att.filter((a) => a.teamId === t).length;
+  return teams.reduce((best, t) => (size(t._id) < size(best._id) ? t : best))._id;
+}
+
+/** Add a player to the session (or return their existing spot). Late joiners go on the smallest team.
+ *  Officers (signed in, or by an email on OFFICER_EMAILS) check in to run the night, off the teams. */
+export async function addToSession(
+  ctx: MutationCtx,
+  session: Doc<"sessions">,
+  name: string,
+  email: string,
+  broughtBy?: string,
+  signedInOfficer = false,
+) {
   const p = cleanPlayer(name, email);
+  const officer = signedInOfficer || isOfficerEmail(p.email);
   let player = await ctx.db
     .query("players")
     .withIndex("by_email", (q) => q.eq("email", p.email))
@@ -66,20 +104,19 @@ export async function addToSession(ctx: MutationCtx, session: Doc<"sessions">, n
     .query("attendance")
     .withIndex("by_session_player", (q) => q.eq("sessionId", session._id).eq("playerId", player._id))
     .unique();
-  if (existing) return existing.token;
+  if (existing) {
+    if (officer && !existing.officer) await ctx.db.patch(existing._id, { officer: true, playing: !!existing.teamId });
+    return existing.token;
+  }
 
-  const prior = await ctx.db
+  // First time means no earlier real night; practice nights don't count.
+  const history = await ctx.db
     .query("attendance")
     .withIndex("by_player", (q) => q.eq("playerId", player._id))
-    .first();
+    .collect();
+  const prior = (await Promise.all(history.map((h) => ctx.db.get(h.sessionId)))).some((s) => s && !s.practice);
 
-  const teams = await sessionTeams(ctx, session._id);
-  let teamId: Id<"teams"> | undefined;
-  if (teams.length) {
-    const att = await sessionAttendance(ctx, session._id);
-    const size = (t: Id<"teams">) => att.filter((a) => a.teamId === t).length;
-    teamId = teams.reduce((best, t) => (size(t._id) < size(best._id) ? t : best))._id;
-  }
+  const teamId = officer ? undefined : await smallestTeam(ctx, session._id);
 
   const token = randomToken();
   await ctx.db.insert("attendance", {
@@ -92,6 +129,7 @@ export async function addToSession(ctx: MutationCtx, session: Doc<"sessions">, n
     broughtBy: broughtBy?.trim().slice(0, 40) || undefined,
     showXp: WEEKS[session.week - 1]?.showXp ?? 3,
     bonusXp: 0,
+    ...(officer && { officer: true, playing: false }),
   });
   return token;
 }

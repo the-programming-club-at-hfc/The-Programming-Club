@@ -69,7 +69,7 @@ function Season() {
                       <td key={g.id} className={`h-12 text-center ${p.has(g.id) ? GAME_TILE[g.id].tile : "bg-mist/50"}`}>
                         {p.has(g.id) && (
                           <span className={`narrow text-sm font-extrabold ${GAME_TILE[g.id].tile === "tile-pine" ? "text-white" : ""}`}>
-                            {p.get(g.id) ? "×2" : "●"}
+                            {p.get(g.id) ? "Double" : "●"}
                           </span>
                         )}
                       </td>
@@ -80,7 +80,7 @@ function Season() {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-sm text-dim">● played that night. ×2 is the final round, worth double points.</p>
+        <p className="mt-3 text-sm text-dim">● played that night. “Double” marks the final round, worth double points.</p>
       </Wrap>
 
       <Wrap className="mt-24">
@@ -114,7 +114,7 @@ function Season() {
                   <h3 className="text-sm tracking-normal text-dim">What we’ll play</h3>
                   <ol className="steps mt-2">
                     {w.games.map((g) => {
-                      const idea = ideaFor(g.replace(/^Final round ×2: /, ""));
+                      const idea = ideaFor(g.replace(/^Final round, double points: /, ""));
                       return (
                         <li key={g}>
                           {g}

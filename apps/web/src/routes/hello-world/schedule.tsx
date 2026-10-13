@@ -204,7 +204,7 @@ function Editor({ w }: { w: WeekPlan }) {
 
       <section className="mt-12">
         <h3 className="text-2xl lowercase">lineup</h3>
-        <p className="mt-1 text-dim">Played top to bottom. Mark the last round ×2 so it counts double.</p>
+        <p className="mt-1 text-dim">Played top to bottom. Turn on “Double” for the last round so it’s worth double points.</p>
         {d.lineup.length === 0 ? (
           <p className="mt-4 bg-mist px-4 py-6 text-center text-dim">No games yet. Add some from the catalog below.</p>
         ) : (
@@ -231,7 +231,7 @@ function Editor({ w }: { w: WeekPlan }) {
                     aria-pressed={g.double}
                     title="Double points"
                   >
-                    ×2
+                    Double
                   </button>
                   <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
                     ↑

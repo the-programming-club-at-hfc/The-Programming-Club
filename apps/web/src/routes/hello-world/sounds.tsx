@@ -68,7 +68,7 @@ function Sounds() {
 
         <h2 className="mt-10 text-3xl">music</h2>
         <p className="mt-1 text-dim">Put lobby.mp3 or think.mp3 in public/audio to replace a built-in loop.</p>
-        <div className="mt-3 flex flex-wrap">
+        <div className="mt-3 flex flex-wrap gap-2">
           {MUSIC.map(([id, label]) => (
             <button
               key={id}

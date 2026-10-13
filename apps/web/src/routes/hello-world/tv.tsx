@@ -4,10 +4,11 @@ import type { FunctionReturnType } from "convex/server";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { CardView, DECKS, fmtClock, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
 import { OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
+import { cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
@@ -18,6 +19,10 @@ export const Route = createFileRoute("/hello-world/tv")({
 });
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
+type Board = NonNullable<FunctionReturnType<typeof api.answers.board>>;
+type FixBoard = NonNullable<FunctionReturnType<typeof api.fixes.board>>;
+type PuzzleBoard = NonNullable<FunctionReturnType<typeof api.puzzles.board>>;
+type WikiBoard = NonNullable<FunctionReturnType<typeof api.wiki.board>>;
 
 function useOrigin() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
@@ -113,13 +118,40 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   useChimes(live.timer, remaining);
   useTvSound(live, remaining, sound);
   const origin = useOrigin();
-  const joinUrl = `${origin}/hello-world/join?code=${code}`;
+  const joinUrl = `${origin}/join?code=${code}`;
   const s = live.screen;
   const running = !!live.timer.startedAt;
   const plan = useSchedule();
   const wk = plan[live.week - 1];
   const wt = weekTile(wk);
   const deckTile = s.game ? GAME_TILE[s.game] : null;
+  const answerable = s.mode === "card" && isAnswerGame(s.game) && s.index !== undefined;
+  const boardData = useQuery(api.answers.board, answerable ? {} : "skip");
+  const board = answerable && s.game && s.index !== undefined && boardData?.card === cardKey(s.game, s.index) ? boardData : null;
+  const isFix = s.mode === "card" && s.game === "fix" && s.index !== undefined;
+  const fixData = useQuery(api.fixes.board, isFix ? {} : "skip");
+  const fixBoard = isFix && s.index !== undefined && fixData?.card === cardKey("fix", s.index) ? fixData : null;
+  const isPuzzle = s.mode === "card" && s.game === "puzzle" && s.index !== undefined;
+  const puzzleData = useQuery(api.puzzles.board, isPuzzle ? {} : "skip");
+  const puzzleBoard = isPuzzle && s.index !== undefined && puzzleData?.card === cardKey("puzzle", s.index) ? puzzleData : null;
+  const stars = puzzleBoard?.teams.reduce((n, t) => n + Number(t.part1Ms !== null) + Number(t.part2Ms !== null), 0) ?? null;
+  const isWiki = s.mode === "wiki" && !!s.wikiFrom && !!s.wikiTo;
+  const wikiData = useQuery(api.wiki.board, isWiki ? {} : "skip");
+  const wikiBoard = isWiki && wikiData?.card === wikiKey(s.wikiFrom!, s.wikiTo!) ? wikiData : null;
+  useCountSound(
+    board ? board.card : fixBoard ? fixBoard.card : puzzleBoard ? puzzleBoard.card : wikiBoard?.card,
+    board
+      ? board.locked
+      : fixBoard
+        ? fixBoard.fixed.length
+        : puzzleBoard
+          ? stars
+          : wikiBoard
+            ? wikiBoard.finished.filter((f) => f.ok !== false).length
+            : null,
+  );
+  // A card already scored tonight shows as played (answer and results), like it does on phones.
+  const done = !!s.revealed || !!board?.results || !!fixBoard?.scored || !!puzzleBoard?.scored;
 
   return (
     <>
@@ -140,25 +172,49 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 </span>
               )}
               {DECKS[s.game].name}
+              {board && board.locked !== null && !s.revealed && board.teams > 0 && (
+                <span className="ml-auto">
+                  <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} teams locked in
+                </span>
+              )}
+              {fixBoard && !done && fixBoard.teams > 0 && (
+                <span className="ml-auto">
+                  <span className="narrow text-[2.6vw] font-extrabold">{fixBoard.fixed.length}</span> of {fixBoard.teams} teams fixed it
+                </span>
+              )}
+              {puzzleBoard && !done && stars !== null && stars > 0 && (
+                <span className="ml-auto">
+                  <span className="narrow text-[2.6vw] font-extrabold text-gold">{stars}</span> star{stars === 1 ? "" : "s"} so far
+                </span>
+              )}
             </p>
-            <CardView game={s.game} index={s.index} answer={!!s.revealed} size="xl" />
+            <div className={board?.results || fixBoard || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
+              <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" />
+              {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
+              {fixBoard && <FixList board={fixBoard} done={done} />}
+              {puzzleBoard && <StarBoard board={puzzleBoard} done={done} />}
+            </div>
           </div>
         )}
         {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
-          <div className="flex h-full flex-col justify-center gap-[3vw]">
-            <div className="grid grid-cols-2 gap-[0.3vw]">
-              <div className="bg-mist p-[3vw]">
-                <p className="text-[1.6vw] text-dim">Start here</p>
-                <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiFrom}</p>
+          <div className={`grid h-full items-center gap-[3vw] ${wikiBoard && wikiBoard.teams > 0 ? "grid-cols-[minmax(0,1fr)_26vw]" : ""}`}>
+            <div className="flex flex-col gap-[3vw]">
+              <div className={`grid gap-[0.3vw] ${wikiBoard && wikiBoard.teams > 0 ? "" : "grid-cols-2"}`}>
+                <div className="bg-mist p-[3vw]">
+                  <p className="text-[1.6vw] text-dim">Start here</p>
+                  <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiFrom}</p>
+                </div>
+                <div className="tile tile-sky p-[3vw]">
+                  <p className="text-[1.6vw]">Get to</p>
+                  <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiTo}</p>
+                </div>
               </div>
-              <div className="tile tile-sky p-[3vw]">
-                <p className="text-[1.6vw]">Get to</p>
-                <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiTo}</p>
-              </div>
+              <p className="text-[1.5vw] text-dim">
+                {s.wikiClicks ? "Fewest clicks wins. Count every link you click. " : ""}
+                Links inside the article only. No search bar. Back button and Ctrl+F are fine. Tap “We made it!” on a phone when you land.
+              </p>
             </div>
-            <p className="text-[1.5vw] text-dim">
-              Links inside the article only. No search bar. Back button and Ctrl+F are fine. Shout “Wiki!” when you land.
-            </p>
+            {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} />}
           </div>
         )}
         {s.mode === "message" && (
@@ -177,8 +233,9 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
           Week {live.week}: {wk.title}
         </span>
         {live.double && <span className="bg-sun px-[0.8vw] py-[0.2vw] font-bold text-[#12332b]">Last round counts double</span>}
+        {live.practice && <span className="bg-sky px-[0.8vw] py-[0.2vw] font-bold text-[#12332b]">Practice night</span>}
         <span className="ml-auto text-dim">
-          Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/hello-world/join</strong>
+          Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/join</strong>
         </span>
         <CodeSquares code={code} className="text-[2vw]" />
         {s.mode !== "timer" && (running || remaining !== live.timer.durationMs) && (
@@ -195,6 +252,152 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
         </div>
       )}
     </>
+  );
+}
+
+/** A pop each time another team locks in (or fixes it, in Fix it for real, or earns a puzzle star). */
+function useCountSound(card: string | undefined, n: number | null) {
+  const prev = useRef<{ card: string; n: number | null } | null>(null);
+  useEffect(() => {
+    if (!card) return;
+    const p = prev.current;
+    prev.current = { card, n };
+    if (p?.card === card && n !== null && n > (p.n ?? 0)) sfx.join(n);
+  }, [card, n]);
+}
+
+/** Fix it for real: the teams that fixed it, in order, with their times. Points join them once it's scored. No code. */
+function FixList({ board, done }: { board: FixBoard; done: boolean }) {
+  return (
+    <div>
+      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your team computer</p>}
+      {board.fixed.length === 0 ? (
+        <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
+      ) : (
+        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
+          {board.fixed.map((f, i) => (
+            <li key={f.teamId} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
+              <span className="narrow text-[2.4vw] leading-none font-extrabold text-meadow">{i + 1}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{f.name}</span>
+                <span className="block text-[1.2vw] text-dim">
+                  {f.ms === null ? "fixed" : `fixed at ${fmtElapsed(f.ms)}`}
+                  {f.result?.first ? " · first" : ""}
+                </span>
+              </span>
+              <span className="narrow text-[2.6vw] leading-none font-extrabold">{f.result ? `+${f.result.points}` : "✓"}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** Puzzles: every team's stars, most first, with times on the puzzle's clock. Points join them once it's scored. Never answers. */
+function StarBoard({ board, done }: { board: PuzzleBoard; done: boolean }) {
+  const star = (ms: number | null, first: boolean) => (
+    <span className={`block text-[1.2vw] ${ms === null ? "text-dim" : ""}`}>
+      <span className={ms === null ? "" : "text-gold"}>{ms === null ? "☆" : "★"}</span>
+      {ms === null ? " not yet" : ` ${fmtElapsed(ms)}${first ? " · first" : ""}`}
+    </span>
+  );
+  return (
+    <div>
+      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your team computer</p>}
+      {board.teams.length === 0 ? (
+        <p className="mt-[1vw] text-[1.6vw] text-dim">No teams yet.</p>
+      ) : (
+        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
+          {board.teams.map((t) => (
+            <li key={t.teamId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.7vw]">
+              <span className="min-w-0 truncate text-[1.8vw] leading-tight font-extrabold">{t.name}</span>
+              <span>
+                {star(t.part1Ms, t.first1)}
+                {star(t.part2Ms, t.first2)}
+              </span>
+              {done && <span className="narrow text-[2.6vw] leading-none font-extrabold">+{t.result?.points ?? 0}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** Wiki Race: the finish order with places and times (or click counts), then every team's points once it's scored. */
+function RaceList({ board, done }: { board: WikiBoard; done: boolean }) {
+  const rows = board.results
+    ? board.results.map((r) => ({
+        key: r.teamId,
+        name: r.name,
+        place: r.result?.place ?? null,
+        note: null,
+        end: `+${r.result?.points ?? 0}`,
+      }))
+    : board.finished
+        .filter((f) => f.ok !== false)
+        .map((f) => ({
+          key: f.teamId,
+          name: f.name,
+          place: f.place,
+          note: [f.clicks !== null && `${f.clicks} click${f.clicks === 1 ? "" : "s"}`, f.ms !== null && `at ${fmtElapsed(f.ms)}`]
+            .filter(Boolean)
+            .join(" · "),
+          end: f.ok ? "✓" : "",
+        }));
+  return (
+    <div>
+      {!done && (
+        <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">
+          {board.clicks ? "Fewest clicks so far" : "Finish order"}
+        </p>
+      )}
+      {rows.length === 0 ? (
+        <p className="mt-[1vw] text-[1.6vw] text-dim">Nobody yet. Tap “We made it!” on a phone when you land.</p>
+      ) : (
+        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
+          {rows.map((r) => (
+            <li key={r.key} className="grid grid-cols-[3.4vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
+              <span className={`narrow text-[2.2vw] leading-none font-extrabold ${r.place !== null ? "text-meadow" : "text-dim"}`}>
+                {r.place !== null ? ordinal(r.place) : "–"}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{r.name}</span>
+                {(r.note || (board.results && r.place === null)) && (
+                  <span className="block text-[1.2vw] text-dim">{r.note || "for playing"}</span>
+                )}
+              </span>
+              <span className="narrow text-[2.6vw] leading-none font-extrabold">{r.end}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** Who got what on the revealed card. Picks stay hidden until now. */
+function Results({ results, bug }: { results: NonNullable<Board["results"]>; bug: boolean }) {
+  return (
+    <ol className="flex flex-col gap-[0.5vw]">
+      {results.map(({ _id, name, result: r }) => (
+        <li key={_id} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
+          <span className={`text-[2.4vw] leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}>
+            {r?.correct || r?.points ? "✓" : "✗"}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{name}</span>
+            {(bug || !r) && (
+              <span className="block text-[1.2vw] text-dim">
+                {!r ? "no answer" : `line ${r.line ? "✓" : "✗"} · fix ${r.fix ? "✓" : "✗"}${r.early ? " · early" : ""}`}
+              </span>
+            )}
+          </span>
+          <span className="narrow text-[2.6vw] leading-none font-extrabold">+{r?.points ?? 0}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DesktopRouteImport } from './routes/_desktop'
 import { Route as HelloWorldRouteRouteImport } from './routes/hello-world/route'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DesktopIndexRouteImport } from './routes/_desktop/index'
@@ -24,6 +25,7 @@ import { Route as DesktopSiteRouteImport } from './routes/_desktop/site'
 import { Route as DesktopWorldCupRouteImport } from './routes/_desktop/world-cup'
 import { Route as HelloWorldIndexRouteImport } from './routes/hello-world/index'
 import { Route as HelloWorldCupRouteImport } from './routes/hello-world/cup'
+import { Route as HelloWorldFixRouteImport } from './routes/hello-world/fix'
 import { Route as HelloWorldHostRouteImport } from './routes/hello-world/host'
 import { Route as HelloWorldJoinRouteImport } from './routes/hello-world/join'
 import { Route as HelloWorldKickoffRouteImport } from './routes/hello-world/kickoff'
@@ -33,6 +35,7 @@ import { Route as HelloWorldScheduleRouteImport } from './routes/hello-world/sch
 import { Route as HelloWorldScoresRouteImport } from './routes/hello-world/scores'
 import { Route as HelloWorldSeasonRouteImport } from './routes/hello-world/season'
 import { Route as HelloWorldSoundsRouteImport } from './routes/hello-world/sounds'
+import { Route as HelloWorldTestRouteImport } from './routes/hello-world/test'
 import { Route as HelloWorldTvRouteImport } from './routes/hello-world/tv'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 
@@ -43,6 +46,11 @@ const DesktopRoute = DesktopRouteImport.update({
 const HelloWorldRouteRoute = HelloWorldRouteRouteImport.update({
   id: '/hello-world',
   path: '/hello-world',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -110,6 +118,11 @@ const HelloWorldCupRoute = HelloWorldCupRouteImport.update({
   path: '/cup',
   getParentRoute: () => HelloWorldRouteRoute,
 } as any)
+const HelloWorldFixRoute = HelloWorldFixRouteImport.update({
+  id: '/fix',
+  path: '/fix',
+  getParentRoute: () => HelloWorldRouteRoute,
+} as any)
 const HelloWorldHostRoute = HelloWorldHostRouteImport.update({
   id: '/host',
   path: '/host',
@@ -155,6 +168,11 @@ const HelloWorldSoundsRoute = HelloWorldSoundsRouteImport.update({
   path: '/sounds',
   getParentRoute: () => HelloWorldRouteRoute,
 } as any)
+const HelloWorldTestRoute = HelloWorldTestRouteImport.update({
+  id: '/test',
+  path: '/test',
+  getParentRoute: () => HelloWorldRouteRoute,
+} as any)
 const HelloWorldTvRoute = HelloWorldTvRouteImport.update({
   id: '/tv',
   path: '/tv',
@@ -169,6 +187,7 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/hello-world': typeof HelloWorldRouteRouteWithChildren
   '/': typeof DesktopIndexRoute
+  '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/about': typeof DesktopAboutRoute
@@ -180,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/site': typeof DesktopSiteRoute
   '/world-cup': typeof DesktopWorldCupRoute
   '/hello-world/cup': typeof HelloWorldCupRoute
+  '/hello-world/fix': typeof HelloWorldFixRoute
   '/hello-world/host': typeof HelloWorldHostRoute
   '/hello-world/join': typeof HelloWorldJoinRoute
   '/hello-world/kickoff': typeof HelloWorldKickoffRoute
@@ -189,11 +209,13 @@ export interface FileRoutesByFullPath {
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
+  '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/hello-world/': typeof HelloWorldIndexRoute
 }
 export interface FileRoutesByTo {
+  '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/about': typeof DesktopAboutRoute
@@ -205,6 +227,7 @@ export interface FileRoutesByTo {
   '/site': typeof DesktopSiteRoute
   '/world-cup': typeof DesktopWorldCupRoute
   '/hello-world/cup': typeof HelloWorldCupRoute
+  '/hello-world/fix': typeof HelloWorldFixRoute
   '/hello-world/host': typeof HelloWorldHostRoute
   '/hello-world/join': typeof HelloWorldJoinRoute
   '/hello-world/kickoff': typeof HelloWorldKickoffRoute
@@ -214,6 +237,7 @@ export interface FileRoutesByTo {
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
+  '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/': typeof DesktopIndexRoute
@@ -223,6 +247,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/hello-world': typeof HelloWorldRouteRouteWithChildren
   '/_desktop': typeof DesktopRouteWithChildren
+  '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/_desktop/about': typeof DesktopAboutRoute
@@ -234,6 +259,7 @@ export interface FileRoutesById {
   '/_desktop/site': typeof DesktopSiteRoute
   '/_desktop/world-cup': typeof DesktopWorldCupRoute
   '/hello-world/cup': typeof HelloWorldCupRoute
+  '/hello-world/fix': typeof HelloWorldFixRoute
   '/hello-world/host': typeof HelloWorldHostRoute
   '/hello-world/join': typeof HelloWorldJoinRoute
   '/hello-world/kickoff': typeof HelloWorldKickoffRoute
@@ -243,6 +269,7 @@ export interface FileRoutesById {
   '/hello-world/scores': typeof HelloWorldScoresRoute
   '/hello-world/season': typeof HelloWorldSeasonRoute
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
+  '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/_desktop/': typeof DesktopIndexRoute
@@ -253,6 +280,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/hello-world'
     | '/'
+    | '/join'
     | '/privacy'
     | '/terms'
     | '/about'
@@ -264,6 +292,7 @@ export interface FileRouteTypes {
     | '/site'
     | '/world-cup'
     | '/hello-world/cup'
+    | '/hello-world/fix'
     | '/hello-world/host'
     | '/hello-world/join'
     | '/hello-world/kickoff'
@@ -273,11 +302,13 @@ export interface FileRouteTypes {
     | '/hello-world/scores'
     | '/hello-world/season'
     | '/hello-world/sounds'
+    | '/hello-world/test'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/hello-world/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/join'
     | '/privacy'
     | '/terms'
     | '/about'
@@ -289,6 +320,7 @@ export interface FileRouteTypes {
     | '/site'
     | '/world-cup'
     | '/hello-world/cup'
+    | '/hello-world/fix'
     | '/hello-world/host'
     | '/hello-world/join'
     | '/hello-world/kickoff'
@@ -298,6 +330,7 @@ export interface FileRouteTypes {
     | '/hello-world/scores'
     | '/hello-world/season'
     | '/hello-world/sounds'
+    | '/hello-world/test'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/'
@@ -306,6 +339,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/hello-world'
     | '/_desktop'
+    | '/join'
     | '/privacy'
     | '/terms'
     | '/_desktop/about'
@@ -317,6 +351,7 @@ export interface FileRouteTypes {
     | '/_desktop/site'
     | '/_desktop/world-cup'
     | '/hello-world/cup'
+    | '/hello-world/fix'
     | '/hello-world/host'
     | '/hello-world/join'
     | '/hello-world/kickoff'
@@ -326,6 +361,7 @@ export interface FileRouteTypes {
     | '/hello-world/scores'
     | '/hello-world/season'
     | '/hello-world/sounds'
+    | '/hello-world/test'
     | '/hello-world/tv'
     | '/sign-in/$'
     | '/_desktop/'
@@ -335,6 +371,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   HelloWorldRouteRoute: typeof HelloWorldRouteRouteWithChildren
   DesktopRoute: typeof DesktopRouteWithChildren
+  JoinRoute: typeof JoinRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   SignInSplatRoute: typeof SignInSplatRoute
@@ -354,6 +391,13 @@ declare module '@tanstack/react-router' {
       path: '/hello-world'
       fullPath: '/hello-world'
       preLoaderRoute: typeof HelloWorldRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -447,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelloWorldCupRouteImport
       parentRoute: typeof HelloWorldRouteRoute
     }
+    '/hello-world/fix': {
+      id: '/hello-world/fix'
+      path: '/fix'
+      fullPath: '/hello-world/fix'
+      preLoaderRoute: typeof HelloWorldFixRouteImport
+      parentRoute: typeof HelloWorldRouteRoute
+    }
     '/hello-world/host': {
       id: '/hello-world/host'
       path: '/host'
@@ -510,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelloWorldSoundsRouteImport
       parentRoute: typeof HelloWorldRouteRoute
     }
+    '/hello-world/test': {
+      id: '/hello-world/test'
+      path: '/test'
+      fullPath: '/hello-world/test'
+      preLoaderRoute: typeof HelloWorldTestRouteImport
+      parentRoute: typeof HelloWorldRouteRoute
+    }
     '/hello-world/tv': {
       id: '/hello-world/tv'
       path: '/tv'
@@ -529,6 +587,7 @@ declare module '@tanstack/react-router' {
 
 interface HelloWorldRouteRouteChildren {
   HelloWorldCupRoute: typeof HelloWorldCupRoute
+  HelloWorldFixRoute: typeof HelloWorldFixRoute
   HelloWorldHostRoute: typeof HelloWorldHostRoute
   HelloWorldJoinRoute: typeof HelloWorldJoinRoute
   HelloWorldKickoffRoute: typeof HelloWorldKickoffRoute
@@ -538,12 +597,14 @@ interface HelloWorldRouteRouteChildren {
   HelloWorldScoresRoute: typeof HelloWorldScoresRoute
   HelloWorldSeasonRoute: typeof HelloWorldSeasonRoute
   HelloWorldSoundsRoute: typeof HelloWorldSoundsRoute
+  HelloWorldTestRoute: typeof HelloWorldTestRoute
   HelloWorldTvRoute: typeof HelloWorldTvRoute
   HelloWorldIndexRoute: typeof HelloWorldIndexRoute
 }
 
 const HelloWorldRouteRouteChildren: HelloWorldRouteRouteChildren = {
   HelloWorldCupRoute: HelloWorldCupRoute,
+  HelloWorldFixRoute: HelloWorldFixRoute,
   HelloWorldHostRoute: HelloWorldHostRoute,
   HelloWorldJoinRoute: HelloWorldJoinRoute,
   HelloWorldKickoffRoute: HelloWorldKickoffRoute,
@@ -553,6 +614,7 @@ const HelloWorldRouteRouteChildren: HelloWorldRouteRouteChildren = {
   HelloWorldScoresRoute: HelloWorldScoresRoute,
   HelloWorldSeasonRoute: HelloWorldSeasonRoute,
   HelloWorldSoundsRoute: HelloWorldSoundsRoute,
+  HelloWorldTestRoute: HelloWorldTestRoute,
   HelloWorldTvRoute: HelloWorldTvRoute,
   HelloWorldIndexRoute: HelloWorldIndexRoute,
 }
@@ -591,6 +653,7 @@ const DesktopRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   HelloWorldRouteRoute: HelloWorldRouteRouteWithChildren,
   DesktopRoute: DesktopRouteWithChildren,
+  JoinRoute: JoinRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   SignInSplatRoute: SignInSplatRoute,

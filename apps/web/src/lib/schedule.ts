@@ -11,7 +11,7 @@ export type LineupItem = { label: string; double: boolean };
 export type WeekPlan = Week & { week: number; start: Date; cancelled: boolean; lineup: LineupItem[]; edited: boolean };
 type Stored = FunctionReturnType<typeof api.schedule.weeks>[number];
 
-const DOUBLE = "Final round ×2: ";
+const DOUBLE = "Final round, double points: ";
 export const parseLine = (s: string): LineupItem =>
   s.startsWith(DOUBLE) ? { label: s.slice(DOUBLE.length), double: true } : { label: s, double: false };
 export const lineText = (g: LineupItem) => (g.double ? DOUBLE + g.label : g.label);
@@ -68,17 +68,21 @@ export function likelyWeek(plan: WeekPlan[], now = Date.now()) {
   return n ? n.i + 1 : plan.length;
 }
 
-// How a lineup entry names each game. "Silent Relay" is Code Relay; "Bug Bounty" is a Bug Hunt variant.
+// How a lineup entry names each game. "Silent Relay" is Code Relay; "Bug Bounty" and "Fix it for real" are Bug Hunt
+// variants, and the Advent-style puzzles are a Code Relay variant. Fix it for real and puzzles come first so they open
+// their own decks on /host and show their own tiles.
 const GAME_NAMES: [RegExp, string][] = [
+  [/Fix it for real/, "fix"],
+  [/[Pp]uzzle/, "puzzle"],
   [/Wiki Race/, "wiki"],
-  [/Bug Hunt|Bug Bounty/, "bug"],
-  [/Relay/, "relay"],
+  [/Bug Hunt|Bug Bounty|Fix it for real/, "bug"],
+  [/Relay|[Pp]uzzle/, "relay"],
   [/Output\?/, "output"],
   [/Pictionary/, "pictionary"],
   [/Guess the Language/, "lang"],
 ];
 
-/** Which games a lineup entry refers to, e.g. "Final round ×2: Bug Hunt, hard" is Bug Hunt. */
+/** Which games a lineup entry refers to, e.g. "Final round, double points: Bug Hunt, hard" is Bug Hunt. */
 export const gamesIn = (line: string) => GAME_NAMES.filter(([re]) => re.test(line)).map(([, id]) => id);
 
 const PLANNED = [...DEFAULT_PLAN.flatMap((w) => w.lineup.map((g) => g.label)), ...REMIX_MENU];
@@ -109,8 +113,8 @@ export const CATALOG: { id: string | null; name: string; items: string[] }[] = (
   const groups = GAMES.map((g) => ({ id: g.id, name: g.name, items: [] as string[] }));
   const other = { id: null, name: "Other", items: [] as string[] };
   for (const label of all) {
-    const id = gamesIn(label)[0];
-    (groups.find((g) => g.id === id) ?? other).items.push(label);
+    const ids = gamesIn(label);
+    (groups.find((g) => ids.includes(g.id)) ?? other).items.push(label);
   }
   return [...groups, other].filter((g) => g.items.length);
 })();

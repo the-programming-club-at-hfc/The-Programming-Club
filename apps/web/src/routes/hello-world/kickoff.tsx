@@ -27,7 +27,7 @@ function JoinBox() {
   return (
     <div className="flex items-center gap-6">
       <div className="bg-white p-3">
-        <QRCodeSVG value={`${origin}/hello-world/join?code=${code}`} size={180} marginSize={0} />
+        <QRCodeSVG value={`${origin}/join?code=${code}`} size={180} marginSize={0} />
       </div>
       <div>
         <p className="text-dim">Scan to join, or enter code</p>
@@ -174,8 +174,8 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         <Big>
           <li>Week 4 is the Midseason Cup. Week 6 is the Final.</li>
           <li>Everyone starts at zero, so a first-timer can win.</li>
-          <li>Every week you attend earns you a power-up card.</li>
-          <li>The last round is All-In: wager any or all of your points.</li>
+          <li>The last round counts double, just like every night.</li>
+          <li>The Final is two Advent of Code–style puzzles.</li>
           <li>The winners sign the Golden Keycap.</li>
         </Big>
       </div>

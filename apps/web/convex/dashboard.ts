@@ -2,12 +2,13 @@ import { query } from "./_generated/server";
 import { openSession } from "./lib";
 import { requireOfficer } from "./officers";
 
-/** The officer dashboard: tonight at a glance, every night's turnout, season totals, and event interest. */
+/** The officer dashboard: tonight at a glance, every night's turnout, season totals, and event interest.
+ *  Practice nights only show up as "live"; they stay out of turnout and totals. */
 export const overview = query({
   args: {},
   handler: async (ctx) => {
     await requireOfficer(ctx);
-    const [sessions, attendance, live, hackInterest] = await Promise.all([
+    const [allSessions, allAttendance, live, hackInterest] = await Promise.all([
       ctx.db.query("sessions").collect(),
       ctx.db.query("attendance").collect(),
       openSession(ctx),
@@ -17,6 +18,9 @@ export const overview = query({
         .collect(),
     ]);
 
+    const sessions = allSessions.filter((s) => !s.practice);
+    const real = new Set(sessions.map((s) => s._id));
+    const attendance = allAttendance.filter((a) => real.has(a.sessionId));
     const nights = sessions
       .map((s) => {
         const att = attendance.filter((a) => a.sessionId === s._id);
@@ -40,7 +44,8 @@ export const overview = query({
         week: live.week,
         code: live.code,
         startedAt: live.startedAt,
-        joined: nights.find((n) => n._id === live._id)?.headcount ?? 0,
+        joined: allAttendance.filter((a) => a.sessionId === live._id).length,
+        practice: !!live.practice,
       },
       nights,
       totals: {
