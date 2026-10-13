@@ -7,7 +7,12 @@ declare module "bun:test" {
     toContain: (item: unknown) => void;
     toHaveLength: (n: number) => void;
   }
+  interface AsyncMatchers {
+    toThrow: (message?: string) => Promise<void>;
+  }
   export function describe(name: string, fn: () => void): void;
-  export function test(name: string, fn: () => void): void;
-  export function expect(value: unknown): Matchers & { not: Matchers };
+  export function test(name: string, fn: () => void | Promise<void>): void;
+  export function beforeEach(fn: () => void): void;
+  export function setSystemTime(now?: Date): void;
+  export function expect(value: unknown): Matchers & { not: Matchers; rejects: AsyncMatchers };
 }
