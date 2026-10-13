@@ -9,10 +9,10 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import type { GameId, Screen } from "#/components/game";
 import { ExportButton, OfficerGate, useJoinCode } from "#/components/officer";
-import { GAME_TILE, Picto, Wrap } from "#/components/ui";
+import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { BUGS, PICTIONARY, RELAYS, WIKI_RACES } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
-import { isAnswerGame } from "#/lib/grading";
+import { isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB, fmtDate, isCupWeek } from "#/lib/season";
@@ -836,15 +836,94 @@ function FixStatus({ live }: { live: Live }) {
   );
 }
 
+/** Wiki Race on the TV: the finish order from phones with a ✓/✗ for the referee, then the points. */
+function WikiStatus({ live }: { live: Live }) {
+  const data = useQuery(api.wiki.board);
+  const check = useMutation(api.wiki.check);
+  if (!data) return null;
+  const done = new Set(data.finished.map((f) => f.teamId));
+  const racing = live.teams.filter((t) => !done.has(t._id));
+  const points = new Map(data.results?.map((r) => [r.teamId, r.result?.points ?? 0]));
+  return (
+    <div className="mt-3 border-4 border-line p-3">
+      <p className="font-bold">
+        {data.scored ? "Scored" : `Finished: ${data.finished.filter((f) => f.ok !== false).length} of ${data.teams} teams`}
+        {data.clicks && " · Fewest Clicks"}
+      </p>
+      {data.teams === 0 ? (
+        <p className="text-sm text-dim">No teams yet.</p>
+      ) : (
+        <ul className="mt-1 divide-y-2 divide-grid/60">
+          {data.finished.map((f) => (
+            <li key={f.teamId} className="flex flex-wrap items-center gap-2 py-1.5">
+              <span className="narrow w-9 text-xl font-extrabold">{f.place !== null ? ordinal(f.place) : "–"}</span>
+              <span className={`font-bold ${f.ok === false ? "text-dim line-through" : ""}`}>{f.name}</span>
+              {f.clicks !== null && <span className="chip bg-sun/40">{f.clicks} clicks</span>}
+              <span className="text-xs text-dim">
+                {f.ms !== null && `at ${fmtElapsed(f.ms)}`}
+                {f.by && ` · ${f.by}`}
+              </span>
+              <span className="ml-auto" />
+              {data.scored ? (
+                <span className="narrow text-xl font-extrabold">+{points.get(f.teamId) ?? 0}</span>
+              ) : (
+                <>
+                  <button
+                    className={`btn btn-sm ${f.ok === true ? "btn-on" : ""}`}
+                    onClick={() => run(check({ teamId: f.teamId, card: data.card, ok: f.ok === true ? null : true }))}
+                    aria-pressed={f.ok === true}
+                    aria-label={`${f.name} made it`}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    className={`btn btn-sm ${f.ok === false ? "btn-neon" : ""}`}
+                    onClick={() => run(check({ teamId: f.teamId, card: data.card, ok: f.ok === false ? null : false }))}
+                    aria-pressed={f.ok === false}
+                    aria-label={`${f.name} isn’t there yet`}
+                  >
+                    ✗
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+          {racing.map((t) => (
+            <li key={t._id} className="flex flex-wrap items-center gap-2 py-1.5 text-dim">
+              <span className="narrow w-9 text-xl font-extrabold">–</span>
+              <span className="font-bold">{t.name}</span>
+              <span className="chip">{data.scored ? "Didn’t finish" : "Racing"}</span>
+              {data.scored && <span className="narrow ml-auto text-xl font-extrabold text-ink">+{points.get(t._id) ?? 0}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-dim">
+        {data.scored
+          ? "Points went on the board when the race ended. Use the score buttons to fix anything."
+          : "Glance at each team’s screen: ✓ it counts, ✗ not there yet (the team can tap again). Unchecked finishes count. Ending the race scores it once: 5, 4, 3 by place, 2 for any other finish, 1 for playing, doubled on double points."}
+      </p>
+    </div>
+  );
+}
+
 function WikiTool({ live, used }: { live: Live; used: string[] }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
+  const s = live.screen;
   const [cs, setCs] = useState(false);
+  const [clicks, setClicks] = useState(!!s.wikiClicks);
   const [race, setRace] = useState<{ from: string; to: string } | null>(
-    live.screen.mode === "wiki" && live.screen.wikiFrom && live.screen.wikiTo
-      ? { from: live.screen.wikiFrom, to: live.screen.wikiTo }
-      : null,
+    s.mode === "wiki" && s.wikiFrom && s.wikiTo ? { from: s.wikiFrom, to: s.wikiTo } : null,
   );
+  // Follow the TV when the Next button or another officer puts up a race.
+  useEffect(() => {
+    if (s.mode === "wiki" && s.wikiFrom && s.wikiTo) {
+      setRace({ from: s.wikiFrom, to: s.wikiTo });
+      setClicks(!!s.wikiClicks);
+    }
+  }, [s.mode, s.wikiFrom, s.wikiTo, s.wikiClicks]);
+  const onTv = !!race && s.mode === "wiki" && s.wikiFrom === race.from && s.wikiTo === race.to;
   const raced = (r: { from: string; to: string }) => used.includes(`wiki:${r.from}>${r.to}`);
   const draw = () => {
     const pool = WIKI_RACES.filter((r) => !cs || r.cs);
@@ -862,6 +941,9 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
         </button>
         <button className={`chip ml-2 ${cs ? "bg-ink text-paper" : ""}`} onClick={() => setCs(!cs)}>
           Computer science targets only
+        </button>
+        <button className={`chip ml-2 ${clicks ? "bg-ink text-paper" : ""}`} onClick={() => setClicks(!clicks)} aria-pressed={clicks}>
+          Fewest Clicks
         </button>
         <select
           className="field mt-2 w-full py-1 text-sm"
@@ -890,22 +972,35 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
             </a>
           </div>
           <div className="mt-3 flex flex-wrap">
-            <button
-              className="btn btn-sm btn-neon"
-              onClick={() => run(setScreen({ screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to } }))}
-            >
-              Show on TV
-            </button>
+            {onTv && !!s.wikiClicks === clicks ? (
+              <button
+                className={`btn btn-sm ${s.revealed ? "" : "btn-coin"}`}
+                disabled={!!s.revealed}
+                onClick={() => run(setScreen({ screen: { ...s, revealed: true } }))}
+              >
+                {s.revealed ? "Race over" : "End race and score"}
+              </button>
+            ) : (
+              <button
+                className="btn btn-sm btn-neon"
+                onClick={() =>
+                  run(setScreen({ screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: clicks || undefined } }))
+                }
+              >
+                Show on TV
+              </button>
+            )}
             <button className="btn btn-sm" onClick={() => setRace({ from: race.to, to: race.from })}>
               Reverse
             </button>
-            <button className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: 300, relay: false, autostart: true }))}>
-              Start 5:00
-            </button>
-            <button className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: 360, relay: false, autostart: true }))}>
-              Fewest Clicks 6:00
+            <button
+              className="btn btn-sm"
+              onClick={() => run(timer({ action: "set", seconds: wikiSeconds(clicks), relay: false, autostart: true }))}
+            >
+              Start {fmtClock(wikiSeconds(clicks) * 1000)}
             </button>
           </div>
+          {onTv && <WikiStatus live={live} />}
         </>
       )}
     </div>

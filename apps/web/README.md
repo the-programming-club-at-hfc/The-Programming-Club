@@ -11,11 +11,11 @@ Hello, World Cup pages, all under `/hello-world` (old addresses like `/join` and
 | Page | Who uses it | What it does |
 | --- | --- | --- |
 | `/hello-world` `/season` `/rules` `/cup` | Everyone | The season, the games, scoring, and the Cup-night agenda |
-| `/join` | Members | Scan the TV's QR code, enter a name and HawkMail. No account needed. Shows your team, score, timer, and the current challenge, and lets your team answer Bug Hunt, Output?, and Guess the Language |
+| `/join` | Members | Scan the TV's QR code, enter a name and HawkMail. No account needed. Shows your team, score, timer, and the current challenge, and lets your team answer Bug Hunt, Output?, and Guess the Language, and tap “We made it!” in a Wiki Race |
 | `/fix` | Team computers | Fix it for real, the double-points final on Bug Hunt nights: pick the team, then edit and run a buggy Python program in the browser (Pyodide from its CDN, in a Web Worker). The site marks the team fixed when every test passes |
 | `/tv` | The gaming-room TV | Join screen, scoreboard, timer, and challenge cards, all controlled live from `/host` |
-| `/host` | Officers | Sign in with HawkMail (Clerk) to start the night (or a practice night that doesn’t count), make teams, score, run the TV, give bonus XP, and export attendance. Bug Hunt, Output?, and Guess the Language are answered on phones, Fix it for real on team computers, and all are scored when the answer is revealed |
-| `/test` | Officers | Play every Bug Hunt, Fix it for real, Output?, and Guess the Language card as a pretend team, see the points the real scoring gives, and flag cards that are too easy, too hard, or broken |
+| `/host` | Officers | Sign in with HawkMail (Clerk) to start the night (or a practice night that doesn’t count), make teams, score, run the TV, give bonus XP, and export attendance. Bug Hunt, Output?, and Guess the Language are answered on phones, Fix it for real on team computers, and all are scored when the answer is revealed. Wiki Race finishes come in from phones; the referee checks them with ✓/✗, and the race is scored when it ends |
+| `/test` | Officers | Play every Bug Hunt, Fix it for real, Output?, Guess the Language card, and Wiki Race as a pretend team, see the points the real scoring gives, and flag cards that are too easy, too hard, or broken |
 | `/schedule` | Officers | Season planner: change any week's lineup (picking from every game in the season), details, or date, or cancel a week |
 | `/kickoff` | Officers | Slides for the first meeting (arrow keys, **F** for full screen) |
 | `/scores` | Everyone | Season XP high scores |

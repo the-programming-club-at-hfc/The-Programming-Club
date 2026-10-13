@@ -267,3 +267,64 @@ export function answersOpen(o: {
   // Paused: open while time is left, or within the grace after the recorded run-out.
   return o.running ? o.remaining > -o.grace : o.remaining > 0 || o.endedAt !== undefined;
 }
+
+// ---- Wiki Race ------------------------------------------------------------
+
+/** A Wiki Race's key, like a card's: "wiki:Pizza>Moon". */
+export const wikiKey = (from: string, to: string) => `wiki:${from}>${to}`;
+
+/** The start and target articles in a Wiki Race key. */
+export const wikiPair = (key: string) => {
+  const [from = "", to = ""] = key.slice("wiki:".length).split(">");
+  return { from, to };
+};
+
+/** Seconds on the clock for a Wiki Race: 5 minutes, or 6 for Fewest Clicks. */
+export const wikiSeconds = (clicks: boolean) => (clicks ? 360 : 300);
+
+/** Points for 1st, 2nd, and 3rd, for any other team that finishes, and for playing. */
+export const WIKI_PLACES = [5, 4, 3];
+export const WIKI_FINISHED = 2;
+export const WIKI_PLAYED = 1;
+
+/** Points for a finishing place, or for playing (null: didn't finish). Before double points. */
+export const wikiPoints = (place: number | null) => (place === null ? WIKI_PLAYED : (WIKI_PLACES[place - 1] ?? WIKI_FINISHED));
+
+/**
+ * Each finish's place. A race goes by server time (an exact tie goes to whoever is first in the list); Fewest Clicks
+ * goes by the lowest count, and teams with the same count share the place.
+ */
+export function wikiPlaces(finishes: { at: number; clicks?: number }[], clicks: boolean) {
+  if (clicks) {
+    const n = (f: { clicks?: number }) => f.clicks ?? Infinity;
+    return finishes.map((f) => 1 + finishes.filter((o) => n(o) < n(f)).length);
+  }
+  const order = finishes.map((_, i) => i).sort((a, b) => finishes[a].at - finishes[b].at || a - b);
+  return finishes.map((_, i) => order.indexOf(i) + 1);
+}
+
+/**
+ * What to award when a Wiki Race is scored: every team gets points for its place, or 1 for playing if it didn't finish
+ * (or the referee turned its finish down), all doubled on a double-points round. `finishes` are the finishes the
+ * referee didn't turn down, all made before time ran out. Returns null if the race was already scored tonight.
+ */
+export function wikiAwardsFor<T>(o: {
+  key: string;
+  clicks: boolean;
+  double: boolean;
+  scored: string[];
+  teams: T[];
+  finishes: { team: T; at: number; clicks?: number }[];
+}) {
+  if (o.scored.includes(o.key)) return null;
+  const places = wikiPlaces(o.finishes, o.clicks);
+  return {
+    scored: [...o.scored, o.key],
+    awards: o.teams.map((team) => {
+      const i = o.finishes.findIndex((f) => f.team === team);
+      const place = i === -1 ? null : places[i];
+      const points = wikiPoints(place);
+      return { team, place, points: o.double ? points * 2 : points };
+    }),
+  };
+}

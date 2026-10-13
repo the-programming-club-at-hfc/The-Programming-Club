@@ -1,12 +1,14 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import { openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
+import { scoreWikiReveal } from "./wiki";
 import type { Doc } from "./_generated/dataModel";
-import { clockLeft, isFreshStart, settle, showCard } from "../src/lib/grading";
+import { clockLeft, isFreshStart, settle, showCard, wikiKey } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
 
 /** The card windows with the clock's run-out time recorded, before anything changes the clock or the screen. */
@@ -106,27 +108,32 @@ export const reopen = mutation({
   },
 });
 
+/** Put something on the TV, keeping each card's answer window, and score a reveal. */
+async function putScreen(ctx: MutationCtx, s: Doc<"sessions">, screen: Doc<"sessions">["screen"]) {
+  const card =
+    screen.mode === "card" && screen.game && screen.index !== undefined
+      ? `${screen.game}:${screen.index}`
+      : screen.mode === "wiki" && screen.wikiFrom && screen.wikiTo
+        ? wikiKey(screen.wikiFrom, screen.wikiTo)
+        : null;
+  const shown = s.shown ?? [];
+  const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
+  // Each answerable card keeps its own window; anything else going up clears the current one.
+  const now = Date.now();
+  const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now });
+  Object.assign(next, { card: w.card, played: w.played });
+  await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
+  // Revealing scores phone answers, Fix it for real fixes, or a Wiki Race, once per card.
+  await scoreReveal(ctx, next);
+  await scoreFixReveal(ctx, next);
+  await scoreWikiReveal(ctx, next);
+}
+
 export const setScreen = mutation({
   args: { screen: screenV },
   handler: async (ctx, { screen }) => {
     await requireOfficer(ctx);
-    const s = await requireOpenSession(ctx);
-    const card =
-      screen.mode === "card" && screen.game && screen.index !== undefined
-        ? `${screen.game}:${screen.index}`
-        : screen.mode === "wiki" && screen.wikiFrom && screen.wikiTo
-          ? `wiki:${screen.wikiFrom}>${screen.wikiTo}`
-          : null;
-    const shown = s.shown ?? [];
-    const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
-    // Each answerable card keeps its own window; anything else going up clears the current one.
-    const now = Date.now();
-    const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now });
-    Object.assign(next, { card: w.card, played: w.played });
-    await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
-    // Revealing scores phone answers or Fix it for real fixes, once per card.
-    await scoreReveal(ctx, next);
-    await scoreFixReveal(ctx, next);
+    await putScreen(ctx, await requireOpenSession(ctx), screen);
   },
 });
 

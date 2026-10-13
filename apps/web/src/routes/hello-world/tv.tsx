@@ -8,7 +8,7 @@ import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRema
 import { OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
-import { cardKey, isAnswerGame } from "#/lib/grading";
+import { cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
@@ -21,6 +21,7 @@ export const Route = createFileRoute("/hello-world/tv")({
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type Board = NonNullable<FunctionReturnType<typeof api.answers.board>>;
 type FixBoard = NonNullable<FunctionReturnType<typeof api.fixes.board>>;
+type WikiBoard = NonNullable<FunctionReturnType<typeof api.wiki.board>>;
 
 function useOrigin() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
@@ -129,7 +130,13 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const isFix = s.mode === "card" && s.game === "fix" && s.index !== undefined;
   const fixData = useQuery(api.fixes.board, isFix ? {} : "skip");
   const fixBoard = isFix && s.index !== undefined && fixData?.card === cardKey("fix", s.index) ? fixData : null;
-  useCountSound(board ? board.card : fixBoard?.card, board ? board.locked : (fixBoard?.fixed.length ?? null));
+  const isWiki = s.mode === "wiki" && !!s.wikiFrom && !!s.wikiTo;
+  const wikiData = useQuery(api.wiki.board, isWiki ? {} : "skip");
+  const wikiBoard = isWiki && wikiData?.card === wikiKey(s.wikiFrom!, s.wikiTo!) ? wikiData : null;
+  useCountSound(
+    board ? board.card : fixBoard ? fixBoard.card : wikiBoard?.card,
+    board ? board.locked : fixBoard ? fixBoard.fixed.length : wikiBoard ? wikiBoard.finished.filter((f) => f.ok !== false).length : null,
+  );
   // A card already scored tonight shows as played (answer and results), like it does on phones.
   const done = !!s.revealed || !!board?.results || !!fixBoard?.scored;
 
@@ -171,20 +178,24 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
           </div>
         )}
         {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
-          <div className="flex h-full flex-col justify-center gap-[3vw]">
-            <div className="grid grid-cols-2 gap-[0.3vw]">
-              <div className="bg-mist p-[3vw]">
-                <p className="text-[1.6vw] text-dim">Start here</p>
-                <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiFrom}</p>
+          <div className={`grid h-full items-center gap-[3vw] ${wikiBoard && wikiBoard.teams > 0 ? "grid-cols-[minmax(0,1fr)_26vw]" : ""}`}>
+            <div className="flex flex-col gap-[3vw]">
+              <div className={`grid gap-[0.3vw] ${wikiBoard && wikiBoard.teams > 0 ? "" : "grid-cols-2"}`}>
+                <div className="bg-mist p-[3vw]">
+                  <p className="text-[1.6vw] text-dim">Start here</p>
+                  <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiFrom}</p>
+                </div>
+                <div className="tile tile-sky p-[3vw]">
+                  <p className="text-[1.6vw]">Get to</p>
+                  <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiTo}</p>
+                </div>
               </div>
-              <div className="tile tile-sky p-[3vw]">
-                <p className="text-[1.6vw]">Get to</p>
-                <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiTo}</p>
-              </div>
+              <p className="text-[1.5vw] text-dim">
+                {s.wikiClicks ? "Fewest clicks wins. Count every link you click. " : ""}
+                Links inside the article only. No search bar. Back button and Ctrl+F are fine. Tap “We made it!” on a phone when you land.
+              </p>
             </div>
-            <p className="text-[1.5vw] text-dim">
-              Links inside the article only. No search bar. Back button and Ctrl+F are fine. Shout “Wiki!” when you land.
-            </p>
+            {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} />}
           </div>
         )}
         {s.mode === "message" && (
@@ -256,6 +267,58 @@ function FixList({ board, done }: { board: FixBoard; done: boolean }) {
                 </span>
               </span>
               <span className="narrow text-[2.6vw] leading-none font-extrabold">{f.result ? `+${f.result.points}` : "✓"}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** Wiki Race: the finish order with places and times (or click counts), then every team's points once it's scored. */
+function RaceList({ board, done }: { board: WikiBoard; done: boolean }) {
+  const rows = board.results
+    ? board.results.map((r) => ({
+        key: r.teamId,
+        name: r.name,
+        place: r.result?.place ?? null,
+        note: null,
+        end: `+${r.result?.points ?? 0}`,
+      }))
+    : board.finished
+        .filter((f) => f.ok !== false)
+        .map((f) => ({
+          key: f.teamId,
+          name: f.name,
+          place: f.place,
+          note: [f.clicks !== null && `${f.clicks} click${f.clicks === 1 ? "" : "s"}`, f.ms !== null && `at ${fmtElapsed(f.ms)}`]
+            .filter(Boolean)
+            .join(" · "),
+          end: f.ok ? "✓" : "",
+        }));
+  return (
+    <div>
+      {!done && (
+        <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">
+          {board.clicks ? "Fewest clicks so far" : "Finish order"}
+        </p>
+      )}
+      {rows.length === 0 ? (
+        <p className="mt-[1vw] text-[1.6vw] text-dim">Nobody yet. Tap “We made it!” on a phone when you land.</p>
+      ) : (
+        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
+          {rows.map((r) => (
+            <li key={r.key} className="grid grid-cols-[3.4vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
+              <span className={`narrow text-[2.2vw] leading-none font-extrabold ${r.place !== null ? "text-meadow" : "text-dim"}`}>
+                {r.place !== null ? ordinal(r.place) : "–"}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{r.name}</span>
+                {(r.note || (board.results && r.place === null)) && (
+                  <span className="block text-[1.2vw] text-dim">{r.note || "for playing"}</span>
+                )}
+              </span>
+              <span className="narrow text-[2.6vw] leading-none font-extrabold">{r.end}</span>
             </li>
           ))}
         </ol>

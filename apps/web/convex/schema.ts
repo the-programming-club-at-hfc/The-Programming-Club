@@ -20,6 +20,8 @@ export const screenV = v.object({
   hint: v.optional(v.boolean()),
   wikiFrom: v.optional(v.string()),
   wikiTo: v.optional(v.string()),
+  // Wiki Race, Fewest Clicks: teams send their click count instead of racing the clock.
+  wikiClicks: v.optional(v.boolean()),
   message: v.optional(v.string()),
 });
 
@@ -145,6 +147,24 @@ export default defineSchema({
     code: v.string(),
     // Set when the card is revealed. `points` includes double points.
     result: v.optional(v.object({ points: v.number(), first: v.boolean() })),
+  })
+    .index("by_session_card", ["sessionId", "card"])
+    .index("by_team_card", ["teamId", "card"]),
+
+  // A team's Wiki Race: its "We made it!" from a phone, the referee's check, and its points. See convex/wiki.ts.
+  races: defineTable({
+    sessionId: v.id("sessions"),
+    teamId: v.id("teams"),
+    card: v.string(),
+    // Server time the team finished, and who tapped. Unset for a team that didn't finish (added when scored).
+    at: v.optional(v.number()),
+    by: v.optional(v.string()),
+    // Fewest Clicks: the team's count.
+    clicks: v.optional(v.number()),
+    // The referee's check: true it counts, false not there yet. Unset until checked.
+    ok: v.optional(v.boolean()),
+    // Set when the race is scored. `points` includes double points; no place means the team didn't finish.
+    result: v.optional(v.object({ points: v.number(), place: v.optional(v.number()) })),
   })
     .index("by_session_card", ["sessionId", "card"])
     .index("by_team_card", ["teamId", "card"]),
