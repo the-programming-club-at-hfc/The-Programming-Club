@@ -150,15 +150,22 @@ function Overview() {
       </Section>
 
       <Section title="Events">
-        <div className="flex items-center justify-between gap-3 rounded-[8px] bg-mist p-3">
-          <div>
-            <p className="font-bold">Hack The Nest</p>
-            <p className="text-sm text-dim">Nov 14–15 · EMU</p>
-          </div>
-          <p className="text-right text-sm">
-            <span className="narrow block text-3xl font-extrabold">{data.hackInterest}</span>
-            interested
-          </p>
+        <div className="space-y-2">
+          {[
+            ["AI Business Conference", "Oct 23 · U-M Ross", data.conferenceInterest],
+            ["Hack The Nest", "Nov 14–15 · EMU", data.hackInterest],
+          ].map(([name, when, n]) => (
+            <div key={name} className="flex items-center justify-between gap-3 rounded-[8px] bg-mist p-3">
+              <div>
+                <p className="font-bold">{name}</p>
+                <p className="text-sm text-dim">{when}</p>
+              </div>
+              <p className="text-right text-sm">
+                <span className="narrow block text-3xl font-extrabold">{n}</span>
+                interested
+              </p>
+            </div>
+          ))}
         </div>
       </Section>
     </div>

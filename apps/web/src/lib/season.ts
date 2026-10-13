@@ -7,7 +7,7 @@ export const CLUB = {
   tag: "Season 0",
   day: "Wednesdays",
   time: "5–6 p.m.",
-  room: "the Gaming Room",
+  room: "Room E-178",
   url: "programmingclub.dev",
   // Who can join, word for word as on approved club flyers (Student Clubs Policy Manual: only enrolled students participate).
   eligibility: "Open to all currently enrolled HFC students",
@@ -18,6 +18,9 @@ export const CLUB = {
     teams: "", // Invite link to the club's Microsoft Teams group (QR code on the last kickoff slide)
   },
 };
+
+/** HFC student (@hawkmail.hfcc.edu) and staff (@hfcc.edu) emails: the only ones members join with, since the club is HFC-only. */
+export const isHfcEmail = (email: string) => /@(hawkmail\.)?hfcc\.edu$/i.test(email.trim());
 
 // Shown on the kickoff slides. Sign-in permissions come from OFFICER_EMAILS on the Convex deployment (see convex/officers.ts).
 export const OFFICERS = [
