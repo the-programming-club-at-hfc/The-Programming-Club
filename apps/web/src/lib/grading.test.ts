@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { BUGS, LANGS, OUTPUTS } from "./content";
+import { BUGS, LANGS, OUTPUTS, WIKI_RACES } from "./content";
 import { FIXES } from "./fixes";
 import { PUZZLES, puzzleSeed } from "./puzzles";
 import {
@@ -19,6 +19,10 @@ import {
   settle,
   showCard,
   submitAnswer,
+  wikiAwardsFor,
+  wikiKey,
+  wikiPair,
+  wikiPlaces,
 } from "./grading";
 
 const T0 = 1_000_000;
@@ -462,5 +466,67 @@ describe("puzzles", () => {
       expect(submitAnswer({ wrong: 0, part1At: T0 }, 2, a.part2, () => p.solve(input).part2, T0).kind).toBe("right");
       expect(submitAnswer({ wrong: 0, part1At: T0 }, 2, a.part1, () => p.solve(input).part2, T0).kind).toBe("wrong");
     }
+  });
+});
+
+describe("Wiki Race", () => {
+  const key = wikiKey("Pizza", "Moon");
+  const teams = ["a", "b", "c", "d", "e", "f"];
+  const base = { key, clicks: false, double: false, scored: [], teams };
+  const points = (r: ReturnType<typeof wikiAwardsFor<string>>) => Object.fromEntries(r!.awards.map((a) => [a.team, a.points]));
+
+  test("keys round-trip, and no article name has the separator", () => {
+    expect(wikiPair(key)).toEqual({ from: "Pizza", to: "Moon" });
+    for (const r of WIKI_RACES) expect(wikiPair(wikiKey(r.from, r.to))).toEqual({ from: r.from, to: r.to });
+  });
+
+  test("5, 4, 3 by finishing time, 2 for any other finish, 1 for playing", () => {
+    const r = wikiAwardsFor({
+      ...base,
+      finishes: [
+        { team: "c", at: sec(90) },
+        { team: "a", at: sec(30) },
+        { team: "e", at: sec(200) },
+        { team: "b", at: sec(60) },
+      ],
+    });
+    expect(points(r)).toEqual({ a: 5, b: 4, c: 3, d: 1, e: 2, f: 1 });
+    expect(r!.awards.find((a) => a.team === "e")!.place).toBe(4);
+    expect(r!.awards.find((a) => a.team === "d")!.place).toBeNull();
+    expect(r!.scored).toEqual([key]);
+  });
+
+  test("an exact tie in time goes to whoever came in first", () => {
+    expect(wikiPlaces([{ at: sec(5) }, { at: sec(5) }, { at: sec(1) }], false)).toEqual([2, 3, 1]);
+  });
+
+  test("Fewest Clicks goes by the lowest count, not time, and equal counts share the place", () => {
+    const r = wikiAwardsFor({
+      ...base,
+      clicks: true,
+      finishes: [
+        { team: "a", at: sec(10), clicks: 9 },
+        { team: "b", at: sec(200), clicks: 4 },
+        { team: "c", at: sec(100), clicks: 6 },
+        { team: "d", at: sec(50), clicks: 6 },
+        { team: "e", at: sec(20), clicks: 12 },
+      ],
+    });
+    expect(points(r)).toEqual({ a: 2, b: 5, c: 4, d: 4, e: 2, f: 1 });
+  });
+
+  test("double points doubles everything, including playing", () => {
+    const r = wikiAwardsFor({ ...base, double: true, finishes: [{ team: "a", at: sec(1) }] });
+    expect(points(r)).toEqual({ a: 10, b: 2, c: 2, d: 2, e: 2, f: 2 });
+  });
+
+  test("nobody finished: everyone gets 1 for playing", () => {
+    expect(points(wikiAwardsFor({ ...base, finishes: [] }))).toEqual({ a: 1, b: 1, c: 1, d: 1, e: 1, f: 1 });
+  });
+
+  test("scoring twice scores once", () => {
+    const finishes = [{ team: "a", at: sec(1) }];
+    const first = wikiAwardsFor({ ...base, finishes })!;
+    expect(wikiAwardsFor({ ...base, scored: first.scored, finishes })).toBeNull();
   });
 });

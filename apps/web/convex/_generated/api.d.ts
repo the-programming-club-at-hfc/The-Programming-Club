@@ -23,6 +23,7 @@ import type * as sessions from "../sessions.js";
 import type * as stats from "../stats.js";
 import type * as teamNames from "../teamNames.js";
 import type * as teams from "../teams.js";
+import type * as wiki from "../wiki.js";
 
 import type {
   ApiFromModules,
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   stats: typeof stats;
   teamNames: typeof teamNames;
   teams: typeof teams;
+  wiki: typeof wiki;
 }>;
 
 /**

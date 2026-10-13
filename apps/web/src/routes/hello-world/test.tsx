@@ -8,7 +8,8 @@ import type { PickArgs, TeamPick } from "#/components/answer";
 import { CardView, DECKS, LevelChip, fmtClock } from "#/components/game";
 import { OfficerGate } from "#/components/officer";
 import { Wrap } from "#/components/ui";
-import { BUGS, OUTPUTS } from "#/lib/content";
+import { WikiPair, WikiRound } from "#/components/wiki";
+import { BUGS, OUTPUTS, WIKI_RACES } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
 import {
   FIRST_FIX_BONUS,
@@ -19,12 +20,14 @@ import {
   PART2_POINTS,
   answersOpen,
   awardsFor,
-  cardKey,
   cardSeconds,
   earlyMs,
   fixAwardsFor,
   puzzleAwardsFor,
   submitAnswer,
+  wikiAwardsFor,
+  wikiPlaces,
+  wikiSeconds,
 } from "#/lib/grading";
 import type { AnswerGame, Stars } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
@@ -41,8 +44,10 @@ export const Route = createFileRoute("/hello-world/test")({
   component: TestPage,
 });
 
-type TestGame = AnswerGame | "fix" | "puzzle";
-const GAMES: TestGame[] = ["bug", "fix", "puzzle", "output", "lang"];
+type TestGame = AnswerGame | "fix" | "puzzle" | "wiki";
+const GAMES: TestGame[] = ["bug", "fix", "puzzle", "output", "lang", "wiki"];
+const deckName = (g: TestGame) => (g === "wiki" ? "Wiki Race" : DECKS[g].name);
+const keyOf = (g: TestGame, i: number) => `${g}:${i}`;
 const FLAGS = ["too easy", "too hard", "broken"] as const;
 type Flag = { flag: (typeof FLAGS)[number]; note: string };
 const FLAGS_KEY = "hwc.flags";
@@ -90,9 +95,9 @@ function Tester() {
   const [index, setIndex] = useState(0);
   const [tv, setTv] = useState(true);
   const [flags, saveFlags] = useFlags();
-  const size = DECKS[game].size;
+  const size = game === "wiki" ? WIKI_RACES.length : DECKS[game].size;
   const go = (d: number) => setIndex((index + d + size) % size);
-  const flag = flags[cardKey(game, index)] as Flag | undefined;
+  const flag = flags[keyOf(game, index)] as Flag | undefined;
   // Python loads the first time someone opens the Fix it for real deck, then stays ready.
   const [pyOn, setPyOn] = useState(false);
   useEffect(() => {
@@ -126,7 +131,7 @@ function Tester() {
             }}
             className={`px-3 py-1.5 font-bold ${game === g ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
           >
-            {DECKS[g].name}
+            {deckName(g)}
           </button>
         ))}
       </div>
@@ -151,11 +156,13 @@ function Tester() {
 
       <div className="mt-6 flex flex-wrap items-start gap-6">
         {game === "fix" ? (
-          <FixPlay key={cardKey(game, index)} index={index} tv={tv} py={py} />
+          <FixPlay key={keyOf(game, index)} index={index} tv={tv} py={py} />
         ) : game === "puzzle" ? (
-          <PuzzlePlay key={cardKey(game, index)} index={index} tv={tv} py={py} />
+          <PuzzlePlay key={keyOf(game, index)} index={index} tv={tv} py={py} />
+        ) : game === "wiki" ? (
+          <WikiPlay key={keyOf(game, index)} index={index} tv={tv} />
         ) : (
-          <Play key={cardKey(game, index)} game={game} index={index} tv={tv} />
+          <Play key={keyOf(game, index)} game={game} index={index} tv={tv} />
         )}
       </div>
 
@@ -531,6 +538,141 @@ function PuzzlePlay({ index, tv, py }: { index: number; tv: boolean; py: Python 
   );
 }
 
+/** One Wiki Race on a pretend team's phone, with pretend rivals ahead of it and the same scoring Convex uses. */
+function WikiPlay({ index, tv }: { index: number; tv: boolean }) {
+  const race = WIKI_RACES[index];
+  const [clicks, setClicks] = useState(false);
+  const secs = wikiSeconds(clicks);
+  const [start, setStart] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  const [timed, setTimed] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [double, setDouble] = useState(false);
+  const [ahead, setAhead] = useState(0);
+  const [finish, setFinish] = useState<{ at: number; clicks?: number; ok: boolean | null } | null>(null);
+
+  useEffect(() => {
+    if (!timed || revealed) return;
+    const id = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(id);
+  }, [timed, revealed]);
+
+  const remaining = timed ? Math.max(0, start + secs * 1000 - now) : secs * 1000;
+  const open = answersOpen({ revealed, scored: false, endedAt: undefined, own: timed, running: timed, remaining, now, grace: 0 });
+  // Rivals that finished before you (Fewest Clicks: with fewer clicks), plus one team that doesn't finish.
+  const rivals = Array.from({ length: ahead }, (_, i) => ({ team: `r${i}`, at: start + i, clicks: 0 }));
+  const mine = finish && finish.ok !== false ? [{ team: "you", at: finish.at, clicks: finish.clicks }] : [];
+  const finishes = [...rivals, ...mine];
+  const award = wikiAwardsFor({
+    key: "wiki:test",
+    clicks,
+    double,
+    scored: [],
+    teams: ["you", "slow", ...rivals.map((r) => r.team)],
+    finishes,
+  })?.awards[0];
+  const place = mine.length ? wikiPlaces(finishes, clicks)[finishes.length - 1] : null;
+
+  const restart = (withTimer: boolean, withClicks = clicks) => {
+    const t = Date.now();
+    setStart(t);
+    setNow(t);
+    setTimed(withTimer);
+    setRevealed(false);
+    setFinish(null);
+    setClicks(withClicks);
+  };
+
+  return (
+    <>
+      <div className="w-[390px] max-w-full shrink-0">
+        <div className="rounded-[28px] border-8 border-ink bg-paper p-3">
+          {timed && !revealed && (
+            <p className={`narrow mb-3 text-center text-6xl leading-none font-extrabold ${remaining <= 10_000 ? "text-signal" : ""}`}>
+              {remaining === 0 ? "time" : fmtClock(remaining)}
+            </p>
+          )}
+          <WikiRound
+            key={String(clicks)}
+            from={race.from}
+            to={race.to}
+            clicks={clicks}
+            open={open}
+            revealed={revealed}
+            finish={finish && { ms: finish.at - start, clicks: finish.clicks ?? null, ok: finish.ok, by: "You", place }}
+            result={revealed && award ? { points: award.points, place: award.place ?? undefined } : null}
+            onFinish={(n) => setFinish({ at: Date.now(), clicks: n, ok: null })}
+            onUndo={() => setFinish(null)}
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-1">
+          {revealed ? (
+            <button className="btn btn-sm btn-coin" onClick={() => restart(timed)}>
+              Play again
+            </button>
+          ) : (
+            <button
+              className="btn btn-sm btn-coin"
+              onClick={() => {
+                setRevealed(true);
+                void unlockAudio().then(() => sfx.reveal());
+              }}
+            >
+              End race
+            </button>
+          )}
+          <button className="btn btn-sm" onClick={() => restart(true)}>
+            Start {fmtClock(secs * 1000)} timer
+          </button>
+          <button className="btn btn-sm" onClick={() => restart(false)}>
+            Reset, no timer
+          </button>
+          <button className={`btn btn-sm ${clicks ? "btn-on" : ""}`} onClick={() => restart(timed, !clicks)} aria-pressed={clicks}>
+            Fewest Clicks
+          </button>
+          <button className={`btn btn-sm ${double ? "btn-on" : ""}`} onClick={() => setDouble(!double)} aria-pressed={double}>
+            Double points
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1 text-sm">
+          <span className="font-bold">Referee:</span>
+          <button
+            className={`btn btn-sm ${finish?.ok === true ? "btn-on" : ""}`}
+            disabled={!finish || revealed}
+            onClick={() => finish && setFinish({ ...finish, ok: finish.ok === true ? null : true })}
+          >
+            ✓
+          </button>
+          <button
+            className={`btn btn-sm ${finish?.ok === false ? "btn-neon" : ""}`}
+            disabled={!finish || revealed}
+            onClick={() => finish && setFinish({ ...finish, ok: finish.ok === false ? null : false })}
+          >
+            ✗
+          </button>
+          <span className="ml-2 font-bold">Teams ahead of you:</span>
+          {[0, 1, 2, 3, 4].map((n) => (
+            <button key={n} className={`chip ${ahead === n ? "bg-ink text-paper" : ""}`} onClick={() => setAhead(n)}>
+              {n}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-sm text-dim">
+          Scored with you, the teams ahead of you, and one team that doesn’t finish.
+          {finish && ` You finished at ${((finish.at - start) / 1000).toFixed(1)}s.`}
+          {revealed && ` Real scoring: +${award?.points ?? 0}.`}
+        </p>
+      </div>
+      {tv && (
+        <div className="theme-pine min-w-0 flex-1 basis-[28rem] rounded-[10px] p-6">
+          <p className="mb-3 text-sm font-bold text-dim">TV · Wiki Race</p>
+          <WikiPair from={race.from} to={race.to} />
+        </div>
+      )}
+    </>
+  );
+}
+
 function FlagPanel({
   game,
   index,
@@ -544,7 +686,7 @@ function FlagPanel({
   save: (f: Record<string, Flag>) => void;
   jump: (g: TestGame, i: number) => void;
 }) {
-  const key = cardKey(game, index);
+  const key = keyOf(game, index);
   const cur = flags[key] as Flag | undefined;
   const [copied, setCopied] = useState(false);
   const set = (f: Flag | null) => {
@@ -562,7 +704,7 @@ function FlagPanel({
   const text = list
     .map(
       ({ g, i, f }) =>
-        `${DECKS[g].name}, card ${i + 1}${g === "bug" || g === "fix" || g === "puzzle" ? ` (${levelName(g, i)})` : ""}: ${f.flag}${f.note ? `. ${f.note}` : ""}`,
+        `${deckName(g)}, card ${i + 1}${g === "bug" || g === "fix" || g === "puzzle" ? ` (${levelName(g, i)})` : ""}: ${f.flag}${f.note ? `. ${f.note}` : ""}`,
     )
     .join("\n");
 
@@ -618,7 +760,7 @@ function FlagPanel({
             <li key={`${g}:${i}`}>
               <button className="w-full py-1.5 text-left hover:text-pine" onClick={() => jump(g, i)}>
                 <strong>
-                  {DECKS[g].name}, card {i + 1}
+                  {deckName(g)}, card {i + 1}
                 </strong>
                 : {f.flag}
                 {f.note && <span className="text-dim"> · {f.note}</span>}

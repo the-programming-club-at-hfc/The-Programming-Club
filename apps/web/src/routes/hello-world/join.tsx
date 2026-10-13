@@ -7,7 +7,8 @@ import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
 import { CardView, Hint, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
-import { answersOpen, cardKey, isAnswerGame } from "#/lib/grading";
+import { WikiPair, WikiRound } from "#/components/wiki";
+import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
@@ -306,15 +307,20 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         </div>
       )}
       {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
-        <div className="mt-8 grid grid-cols-2 gap-[3px]">
-          <div className="bg-mist p-5">
-            <p className="text-sm text-dim">Start here</p>
-            <p className="mt-1 text-2xl font-extrabold">{s.wikiFrom}</p>
-          </div>
-          <div className="tile tile-sky p-5">
-            <p className="text-sm">Get to</p>
-            <p className="mt-1 text-2xl font-extrabold">{s.wikiTo}</p>
-          </div>
+        <div className="mt-8">
+          {me.team ? (
+            <TeamRace
+              key={wikiKey(s.wikiFrom, s.wikiTo)}
+              token={token}
+              live={live}
+              from={s.wikiFrom}
+              to={s.wikiTo}
+              teamId={me.team._id}
+              remaining={remaining}
+            />
+          ) : (
+            <WikiPair from={s.wikiFrom} to={s.wikiTo} />
+          )}
         </div>
       )}
       {s.mode === "message" && s.message && <p className="card mt-8 p-6 text-2xl font-bold">{s.message}</p>}
@@ -329,6 +335,67 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         </button>
       </div>
     </Wrap>
+  );
+}
+
+/** Whether this phone can still answer the card (or race) on the TV: the server's rule, with no grace. */
+const phoneOpen = (live: Live, key: string, remaining: number) =>
+  answersOpen({
+    revealed: !!live.screen.revealed,
+    scored: live.scored.includes(key),
+    endedAt: live.card?.key === key ? live.card.endedAt : undefined,
+    own: live.timer.card === key,
+    running: !!live.timer.startedAt,
+    remaining,
+    now: Date.now(),
+    grace: 0,
+  });
+
+/** Sends a mutation, showing what went wrong on the phone. */
+const sender = (setError: (e: string) => void) => (p: Promise<unknown>) => {
+  setError("");
+  p.catch((e: unknown) =>
+    setError(e instanceof ConvexError ? String(e.data) : "That didn’t go through. Check your connection and try again."),
+  );
+};
+
+/** The team's Wiki Race: one "We made it!" per team, shared live across teammates' phones. */
+function TeamRace({
+  token,
+  live,
+  from,
+  to,
+  teamId,
+  remaining,
+}: {
+  token: string;
+  live: Live;
+  from: string;
+  to: string;
+  teamId: Id<"teams">;
+  remaining: number;
+}) {
+  const board = useQuery(api.wiki.board);
+  const finish = useMutation(api.wiki.finish);
+  const undo = useMutation(api.wiki.undo);
+  const [error, setError] = useState("");
+  const send = sender(setError);
+  const key = wikiKey(from, to);
+  const b = board?.card === key ? board : null;
+  const mine = b?.finished.find((f) => f.teamId === teamId);
+  return (
+    <WikiRound
+      from={from}
+      to={to}
+      clicks={!!live.screen.wikiClicks}
+      open={phoneOpen(live, key, remaining)}
+      revealed={!!live.screen.revealed || live.scored.includes(key)}
+      finish={mine ?? null}
+      result={b?.results?.find((r) => r.teamId === teamId)?.result ?? null}
+      error={error}
+      onFinish={(clicks) => send(finish({ token, card: key, clicks }))}
+      onUndo={() => send(undo({ token, card: key }))}
+    />
   );
 }
 
@@ -352,22 +419,8 @@ function TeamAnswer({
   const [error, setError] = useState("");
   const key = cardKey(game, index);
   const current = mine?.card === key ? mine : null;
-  const open = answersOpen({
-    revealed: !!live.screen.revealed,
-    scored: live.scored.includes(key),
-    endedAt: live.card?.key === key ? live.card.endedAt : undefined,
-    own: live.timer.card === key,
-    running: !!live.timer.startedAt,
-    remaining,
-    now: Date.now(),
-    grace: 0,
-  });
-  const send = (p: Promise<unknown>) => {
-    setError("");
-    p.catch((e: unknown) =>
-      setError(e instanceof ConvexError ? String(e.data) : "That didn’t go through. Check your connection and try again."),
-    );
-  };
+  const open = phoneOpen(live, key, remaining);
+  const send = sender(setError);
   return (
     <PhoneRound
       game={game}

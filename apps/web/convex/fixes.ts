@@ -8,6 +8,7 @@ import { cardStart, isOpen, liveCard } from "./answers";
 import { puzzleCard } from "./puzzles";
 import { FIXES } from "../src/lib/fixes";
 import { cardKey, fixAwardsFor } from "../src/lib/grading";
+import { wikiCard } from "./wiki";
 
 // Fix it for real: each team's computer runs the tests in the browser and reports here once they all pass.
 // The scoring rules live in src/lib/grading.ts so the officer test page scores the same way.
@@ -19,8 +20,8 @@ export function fixCard(s: Doc<"sessions">) {
   return { index, key: cardKey("fix", index) };
 }
 
-/** The card on the TV that teams answer against the clock: a phone-answered card, a Fix it for real card, or a puzzle. */
-export const timedCard = (s: Doc<"sessions">) => liveCard(s) ?? fixCard(s) ?? puzzleCard(s);
+/** The card on the TV that teams answer against the clock: a phone-answered card, a Fix it for real card, a puzzle, or a Wiki Race. */
+export const timedCard = (s: Doc<"sessions">) => liveCard(s) ?? fixCard(s) ?? puzzleCard(s) ?? wikiCard(s);
 
 /** Tonight's fixes for a card in the order they came in, leaving out teams that no longer exist. */
 async function cardFixes(ctx: QueryCtx, s: Doc<"sessions">, card: string) {

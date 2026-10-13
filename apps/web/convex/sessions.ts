@@ -1,13 +1,15 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import { openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
 import { scorePuzzleReveal, scoreUnrevealedPuzzles } from "./puzzles";
+import { scoreWikiReveal } from "./wiki";
 import type { Doc } from "./_generated/dataModel";
-import { clockLeft, isFreshStart, settle, showCard } from "../src/lib/grading";
+import { clockLeft, isFreshStart, settle, showCard, wikiKey } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
 
 /** The card windows with the clock's run-out time recorded, before anything changes the clock or the screen. */
@@ -37,6 +39,7 @@ export const live = query({
       card: s.card ?? null,
       scored: s.scored ?? [],
       practice: !!s.practice,
+      round: s.round ?? null,
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
@@ -108,28 +111,47 @@ export const reopen = mutation({
   },
 });
 
+/** Put something on the TV, keeping each card's answer window, and score a reveal. */
+async function putScreen(ctx: MutationCtx, s: Doc<"sessions">, screen: Doc<"sessions">["screen"]) {
+  const card =
+    screen.mode === "card" && screen.game && screen.index !== undefined
+      ? `${screen.game}:${screen.index}`
+      : screen.mode === "wiki" && screen.wikiFrom && screen.wikiTo
+        ? wikiKey(screen.wikiFrom, screen.wikiTo)
+        : null;
+  const shown = s.shown ?? [];
+  const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
+  // Each answerable card keeps its own window; anything else going up clears the current one.
+  const now = Date.now();
+  const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now });
+  Object.assign(next, { card: w.card, played: w.played });
+  await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
+  // Revealing scores phone answers, Fix it for real fixes, puzzle stars, or a Wiki Race, once per card.
+  await scoreReveal(ctx, next);
+  await scoreFixReveal(ctx, next);
+  await scorePuzzleReveal(ctx, next);
+  await scoreWikiReveal(ctx, next);
+}
+
 export const setScreen = mutation({
   args: { screen: screenV },
   handler: async (ctx, { screen }) => {
     await requireOfficer(ctx);
+    await putScreen(ctx, await requireOpenSession(ctx), screen);
+  },
+});
+
+/**
+ * Play a lineup round: double points follow the round (on for a double-points round, off otherwise). With a title,
+ * the round's name goes up on the TV too.
+ */
+export const setRound = mutation({
+  args: { round: v.number(), double: v.boolean(), title: v.optional(v.string()) },
+  handler: async (ctx, { round, double, title }) => {
+    await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
-    const card =
-      screen.mode === "card" && screen.game && screen.index !== undefined
-        ? `${screen.game}:${screen.index}`
-        : screen.mode === "wiki" && screen.wikiFrom && screen.wikiTo
-          ? `wiki:${screen.wikiFrom}>${screen.wikiTo}`
-          : null;
-    const shown = s.shown ?? [];
-    const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
-    // Each answerable card keeps its own window; anything else going up clears the current one.
-    const now = Date.now();
-    const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now });
-    Object.assign(next, { card: w.card, played: w.played });
-    await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
-    // Revealing scores phone answers, Fix it for real fixes, or puzzle stars, once per card.
-    await scoreReveal(ctx, next);
-    await scoreFixReveal(ctx, next);
-    await scorePuzzleReveal(ctx, next);
+    await ctx.db.patch(s._id, { round, double });
+    if (title) await putScreen(ctx, { ...s, round, double }, { mode: "message", message: title.slice(0, 120) });
   },
 });
 
@@ -156,7 +178,7 @@ export const setSound = mutation({
 
 export const timer = mutation({
   args: {
-    action: v.union(v.literal("set"), v.literal("toggle"), v.literal("reset"), v.literal("add"), v.literal("relay")),
+    action: v.union(v.literal("set"), v.literal("toggle"), v.literal("pause"), v.literal("reset"), v.literal("add"), v.literal("relay")),
     seconds: v.optional(v.number()),
     relay: v.optional(v.boolean()),
     autostart: v.optional(v.boolean()),
@@ -179,6 +201,10 @@ export const timer = mutation({
       case "toggle":
         if (t.startedAt) Object.assign(t, { remainingMs: remaining, startedAt: undefined });
         else Object.assign(t, remaining > 0 ? { startedAt: now } : { remainingMs: t.durationMs, startedAt: now }, { card });
+        break;
+      // Stop a running clock, and only that (the Next button pauses at the reveal).
+      case "pause":
+        if (t.startedAt) Object.assign(t, { remainingMs: remaining, startedAt: undefined });
         break;
       case "reset":
         Object.assign(t, { remainingMs: t.durationMs, startedAt: undefined });

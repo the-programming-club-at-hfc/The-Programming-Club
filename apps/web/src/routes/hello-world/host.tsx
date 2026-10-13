@@ -2,18 +2,19 @@ import { UserButton } from "@clerk/tanstack-react-start";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { ConvexError } from "convex/values";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import type { GameId, Screen } from "#/components/game";
-import { ExportButton, OfficerGate, useJoinCode } from "#/components/officer";
-import { GAME_TILE, Picto, Wrap } from "#/components/ui";
-import { BUGS, PICTIONARY, RELAYS, WIKI_RACES } from "#/lib/content";
-import { FIXES } from "#/lib/fixes";
+import { NextPanel, WordPeek, nextWord } from "#/components/next";
+import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
+import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
+import { WIKI_RACES } from "#/lib/content";
+import { deckFor, filtersFor } from "#/lib/flow";
+import type { Filter } from "#/lib/flow";
+import { isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
-import { isAnswerGame } from "#/lib/grading";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB, fmtDate, isCupWeek } from "#/lib/season";
@@ -26,14 +27,6 @@ export const Route = createFileRoute("/hello-world/host")({
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type HostData = FunctionReturnType<typeof api.sessions.host>;
 type Row = NonNullable<HostData["rows"]>[number];
-
-async function run(p: Promise<unknown>) {
-  try {
-    await p;
-  } catch (e) {
-    alert(e instanceof ConvexError ? String(e.data) : "That didn’t work. Check your connection and try again.");
-  }
-}
 
 const Panel = ({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) => (
   <section className={`card p-5 ${className}`}>
@@ -57,30 +50,35 @@ function Console() {
   const live = useQuery(api.sessions.live);
   if (!data || live === undefined) return <p className="font-bold text-dim">Loading…</p>;
   if (!data.session || !live) return <StartPanel recent={data.recent} />;
-  return <Running live={live} rows={data.rows} used={data.used} />;
+  return <Running live={live} rows={data.rows} used={data.used} shown={data.session.shown ?? []} />;
 }
 
-function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[] }) {
-  const [tab, setTab] = useState<Tab>("bug");
-  // The lineup round being played picks the deck's filter, e.g. spooky cards for "Fix it for real, spooky".
-  const [start, setStart] = useState<{ tab: Tab; filter: Filter; pick?: number } | null>(null);
-  const [playing, setPlaying] = useState<number | null>(null);
+function Running({ live, rows, used, shown }: { live: Live; rows: Row[]; used: string[]; shown: string[] }) {
+  const lineup = useSchedule()[live.week - 1].lineup;
+  // The lineup round being played (from the session, so it survives a reload) opens its deck with its filter,
+  // e.g. spooky cards for "Fix it for real, spooky".
+  const playing = live.round !== null && live.round < lineup.length ? live.round : null;
+  const label = playing === null ? null : lineup[playing].label;
+  const [tab, setTab] = useState<Tab>(() => tabFor(label) ?? "bug");
+  useEffect(() => {
+    const t = tabFor(label);
+    if (t) setTab(t);
+  }, [label, playing]);
   const deck = useRef<HTMLDivElement>(null);
-  const setDouble = useMutation(api.sessions.setDouble);
+  const setRound = useMutation(api.sessions.setRound);
   return (
     <>
       <Header live={live} />
+      <NextPanel live={live} lineup={lineup} used={used} shown={shown} className="mt-6" />
       <LineupPanel
         week={live.week}
         playing={playing}
         onPlay={(i, item) => {
-          setPlaying(i);
           // A double-points lineup round turns double points on; any other round turns it off.
-          if (item.double !== live.double) void run(setDouble({ on: item.double }));
-          const id = gamesIn(item.label)[0];
-          if (!TABS.some(([t]) => t === id)) return;
-          setTab(id as Tab);
-          setStart({ tab: id as Tab, filter: filterFor(item.label), pick: id === "puzzle" ? puzzleForLabel(item.label) : undefined });
+          void run(setRound({ round: i, double: item.double }));
+          const t = tabFor(item.label);
+          if (!t) return;
+          setTab(t);
           // The game's controls are further down the page, so bring them into view.
           deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
@@ -99,8 +97,8 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
               tab={tab}
               setTab={setTab}
               used={used}
-              filter={start?.tab === tab ? start.filter : "all"}
-              pick={start?.tab === tab ? start.pick : undefined}
+              filter={label && tabFor(label) === tab ? filterFor(label) : "all"}
+              pick={label && tabFor(label) === tab && tab === "puzzle" ? puzzleForLabel(label) : undefined}
             />
           </div>
           <PlayersPanel live={live} rows={rows} sessionId={live._id} />
@@ -554,9 +552,12 @@ const TABS: [Tab, string][] = [
   ["pictionary", "Pictionary"],
   ["lang", "Guess the Language"],
 ];
-type Filter = "all" | "easy" | "medium" | "hard" | "spooky";
-const filterFor = (label: string): Filter =>
-  (["spooky", "easy", "medium", "hard"] as const).find((f) => label.toLowerCase().includes(f)) ?? "all";
+const filterFor = (label: string): Filter => filtersFor(label)[0] ?? "all";
+/** The Games tab for a lineup entry, if it has one. */
+const tabFor = (label: string | null) => {
+  const id = label && gamesIn(label)[0];
+  return TABS.find(([t]) => t === id)?.[0];
+};
 
 function DeckPanel({
   live,
@@ -598,16 +599,6 @@ function DeckPanel({
       </div>
     </Panel>
   );
-}
-
-/** The card numbers in a deck that match a difficulty filter. */
-function deckFor(game: GameId, filter: Filter) {
-  const all = Array.from({ length: DECKS[game].size }, (_, i) => i);
-  if (filter === "all") return all;
-  if (game === "bug") return all.filter((i) => (filter === "spooky" ? BUGS[i].spooky : BUGS[i].level === filter));
-  if (game === "fix") return all.filter((i) => (filter === "spooky" ? FIXES[i].spooky : FIXES[i].level === filter));
-  if (game === "relay") return all.filter((i) => RELAYS[i].level === filter);
-  return all;
 }
 
 function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Live; used: string[]; initial: Filter; pick?: number }) {
@@ -952,15 +943,94 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
   );
 }
 
+/** Wiki Race on the TV: the finish order from phones with a ✓/✗ for the referee, then the points. */
+function WikiStatus({ live }: { live: Live }) {
+  const data = useQuery(api.wiki.board);
+  const check = useMutation(api.wiki.check);
+  if (!data) return null;
+  const done = new Set(data.finished.map((f) => f.teamId));
+  const racing = live.teams.filter((t) => !done.has(t._id));
+  const points = new Map(data.results?.map((r) => [r.teamId, r.result?.points ?? 0]));
+  return (
+    <div className="mt-3 border-4 border-line p-3">
+      <p className="font-bold">
+        {data.scored ? "Scored" : `Finished: ${data.finished.filter((f) => f.ok !== false).length} of ${data.teams} teams`}
+        {data.clicks && " · Fewest Clicks"}
+      </p>
+      {data.teams === 0 ? (
+        <p className="text-sm text-dim">No teams yet.</p>
+      ) : (
+        <ul className="mt-1 divide-y-2 divide-grid/60">
+          {data.finished.map((f) => (
+            <li key={f.teamId} className="flex flex-wrap items-center gap-2 py-1.5">
+              <span className="narrow w-9 text-xl font-extrabold">{f.place !== null ? ordinal(f.place) : "–"}</span>
+              <span className={`font-bold ${f.ok === false ? "text-dim line-through" : ""}`}>{f.name}</span>
+              {f.clicks !== null && <span className="chip bg-sun/40">{f.clicks} clicks</span>}
+              <span className="text-xs text-dim">
+                {f.ms !== null && `at ${fmtElapsed(f.ms)}`}
+                {f.by && ` · ${f.by}`}
+              </span>
+              <span className="ml-auto" />
+              {data.scored ? (
+                <span className="narrow text-xl font-extrabold">+{points.get(f.teamId) ?? 0}</span>
+              ) : (
+                <>
+                  <button
+                    className={`btn btn-sm ${f.ok === true ? "btn-on" : ""}`}
+                    onClick={() => run(check({ teamId: f.teamId, card: data.card, ok: f.ok === true ? null : true }))}
+                    aria-pressed={f.ok === true}
+                    aria-label={`${f.name} made it`}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    className={`btn btn-sm ${f.ok === false ? "btn-neon" : ""}`}
+                    onClick={() => run(check({ teamId: f.teamId, card: data.card, ok: f.ok === false ? null : false }))}
+                    aria-pressed={f.ok === false}
+                    aria-label={`${f.name} isn’t there yet`}
+                  >
+                    ✗
+                  </button>
+                </>
+              )}
+            </li>
+          ))}
+          {racing.map((t) => (
+            <li key={t._id} className="flex flex-wrap items-center gap-2 py-1.5 text-dim">
+              <span className="narrow w-9 text-xl font-extrabold">–</span>
+              <span className="font-bold">{t.name}</span>
+              <span className="chip">{data.scored ? "Didn’t finish" : "Racing"}</span>
+              {data.scored && <span className="narrow ml-auto text-xl font-extrabold text-ink">+{points.get(t._id) ?? 0}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-dim">
+        {data.scored
+          ? "Points went on the board when the race ended. Use the score buttons to fix anything."
+          : "Glance at each team’s screen: ✓ it counts, ✗ not there yet (the team can tap again). Unchecked finishes count. Ending the race scores it once: 5, 4, 3 by place, 2 for any other finish, 1 for playing, doubled on double points."}
+      </p>
+    </div>
+  );
+}
+
 function WikiTool({ live, used }: { live: Live; used: string[] }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
+  const s = live.screen;
   const [cs, setCs] = useState(false);
+  const [clicks, setClicks] = useState(!!s.wikiClicks);
   const [race, setRace] = useState<{ from: string; to: string } | null>(
-    live.screen.mode === "wiki" && live.screen.wikiFrom && live.screen.wikiTo
-      ? { from: live.screen.wikiFrom, to: live.screen.wikiTo }
-      : null,
+    s.mode === "wiki" && s.wikiFrom && s.wikiTo ? { from: s.wikiFrom, to: s.wikiTo } : null,
   );
+  // Follow the TV when the Next button or another officer puts up a race.
+  useEffect(() => {
+    if (s.mode === "wiki" && s.wikiFrom && s.wikiTo) {
+      setRace({ from: s.wikiFrom, to: s.wikiTo });
+      setClicks(!!s.wikiClicks);
+    }
+  }, [s.mode, s.wikiFrom, s.wikiTo, s.wikiClicks]);
+  const onTv = !!race && s.mode === "wiki" && s.wikiFrom === race.from && s.wikiTo === race.to;
   const raced = (r: { from: string; to: string }) => used.includes(`wiki:${r.from}>${r.to}`);
   const draw = () => {
     const pool = WIKI_RACES.filter((r) => !cs || r.cs);
@@ -978,6 +1048,15 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
         </button>
         <button className={`chip ml-2 ${cs ? "bg-ink text-paper" : ""}`} onClick={() => setCs(!cs)}>
           Computer science targets only
+        </button>
+        <button
+          className={`chip ml-2 ${clicks ? "bg-ink text-paper" : ""} disabled:opacity-50`}
+          onClick={() => setClicks(!clicks)}
+          aria-pressed={clicks}
+          // A race keeps its style once it's up, so finishes all count the same way.
+          disabled={onTv}
+        >
+          Fewest Clicks
         </button>
         <select
           className="field mt-2 w-full py-1 text-sm"
@@ -1006,39 +1085,44 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
             </a>
           </div>
           <div className="mt-3 flex flex-wrap">
-            <button
-              className="btn btn-sm btn-neon"
-              onClick={() => run(setScreen({ screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to } }))}
-            >
-              Show on TV
-            </button>
+            {onTv ? (
+              <button
+                className={`btn btn-sm ${s.revealed ? "" : "btn-coin"}`}
+                disabled={!!s.revealed}
+                onClick={() => run(setScreen({ screen: { ...s, revealed: true } }))}
+              >
+                {s.revealed ? "Race over" : "End race and score"}
+              </button>
+            ) : (
+              <button
+                className="btn btn-sm btn-neon"
+                onClick={() =>
+                  run(setScreen({ screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: clicks || undefined } }))
+                }
+              >
+                Show on TV
+              </button>
+            )}
             <button className="btn btn-sm" onClick={() => setRace({ from: race.to, to: race.from })}>
               Reverse
             </button>
-            <button className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: 300, relay: false, autostart: true }))}>
-              Start 5:00
-            </button>
-            <button className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: 360, relay: false, autostart: true }))}>
-              Fewest Clicks 6:00
+            <button
+              className="btn btn-sm"
+              onClick={() => run(timer({ action: "set", seconds: wikiSeconds(clicks), relay: false, autostart: true }))}
+            >
+              Start {fmtClock(wikiSeconds(clicks) * 1000)}
             </button>
           </div>
+          {onTv && <WikiStatus live={live} />}
         </>
       )}
     </div>
   );
 }
 
-// Words left to draw on this device. Kept outside the component so switching tabs doesn't reshuffle.
-let pictionaryLeft: string[] = [];
-const nextWord = () => {
-  if (!pictionaryLeft.length) pictionaryLeft = [...PICTIONARY].sort(() => Math.random() - 0.5);
-  return pictionaryLeft.pop()!;
-};
-
 function PictionaryTool() {
   const timer = useMutation(api.sessions.timer);
   const [word, setWord] = useState<string | null>(null);
-  const [peek, setPeek] = useState(false);
   return (
     <div>
       <div className="flex flex-wrap">
@@ -1049,22 +1133,7 @@ function PictionaryTool() {
           Start 1:00
         </button>
       </div>
-      {word && (
-        <button
-          className="mt-4 grid min-h-40 w-full place-items-center border-4 border-dashed border-gold text-center select-none"
-          onPointerDown={() => setPeek(true)}
-          onPointerUp={() => setPeek(false)}
-          onPointerLeave={() => setPeek(false)}
-          onKeyDown={(e) => (e.key === " " || e.key === "Enter") && setPeek(true)}
-          onKeyUp={() => setPeek(false)}
-        >
-          {peek ? (
-            <span className="font-bold text-5xl text-ink">{word}</span>
-          ) : (
-            <span className="text-dim">Press and hold to show the drawer</span>
-          )}
-        </button>
-      )}
+      {word && <WordPeek word={word} />}
       <p className="mt-3 text-sm text-dim">
         The word stays on this device and never goes on the TV. Hold your phone up for the drawer instead of handing it over: it has the
         score buttons.
