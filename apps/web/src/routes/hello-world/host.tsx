@@ -12,6 +12,7 @@ import { ExportButton, OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap } from "#/components/ui";
 import { BUGS, PICTIONARY, RELAYS, WIKI_RACES } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
+import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
 import { isAnswerGame } from "#/lib/grading";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
@@ -62,7 +63,7 @@ function Console() {
 function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[] }) {
   const [tab, setTab] = useState<Tab>("bug");
   // The lineup round being played picks the deck's filter, e.g. spooky cards for "Fix it for real, spooky".
-  const [start, setStart] = useState<{ tab: Tab; filter: Filter } | null>(null);
+  const [start, setStart] = useState<{ tab: Tab; filter: Filter; pick?: number } | null>(null);
   const [playing, setPlaying] = useState<number | null>(null);
   const deck = useRef<HTMLDivElement>(null);
   const setDouble = useMutation(api.sessions.setDouble);
@@ -79,7 +80,7 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
           const id = gamesIn(item.label)[0];
           if (!TABS.some(([t]) => t === id)) return;
           setTab(id as Tab);
-          setStart({ tab: id as Tab, filter: filterFor(item.label) });
+          setStart({ tab: id as Tab, filter: filterFor(item.label), pick: id === "puzzle" ? puzzleForLabel(item.label) : undefined });
           // The game's controls are further down the page, so bring them into view.
           deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
@@ -93,7 +94,14 @@ function Running({ live, rows, used }: { live: Live; rows: Row[]; used: string[]
         </div>
         <div className="space-y-6">
           <div ref={deck} className="scroll-mt-6">
-            <DeckPanel live={live} tab={tab} setTab={setTab} used={used} filter={start?.tab === tab ? start.filter : "all"} />
+            <DeckPanel
+              live={live}
+              tab={tab}
+              setTab={setTab}
+              used={used}
+              filter={start?.tab === tab ? start.filter : "all"}
+              pick={start?.tab === tab ? start.pick : undefined}
+            />
           </div>
           <PlayersPanel live={live} rows={rows} sessionId={live._id} />
         </div>
@@ -541,6 +549,7 @@ const TABS: [Tab, string][] = [
   ["fix", "Fix it for real"],
   ["output", "Output?"],
   ["relay", "Code Relay"],
+  ["puzzle", "Puzzles"],
   ["wiki", "Wiki Race"],
   ["pictionary", "Pictionary"],
   ["lang", "Guess the Language"],
@@ -555,12 +564,15 @@ function DeckPanel({
   setTab,
   used,
   filter,
+  pick,
 }: {
   live: Live;
   tab: Tab;
   setTab: (t: Tab) => void;
   used: string[];
   filter: Filter;
+  /** A puzzle to start on, from the lineup round being played. */
+  pick?: number;
 }) {
   return (
     <Panel title="Games" className="">
@@ -581,7 +593,7 @@ function DeckPanel({
         ) : tab === "pictionary" ? (
           <PictionaryTool />
         ) : (
-          <CardTool key={`${tab}:${filter}`} game={tab} live={live} used={used} initial={filter} />
+          <CardTool key={`${tab}:${filter}:${pick}`} game={tab} live={live} used={used} initial={filter} pick={pick} />
         )}
       </div>
     </Panel>
@@ -598,7 +610,7 @@ function deckFor(game: GameId, filter: Filter) {
   return all;
 }
 
-function CardTool({ game, live, used, initial }: { game: GameId; live: Live; used: string[]; initial: Filter }) {
+function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Live; used: string[]; initial: Filter; pick?: number }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const s = live.screen;
@@ -614,9 +626,9 @@ function CardTool({ game, live, used, initial }: { game: GameId; live: Live; use
   const [filter, setFilter] = useState<Filter>(() =>
     filters.includes(initial) && (tvIndex === undefined || deckFor(game, initial).includes(tvIndex)) ? initial : "all",
   );
-  // Start on the card the TV is showing, or else the first card not shown on any night yet.
+  // Start on the card the TV is showing, or the lineup round's puzzle, or else the first card not shown on any night yet.
   const [pos, setPos] = useState(() =>
-    tvIndex !== undefined ? deckFor(game, filter).indexOf(tvIndex) : firstFresh(deckFor(game, filter)),
+    tvIndex !== undefined ? deckFor(game, filter).indexOf(tvIndex) : pick !== undefined ? pick : firstFresh(deckFor(game, filter)),
   );
 
   const indexes = useMemo(() => deckFor(game, filter), [game, filter]);
@@ -696,7 +708,16 @@ function CardTool({ game, live, used, initial }: { game: GameId; live: Live; use
         )}
         <button
           className="btn btn-sm"
-          onClick={() => run(timer({ action: "set", seconds: secs, relay: game === "relay", autostart: true }))}
+          onClick={() =>
+            run(
+              timer({
+                action: "set",
+                seconds: secs,
+                relay: game === "relay" || (game === "puzzle" && !!PUZZLES[index].relay),
+                autostart: true,
+              }),
+            )
+          }
         >
           Start {fmtClock(secs * 1000)}
         </button>
@@ -710,6 +731,7 @@ function CardTool({ game, live, used, initial }: { game: GameId; live: Live; use
       </p>
       {onTv && isAnswerGame(game) && <AnswerStatus />}
       {onTv && game === "fix" && <FixStatus live={live} />}
+      {onTv && game === "puzzle" && <PuzzleStatus live={live} index={index} />}
       <div className="mt-2 border-4 border-line bg-mist p-4">
         <CardView game={game} index={index} answer />
       </div>
@@ -832,6 +854,94 @@ function FixStatus({ live }: { live: Live }) {
           ? "Points went on the board when you revealed. Use the score buttons to fix anything."
           : "Team computers mark a team fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points."}
       </p>
+    </div>
+  );
+}
+
+/** A puzzle on the TV: each team's stars and lockouts, the hint button (lit up at half time), then the points. */
+function PuzzleStatus({ live, index }: { live: Live; index: number }) {
+  const board = useQuery(api.puzzles.board);
+  const extra = useQuery(api.puzzles.host);
+  const [showKey, setShowKey] = useState(false);
+  const answers = useQuery(api.puzzles.answers, showKey ? {} : "skip");
+  const setScreen = useMutation(api.sessions.setScreen);
+  const remaining = useRemaining(live.timer);
+  const [now, setNow] = useState(() => Date.now());
+  const locked = board?.teams.some((t) => t.lockedUntil !== null && t.lockedUntil > now);
+  useEffect(() => {
+    if (!locked) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [locked]);
+  const key = `puzzle:${index}`;
+  if (board?.card !== key) return null;
+  const s = live.screen;
+  const halfway = live.timer.card === key && remaining <= live.timer.durationMs / 2;
+  const count = (part: "part1Ms" | "part2Ms") => board.teams.filter((t) => t[part] !== null).length;
+  const star = (ms: number | null, first: boolean) => (
+    <span className={`chip ${ms === null ? "" : "bg-gold text-[#12332b]"}`}>
+      {ms === null ? "☆" : `★ ${fmtElapsed(ms)}${first ? " · first" : ""}`}
+    </span>
+  );
+  return (
+    <div className="mt-3 border-4 border-line p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-bold">
+          {board.scored ? "Scored" : `Part 1: ${count("part1Ms")} of ${board.teams.length} · Part 2: ${count("part2Ms")}`} · team computers
+          at /hello-world/fix
+        </p>
+        {!s.revealed && !board.scored && (
+          <button
+            className={`btn btn-sm ml-auto ${s.hint ? "btn-on" : halfway ? "btn-coin" : ""}`}
+            onClick={() => run(setScreen({ screen: { ...s, hint: !s.hint } }))}
+            aria-pressed={!!s.hint}
+          >
+            {s.hint ? "Hide hint" : halfway ? "Halfway: show hint" : "Show hint"}
+          </button>
+        )}
+      </div>
+      {board.teams.length === 0 ? (
+        <p className="text-sm text-dim">No teams yet.</p>
+      ) : (
+        <ul className="mt-1 divide-y-2 divide-grid/60">
+          {board.teams.map((t) => {
+            const x = extra?.wrong.find((w) => w.teamId === t.teamId);
+            const wait = t.lockedUntil === null ? 0 : Math.ceil((t.lockedUntil - now) / 1000);
+            const a = answers?.teams.find((k) => k.teamId === t.teamId);
+            return (
+              <li key={t.teamId} className="py-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold">{t.name}</span>
+                  {star(t.part1Ms, t.first1)}
+                  {star(t.part2Ms, t.first2)}
+                  {wait > 0 && <span className="chip bg-signal text-white">locked {wait}s</span>}
+                  {board.scored && <span className="narrow ml-auto text-xl font-extrabold">+{t.result?.points ?? 0}</span>}
+                </div>
+                {!!x?.wrong && (
+                  <p className="text-xs text-dim">
+                    {x.wrong} wrong · last: <span className="font-code">{x.lastWrong}</span>
+                  </p>
+                )}
+                {a && (
+                  <p className="text-xs text-dim">
+                    Answers: <span className="font-code break-all">{a.part1}</span> · <span className="font-code break-all">{a.part2}</span>
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="flex-1 text-xs text-dim">
+          {board.scored
+            ? "Points went on the board when you revealed. Use the score buttons to fix anything."
+            : "Each team has its own input. A wrong answer locks the team out for 30 seconds. Revealing adds +3 per part 1 star, +5 per part 2 star, and +2 more for the first team to each star, doubled on double points. Ending the night scores a puzzle you never revealed."}
+        </p>
+        <button className="btn btn-sm text-dim" onClick={() => setShowKey(!showKey)} aria-pressed={showKey}>
+          {showKey ? "Hide answers" : "Show each team’s answers"}
+        </button>
+      </div>
     </div>
   );
 }

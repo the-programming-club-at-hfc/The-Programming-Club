@@ -69,12 +69,14 @@ export function likelyWeek(plan: WeekPlan[], now = Date.now()) {
 }
 
 // How a lineup entry names each game. "Silent Relay" is Code Relay; "Bug Bounty" and "Fix it for real" are Bug Hunt
-// variants. Fix it for real comes first so it opens its own deck on /host and shows its own tile.
+// variants, and the Advent-style puzzles are a Code Relay variant. Fix it for real and puzzles come first so they open
+// their own decks on /host and show their own tiles.
 const GAME_NAMES: [RegExp, string][] = [
   [/Fix it for real/, "fix"],
+  [/[Pp]uzzle/, "puzzle"],
   [/Wiki Race/, "wiki"],
   [/Bug Hunt|Bug Bounty|Fix it for real/, "bug"],
-  [/Relay/, "relay"],
+  [/Relay|[Pp]uzzle/, "relay"],
   [/Output\?/, "output"],
   [/Pictionary/, "pictionary"],
   [/Guess the Language/, "lang"],

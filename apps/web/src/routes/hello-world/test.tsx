@@ -1,29 +1,48 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { ConvexError } from "convex/values";
+import { useEffect, useMemo, useState } from "react";
 import { NO_PICK, PhoneRound } from "#/components/answer";
 import { FixRound } from "#/components/fix";
+import { PuzzleRound } from "#/components/puzzle";
 import type { PickArgs, TeamPick } from "#/components/answer";
 import { CardView, DECKS, LevelChip, fmtClock } from "#/components/game";
 import { OfficerGate } from "#/components/officer";
 import { Wrap } from "#/components/ui";
 import { BUGS, OUTPUTS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
-import { FIRST_FIX_BONUS, FIX_POINTS, answersOpen, awardsFor, cardKey, cardSeconds, earlyMs, fixAwardsFor } from "#/lib/grading";
-import type { AnswerGame } from "#/lib/grading";
+import {
+  FIRST_FIX_BONUS,
+  FIRST_STAR_BONUS,
+  FIX_POINTS,
+  LOCKOUT_MS,
+  PART1_POINTS,
+  PART2_POINTS,
+  answersOpen,
+  awardsFor,
+  cardKey,
+  cardSeconds,
+  earlyMs,
+  fixAwardsFor,
+  puzzleAwardsFor,
+  submitAnswer,
+} from "#/lib/grading";
+import type { AnswerGame, Stars } from "#/lib/grading";
+import { PUZZLES } from "#/lib/puzzles";
 import { usePython } from "#/lib/python";
 import type { Python } from "#/lib/python";
 import { CLUB } from "#/lib/season";
 import { sfx, unlockAudio } from "#/lib/sound";
 
-// Officers play every phone-answered card (and every Fix it for real card, with real Python) as a fake team, with the
-// real components and scoring, and flag cards that are too easy, too hard, or broken. Nothing here writes to the database.
+// Officers play every phone-answered card (and every Fix it for real card and puzzle, with real Python) as a fake team,
+// with the real components and scoring, and flag cards that are too easy, too hard, or broken. Nothing here writes to
+// the database.
 export const Route = createFileRoute("/hello-world/test")({
   head: () => ({ meta: [{ title: `Test the decks · ${CLUB.season}` }, { name: "robots", content: "noindex" }] }),
   component: TestPage,
 });
 
-type TestGame = AnswerGame | "fix";
-const GAMES: TestGame[] = ["bug", "fix", "output", "lang"];
+type TestGame = AnswerGame | "fix" | "puzzle";
+const GAMES: TestGame[] = ["bug", "fix", "puzzle", "output", "lang"];
 const FLAGS = ["too easy", "too hard", "broken"] as const;
 type Flag = { flag: (typeof FLAGS)[number]; note: string };
 const FLAGS_KEY = "hwc.flags";
@@ -52,7 +71,15 @@ function useFlags() {
 }
 
 const levelName = (game: TestGame, i: number) =>
-  game === "bug" ? BUGS[i].level : game === "fix" ? FIXES[i].level : game === "output" && OUTPUTS[i].tiebreak ? "hard" : null;
+  game === "bug"
+    ? BUGS[i].level
+    : game === "fix"
+      ? FIXES[i].level
+      : game === "puzzle"
+        ? PUZZLES[i].level
+        : game === "output" && OUTPUTS[i].tiebreak
+          ? "hard"
+          : null;
 const levelOf = (game: TestGame, i: number) => {
   const l = levelName(game, i);
   return l && <LevelChip level={l} />;
@@ -69,7 +96,7 @@ function Tester() {
   // Python loads the first time someone opens the Fix it for real deck, then stays ready.
   const [pyOn, setPyOn] = useState(false);
   useEffect(() => {
-    if (game === "fix") setPyOn(true);
+    if (game === "fix" || game === "puzzle") setPyOn(true);
   }, [game]);
   const py = usePython(pyOn);
 
@@ -80,8 +107,8 @@ function Tester() {
           <p className="font-bold text-pine">Officers</p>
           <h1 className="text-[clamp(2.4rem,6vw,3.6rem)] lowercase">test the decks</h1>
           <p className="mt-2 max-w-[60ch] text-dim">
-            Play every card the way a team does on a phone (or, for Fix it for real, on a team computer), then reveal to see what the real
-            scoring gives. Flag cards that are too easy, too hard, or broken. Nothing here touches tonight’s game.
+            Play every card the way a team does on a phone (or, for Fix it for real and puzzles, on a team computer), then reveal to see
+            what the real scoring gives. Flag cards that are too easy, too hard, or broken. Nothing here touches tonight’s game.
           </p>
         </div>
         <Link to="/hello-world/host" className="btn btn-sm ml-auto">
@@ -125,6 +152,8 @@ function Tester() {
       <div className="mt-6 flex flex-wrap items-start gap-6">
         {game === "fix" ? (
           <FixPlay key={cardKey(game, index)} index={index} tv={tv} py={py} />
+        ) : game === "puzzle" ? (
+          <PuzzlePlay key={cardKey(game, index)} index={index} tv={tv} py={py} />
         ) : (
           <Play key={cardKey(game, index)} game={game} index={index} tv={tv} />
         )}
@@ -360,6 +389,148 @@ function FixPlay({ index, tv, py }: { index: number; tv: boolean; py: Python }) 
   );
 }
 
+const randomSeed = () => Math.floor(Math.random() * 1_000_000);
+
+/**
+ * One puzzle on a pretend team computer: an input from any seed, the reference answers, real Python, the same answer
+ * checking and 30-second lockout as the server, and the same scoring.
+ */
+function PuzzlePlay({ index, tv, py }: { index: number; tv: boolean; py: Python }) {
+  const p = PUZZLES[index];
+  const secs = cardSeconds("puzzle", index);
+  const [seed, setSeed] = useState(randomSeed);
+  const [start, setStart] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  const [timed, setTimed] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [hint, setHint] = useState(false);
+  const [double, setDouble] = useState(false);
+  const [stars, setStars] = useState<Stars>({ wrong: 0 });
+  const [round, setRound] = useState(0);
+  const input = useMemo(() => p.generate(seed), [p, seed]);
+  const answers = useMemo(() => p.solve(input), [p, input]);
+
+  useEffect(() => {
+    if (!timed || revealed) return;
+    const id = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(id);
+  }, [timed, revealed]);
+
+  const remaining = timed ? Math.max(0, start + secs * 1000 - now) : secs * 1000;
+  const open = answersOpen({ revealed, scored: false, endedAt: undefined, own: timed, running: timed, remaining, now, grace: 0 });
+  const award = puzzleAwardsFor({ index, double, scored: [], teams: stars.part1At === undefined ? [] : [{ id: 0, ...stars }] })?.awards[0];
+  const result = revealed && award ? { points: award.points, first1: award.first1, first2: award.first2 } : null;
+  const ms = (at: number | undefined) => (at === undefined ? null : at - start);
+
+  const restart = (withTimer: boolean, nextSeed = seed) => {
+    const t = Date.now();
+    setSeed(nextSeed);
+    setStart(t);
+    setNow(t);
+    setTimed(withTimer);
+    setRevealed(false);
+    setHint(false);
+    setStars({ wrong: 0 });
+    setRound((r) => r + 1);
+  };
+  const onSubmit = async (part: 1 | 2, answer: string) => {
+    if (!open) throw new ConvexError("Time’s up. Answers are closed for this puzzle.");
+    const r = submitAnswer(stars, part, answer, () => answers[`part${part}`], Date.now());
+    if (r.kind === "early") throw new ConvexError("Solve part 1 first.");
+    if (r.kind === "locked") throw new ConvexError(`Wait ${Math.ceil(r.waitMs / 1000)}s, then try again.`);
+    if (r.kind === "done") return { right: true, waitMs: 0 };
+    setStars(r.stars);
+    return { right: r.kind === "right", waitMs: r.kind === "wrong" ? LOCKOUT_MS : 0 };
+  };
+
+  return (
+    <>
+      <div className="w-full">
+        <div className="card mb-4 flex flex-wrap items-center gap-2 p-4">
+          <label className="flex items-center gap-2 font-bold">
+            Seed
+            <input
+              className="field w-32 py-1"
+              inputMode="numeric"
+              value={seed}
+              onChange={(e) => restart(timed, Number(e.target.value.replace(/\D/g, "").slice(0, 9)))}
+            />
+          </label>
+          <button className="btn btn-sm" onClick={() => restart(timed, randomSeed())}>
+            New input
+          </button>
+          <p className="ml-auto text-sm">
+            <span className="text-dim">Reference answers (officers only):</span> part 1{" "}
+            <strong className="font-code break-all">{answers.part1}</strong> · part 2{" "}
+            <strong className="font-code break-all">{answers.part2}</strong>
+          </p>
+        </div>
+        {timed && !revealed && (
+          <p className={`narrow mb-3 text-6xl leading-none font-extrabold ${remaining <= 10_000 ? "text-signal" : ""}`}>
+            {remaining === 0 ? "time" : fmtClock(remaining)}
+          </p>
+        )}
+        <PuzzleRound
+          key={round}
+          index={index}
+          input={input}
+          py={py}
+          revealed={revealed}
+          hint={hint}
+          open={open}
+          stars={{ part1Ms: ms(stars.part1At), part2Ms: ms(stars.part2At) }}
+          lockedUntil={stars.lockedUntil ?? null}
+          result={result}
+          // Code stays through a new seed, so a solution can be tried on another input.
+          saveKey={`hwc.testPuzzleCode.${index}`}
+          onSubmit={onSubmit}
+        />
+        <div className="mt-4 flex flex-wrap gap-1">
+          {revealed ? (
+            <button className="btn btn-sm btn-coin" onClick={() => restart(timed)}>
+              Play again
+            </button>
+          ) : (
+            <button
+              className="btn btn-sm btn-coin"
+              onClick={() => {
+                setRevealed(true);
+                void unlockAudio().then(() => sfx.reveal());
+              }}
+            >
+              Reveal
+            </button>
+          )}
+          <button className={`btn btn-sm ${hint ? "btn-on" : ""}`} onClick={() => setHint(!hint)} aria-pressed={hint} disabled={revealed}>
+            Show hint
+          </button>
+          <button className="btn btn-sm" onClick={() => restart(true)}>
+            Start {fmtClock(secs * 1000)} timer{p.relay ? " (relay)" : ""}
+          </button>
+          <button className="btn btn-sm" onClick={() => restart(false)}>
+            Reset, no timer
+          </button>
+          <button className={`btn btn-sm ${double ? "btn-on" : ""}`} onClick={() => setDouble(!double)} aria-pressed={double}>
+            Double points
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-dim">
+          +{PART1_POINTS} for part 1, +{PART2_POINTS} for part 2, and +{FIRST_STAR_BONUS} more for the first team to each star. You’re the
+          only team here, so every star is first. A wrong answer locks you out for {LOCKOUT_MS / 1000} seconds.
+          {stars.wrong > 0 && ` Wrong answers so far: ${stars.wrong}.`}
+          {revealed && ` Real scoring: +${result?.points ?? 0}.`}
+        </p>
+      </div>
+      {tv && (
+        <div className="theme-pine min-w-0 flex-1 basis-[28rem] rounded-[10px] p-6">
+          <p className="mb-3 text-sm font-bold text-dim">TV · {DECKS.puzzle.name}</p>
+          <CardView game="puzzle" index={index} answer={revealed} hint={hint} />
+        </div>
+      )}
+    </>
+  );
+}
+
 function FlagPanel({
   game,
   index,
@@ -391,7 +562,7 @@ function FlagPanel({
   const text = list
     .map(
       ({ g, i, f }) =>
-        `${DECKS[g].name}, card ${i + 1}${g === "bug" || g === "fix" ? ` (${levelName(g, i)})` : ""}: ${f.flag}${f.note ? `. ${f.note}` : ""}`,
+        `${DECKS[g].name}, card ${i + 1}${g === "bug" || g === "fix" || g === "puzzle" ? ` (${levelName(g, i)})` : ""}: ${f.flag}${f.note ? `. ${f.note}` : ""}`,
     )
     .join("\n");
 
