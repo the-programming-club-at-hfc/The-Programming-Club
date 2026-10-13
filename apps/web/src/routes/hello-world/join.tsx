@@ -6,10 +6,10 @@ import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
 import { CardView, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
-import { IdeaPrompt } from "#/components/idea";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { answersOpen, cardKey, isAnswerGame } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
+import { IDEA_MAX } from "#/lib/ideas";
 import { useSchedule } from "#/lib/schedule";
 import { CLUB } from "#/lib/season";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -102,6 +102,9 @@ function JoinForm({
   const [code, setCode] = useState(initialCode.toUpperCase());
   const [profile, setProfile] = useState<Profile>({ name: "", email: "" });
   const [broughtBy, setBroughtBy] = useState("");
+  const [idea, setIdea] = useState("");
+  // Only a phone that has never joined gets the idea box ("Switch player" keeps the saved profile).
+  const [firstPhone, setFirstPhone] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -109,6 +112,7 @@ function JoinForm({
   useEffect(() => {
     const saved = localStorage.getItem("hwc.profile");
     if (saved) setProfile(JSON.parse(saved) as Profile);
+    setFirstPhone(!saved && !Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
   }, []);
 
   async function submit(e: { preventDefault: () => void }) {
@@ -116,7 +120,7 @@ function JoinForm({
     setError("");
     setBusy(true);
     try {
-      const token = await join({ code, ...profile, broughtBy: broughtBy || undefined });
+      const token = await join({ code, ...profile, broughtBy: broughtBy || undefined, idea: (firstPhone && idea) || undefined });
       localStorage.setItem("hwc.profile", JSON.stringify(profile));
       localStorage.setItem(tokenKey(sessionId), token);
       onJoined(token);
@@ -204,6 +208,24 @@ function JoinForm({
           <span className="font-bold">Who brought you?</span> <span className="text-dim">Optional. Officers give you both +2 XP.</span>
           <input className="field mt-2" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
         </label>
+        {firstPhone && (
+          <label className="block">
+            <span className="font-bold">Anything you’d like the club to do?</span> <span className="text-dim">Optional.</span>
+            <textarea
+              className="field mt-2 block"
+              rows={2}
+              value={idea}
+              onChange={(e) => setIdea(e.target.value)}
+              maxLength={IDEA_MAX}
+              placeholder="Events, projects, games, workshops…"
+            />
+            {idea.length > IDEA_MAX - 100 && (
+              <span className="mt-1 block text-right text-sm text-dim">
+                {idea.length}/{IDEA_MAX}
+              </span>
+            )}
+          </label>
+        )}
         {error && (
           <p role="alert" className="rounded-[6px] bg-signal/10 px-4 py-3 font-semibold text-signal">
             {error}
@@ -293,7 +315,6 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         </div>
       )}
       {s.mode === "message" && s.message && <p className="card mt-8 p-6 text-2xl font-bold">{s.message}</p>}
-      <IdeaPrompt token={token} />
 
       <div className="mt-10 flex flex-wrap items-center justify-between gap-3 text-dim">
         <p>

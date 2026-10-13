@@ -1,4 +1,4 @@
-// New members' ideas for the club: asked once on their phone after their first join (convex/ideas.ts).
+// New members' ideas for the club: an optional box on the join form, shown the first time a phone joins (players.join).
 import { fmtDate } from "./season";
 
 export const IDEA_MAX = 500;

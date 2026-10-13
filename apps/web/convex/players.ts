@@ -1,17 +1,28 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { addToSession } from "./lib";
+import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
 
-/** Members join from their phone with tonight's code. No account needed. */
+/** Members join from their phone with tonight's code. No account needed. First-timers can share an idea for the club too. */
 export const join = mutation({
-  args: { code: v.string(), name: v.string(), email: v.string(), broughtBy: v.optional(v.string()) },
-  handler: async (ctx, { code, name, email, broughtBy }) => {
+  args: { code: v.string(), name: v.string(), email: v.string(), broughtBy: v.optional(v.string()), idea: v.optional(v.string()) },
+  handler: async (ctx, { code, name, email, broughtBy, idea }) => {
     const session = await ctx.db
       .query("sessions")
       .withIndex("by_code", (q) => q.eq("code", code.trim().toUpperCase()))
       .first();
     if (!session || session.status !== "open") throw new ConvexError("That code isn’t live. Check the code on the TV.");
-    return addToSession(ctx, session, name, email, broughtBy);
+    const token = await addToSession(ctx, session, name, email, broughtBy);
+    // Saved even for a returning member: ideas are welcome.
+    const text = cleanIdea(idea ?? "").slice(0, IDEA_MAX);
+    if (text) {
+      const a = await ctx.db
+        .query("attendance")
+        .withIndex("by_token", (q) => q.eq("token", token))
+        .unique();
+      if (a) await ctx.db.insert("ideas", { playerId: a.playerId, sessionId: session._id, text, createdAt: Date.now() });
+    }
+    return token;
   },
 });
 

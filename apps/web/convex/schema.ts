@@ -83,7 +83,7 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     createdAt: v.number(),
-    // The new-member "what should the club do?" prompt on the phone: answered or skipped, so it never comes back.
+    // Unused: left from the old after-join idea prompt, kept only because a few dev docs still have it set.
     ideaPrompt: v.optional(v.union(v.literal("sent"), v.literal("skipped"))),
   }).index("by_email", ["email"]),
 
@@ -151,7 +151,7 @@ export default defineSchema({
     .index("by_session_card", ["sessionId", "card"])
     .index("by_team_card", ["teamId", "card"]),
 
-  // What new members would like the club to do, from the one-time prompt on their phone. See convex/ideas.ts.
+  // What new members would like the club to do, from the optional box on the join form (players.join). See convex/ideas.ts.
   ideas: defineTable({
     playerId: v.id("players"),
     sessionId: v.id("sessions"),

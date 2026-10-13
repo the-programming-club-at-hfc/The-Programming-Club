@@ -165,7 +165,7 @@ function Overview() {
   );
 }
 
-/** What new members said they'd like the club to do, asked once on their phone after their first join. */
+/** What new members said they'd like the club to do, from the optional box on the join form. */
 function Ideas() {
   const ideas = useQuery(api.ideas.list);
   const [copied, setCopied] = useState(false);
@@ -191,7 +191,7 @@ function Ideas() {
       }
     >
       {ideas.length === 0 ? (
-        <p className="text-dim">None yet. New members get asked on their phone after they join for the first time.</p>
+        <p className="text-dim">None yet. New members can share one when they join for the first time.</p>
       ) : (
         <ul className="max-h-96 divide-y divide-line overflow-y-auto">
           {ideas.map((i) => (
