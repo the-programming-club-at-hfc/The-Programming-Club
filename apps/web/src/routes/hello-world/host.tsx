@@ -50,10 +50,22 @@ function Console() {
   const live = useQuery(api.sessions.live);
   if (!data || live === undefined) return <p className="font-bold text-dim">Loading…</p>;
   if (!data.session || !live) return <StartPanel recent={data.recent} />;
-  return <Running live={live} rows={data.rows} used={data.used} shown={data.session.shown ?? []} />;
+  return <Running live={live} rows={data.rows} used={data.used} shown={data.session.shown ?? []} keys={data.keys} />;
 }
 
-function Running({ live, rows, used, shown }: { live: Live; rows: Row[]; used: string[]; shown: string[] }) {
+function Running({
+  live,
+  rows,
+  used,
+  shown,
+  keys,
+}: {
+  live: Live;
+  rows: Row[];
+  used: string[];
+  shown: string[];
+  keys: Record<string, string | null>;
+}) {
   const lineup = useSchedule()[live.week - 1].lineup;
   // The lineup round being played (from the session, so it survives a reload) opens its deck with its filter,
   // e.g. spooky cards for "Fix it for real, spooky".
@@ -88,7 +100,7 @@ function Running({ live, rows, used, shown }: { live: Live; rows: Row[]; used: s
         <div className="space-y-6">
           <ScreenPanel live={live} />
           <TimerPanel live={live} />
-          <TeamsPanel live={live} />
+          <TeamsPanel live={live} keys={keys} />
         </div>
         <div className="space-y-6">
           <div ref={deck} className="scroll-mt-6">
@@ -331,7 +343,7 @@ function TimerPanel({ live }: { live: Live }) {
   );
 }
 
-function TeamsPanel({ live }: { live: Live }) {
+function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | null> }) {
   const make = useMutation(api.teams.make);
   const add = useMutation(api.teams.add);
   const score = useMutation(api.teams.score);
@@ -376,6 +388,11 @@ function TeamsPanel({ live }: { live: Live }) {
                   {t.name}
                 </button>
                 <span className="text-sm text-dim">{t.members.join(", ") || "empty"}</span>
+                {keys[t._id] && (
+                  <span className="chip text-sm" title="Team computer key (also on the team’s phones)">
+                    {keys[t._id]}
+                  </span>
+                )}
                 <span className="ml-auto narrow font-extrabold text-3xl text-ink tabular-nums">{t.score}</span>
               </div>
               <div className="mt-1 flex flex-wrap gap-2">

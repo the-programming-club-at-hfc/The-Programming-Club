@@ -502,7 +502,7 @@ export const PREP: string[] = [
   "Open programmingclub.dev/host on an officer laptop or phone and start tonight’s week.",
   "Put out markers, paper, and the prize stash.",
   "Code Relay or Cup nights: make sure every team computer has an editor or onecompiler.com open.",
-  "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay Night, the Final): open programmingclub.dev/hello-world/fix on every team computer and pick the team once teams are made. Python loads by itself.",
+  "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay Night, the Final): open programmingclub.dev/hello-world/fix on every team computer. Once teams are made, each team types the team key from their phones (also on /host). Python loads by itself.",
   "Puzzle nights: try the puzzle at /hello-world/test first, so you know the example and how part 2 twists part 1.",
 ];
 export const NEWCOMERS: string[] = [

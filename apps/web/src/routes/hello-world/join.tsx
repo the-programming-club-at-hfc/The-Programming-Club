@@ -306,6 +306,11 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
               </div>
               <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>
+              {me.team.key && (
+                <p className="mt-1 text-sm text-dim">
+                  Team computer key: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
+                </p>
+              )}
             </>
           ) : (
             <p className="text-xl font-semibold">

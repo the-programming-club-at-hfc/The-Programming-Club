@@ -211,7 +211,11 @@ function AnswerBox({
   const wait = Math.ceil((end - now) / 1000);
   useEffect(() => {
     if (end <= Date.now()) return;
-    const id = setInterval(() => setNow(Date.now()), 250);
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= end) clearInterval(id);
+    }, 250);
     return () => clearInterval(id);
   }, [end]);
 

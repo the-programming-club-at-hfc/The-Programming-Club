@@ -43,7 +43,8 @@ export const timerV = v.object({
 });
 
 // One showing of an answerable card: when its clock started (early bonus) and when it ran out (answers stay closed).
-export const cardWindowV = v.object({ key: v.string(), at: v.number(), endedAt: v.optional(v.number()) });
+// `double` is whether double points were on when the card first went up, for scoring it later (e.g. when the night ends).
+export const cardWindowV = v.object({ key: v.string(), at: v.number(), endedAt: v.optional(v.number()), double: v.optional(v.boolean()) });
 
 // One entry in a week's lineup, e.g. { label: "Bug Hunt: hard", double: true } for a double-points final round.
 export const lineupItemV = v.object({ label: v.string(), double: v.boolean() });
@@ -122,6 +123,8 @@ export default defineSchema({
     sessionId: v.id("sessions"),
     name: v.string(),
     score: v.number(),
+    // Typed into the team computer (/hello-world/fix) so it can send answers for this team. Shown on the team's phones.
+    key: v.optional(v.string()),
   }).index("by_session", ["sessionId"]),
 
   // A team's phone answer to one card (Bug Hunt, Output?, Guess the Language). See src/lib/grading.ts.
@@ -171,7 +174,9 @@ export default defineSchema({
     sessionId: v.id("sessions"),
     text: v.string(),
     createdAt: v.number(),
-  }).index("by_createdAt", ["createdAt"]),
+  })
+    .index("by_createdAt", ["createdAt"])
+    .index("by_player", ["playerId"]),
 
   // Puzzles: a team's stars on one puzzle, from answers typed on its team computer. See convex/puzzles.ts.
   stars: defineTable({

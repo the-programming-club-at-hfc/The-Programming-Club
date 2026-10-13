@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DesktopRouteImport } from './routes/_desktop'
 import { Route as HelloWorldRouteRouteImport } from './routes/hello-world/route'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DesktopIndexRouteImport } from './routes/_desktop/index'
@@ -45,6 +46,11 @@ const DesktopRoute = DesktopRouteImport.update({
 const HelloWorldRouteRoute = HelloWorldRouteRouteImport.update({
   id: '/hello-world',
   path: '/hello-world',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -181,6 +187,7 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/hello-world': typeof HelloWorldRouteRouteWithChildren
   '/': typeof DesktopIndexRoute
+  '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/about': typeof DesktopAboutRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/hello-world/': typeof HelloWorldIndexRoute
 }
 export interface FileRoutesByTo {
+  '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/about': typeof DesktopAboutRoute
@@ -239,6 +247,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/hello-world': typeof HelloWorldRouteRouteWithChildren
   '/_desktop': typeof DesktopRouteWithChildren
+  '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/_desktop/about': typeof DesktopAboutRoute
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/hello-world'
     | '/'
+    | '/join'
     | '/privacy'
     | '/terms'
     | '/about'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/hello-world/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/join'
     | '/privacy'
     | '/terms'
     | '/about'
@@ -328,6 +339,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/hello-world'
     | '/_desktop'
+    | '/join'
     | '/privacy'
     | '/terms'
     | '/_desktop/about'
@@ -359,6 +371,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   HelloWorldRouteRoute: typeof HelloWorldRouteRouteWithChildren
   DesktopRoute: typeof DesktopRouteWithChildren
+  JoinRoute: typeof JoinRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   SignInSplatRoute: typeof SignInSplatRoute
@@ -378,6 +391,13 @@ declare module '@tanstack/react-router' {
       path: '/hello-world'
       fullPath: '/hello-world'
       preLoaderRoute: typeof HelloWorldRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -633,6 +653,7 @@ const DesktopRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   HelloWorldRouteRoute: HelloWorldRouteRouteWithChildren,
   DesktopRoute: DesktopRouteWithChildren,
+  JoinRoute: JoinRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   SignInSplatRoute: SignInSplatRoute,
@@ -640,3 +661,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

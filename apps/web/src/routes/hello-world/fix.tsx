@@ -14,35 +14,36 @@ import { usePython } from "#/lib/python";
 import type { Python } from "#/lib/python";
 import { CLUB } from "#/lib/season";
 
-// A team's lab computer for Fix it for real and puzzles. No sign-in: the computer picks its team from tonight's list.
+// A team's lab computer for Fix it for real and puzzles. No sign-in: the computer enters the team key shown on the team's phones.
 export const Route = createFileRoute("/hello-world/fix")({
   head: () => ({ meta: [{ title: `Team computer · ${CLUB.season}` }, { name: "robots", content: "noindex" }] }),
   component: FixPage,
 });
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
-const teamKey = (sessionId: string) => `hwc.fixTeam.${sessionId}`;
+const storeKey = (sessionId: string) => `hwc.fixTeam.${sessionId}`;
 
 function FixPage() {
   const live = useQuery(api.sessions.live);
   // Python starts loading as soon as the page opens, so it's ready when the round starts.
   const py = usePython();
-  const [teamId, setTeamId] = useState<string | null>(null);
+  const [key, setKey] = useState<string | null>(null);
   useEffect(() => {
-    setTeamId(live ? localStorage.getItem(teamKey(live._id)) : null);
+    setKey(live ? localStorage.getItem(storeKey(live._id)) : null);
   }, [live?._id]);
+  const found = useQuery(api.teams.byKey, key ? { key } : "skip");
 
-  if (live === undefined) return <Message title="loading…" />;
+  if (live === undefined || (key && found === undefined)) return <Message title="loading…" />;
   if (live === null) return <Message title="no game right now">This page comes alive when an officer starts the night.</Message>;
 
-  const pick = (id: string | null) => {
-    if (id) localStorage.setItem(teamKey(live._id), id);
-    else localStorage.removeItem(teamKey(live._id));
-    setTeamId(id);
+  const pick = (k: string | null) => {
+    if (k) localStorage.setItem(storeKey(live._id), k);
+    else localStorage.removeItem(storeKey(live._id));
+    setKey(k);
   };
-  const team = live.teams.find((t) => t._id === teamId);
-  if (!team) return <TeamPicker live={live} onPick={pick} />;
-  return <TeamComputer live={live} team={team} py={py} onSwitch={() => pick(null)} />;
+  const team = found && live.teams.find((t) => t._id === found._id);
+  if (!key || !team) return <TeamKeyForm live={live} wrong={!!key && found === null} onKey={pick} />;
+  return <TeamComputer live={live} team={team} teamKey={key} py={py} onSwitch={() => pick(null)} />;
 }
 
 function Message({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -59,35 +60,72 @@ function Message({ title, children }: { title: string; children?: React.ReactNod
   );
 }
 
-function TeamPicker({ live, onPick }: { live: Live; onPick: (id: string) => void }) {
+/** The team key is on every teammate's phone, so only the team itself can send answers from this computer. */
+function TeamKeyForm({ live, wrong, onKey }: { live: Live; wrong: boolean; onKey: (key: string) => void }) {
+  const [key, setKey] = useState("");
   return (
-    <Wrap className="py-12">
+    <Wrap className="max-w-xl py-12">
       <p className="font-bold text-pine">Team computer</p>
       <h1 className="text-[clamp(2.4rem,7vw,3.6rem)] lowercase">which team is this?</h1>
       {live.teams.length === 0 ? (
         <p className="mt-4 text-lg text-dim">
-          Teams aren’t made yet. They’ll show up here on their own.<span className="blink"> _</span>
+          Teams aren’t made yet. Once they are, your team key shows up on your phones.<span className="blink"> _</span>
         </p>
       ) : (
-        <>
-          <p className="mt-4 text-lg text-dim">Tap your team. This computer remembers it for tonight.</p>
-          <ul className="mt-8 grid gap-[3px] sm:grid-cols-2 lg:grid-cols-3">
-            {live.teams.map((t) => (
-              <li key={t._id}>
-                <button className="tile tile-meadow block min-h-32 w-full p-6 text-left" onClick={() => onPick(t._id)}>
-                  <span className="block text-3xl font-extrabold tracking-[-0.03em]">{t.name}</span>
-                  <span className="mt-2 block">{t.members.join(", ") || "No players yet"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
+        <form
+          className="mt-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (key.length === 4) onKey(key);
+          }}
+        >
+          <label className="block">
+            <span className="text-lg text-dim">Type the team key from any teammate’s phone. This computer remembers it for tonight.</span>
+            <input
+              className="field narrow mt-4 text-center text-5xl font-extrabold tracking-[0.3em] uppercase"
+              value={key}
+              onChange={(e) =>
+                setKey(
+                  e.target.value
+                    .replace(/[^a-z]/gi, "")
+                    .toUpperCase()
+                    .slice(0, 4),
+                )
+              }
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              autoFocus
+              aria-label="Team key"
+            />
+          </label>
+          {wrong && (
+            <p role="alert" className="mt-3 font-semibold text-signal">
+              That key isn’t a team tonight. Check a teammate’s phone and try again.
+            </p>
+          )}
+          <button className="btn btn-primary mt-4 w-full text-lg" disabled={key.length !== 4}>
+            Start
+          </button>
+        </form>
       )}
     </Wrap>
   );
 }
 
-function TeamComputer({ live, team, py, onSwitch }: { live: Live; team: Live["teams"][number]; py: Python; onSwitch: () => void }) {
+function TeamComputer({
+  live,
+  team,
+  teamKey,
+  py,
+  onSwitch,
+}: {
+  live: Live;
+  team: Live["teams"][number];
+  teamKey: string;
+  py: Python;
+  onSwitch: () => void;
+}) {
   const remaining = useRemaining(live.timer);
   const s = live.screen;
   const game = s.mode === "card" && (s.game === "fix" || s.game === "puzzle") ? s.game : undefined;
@@ -112,9 +150,17 @@ function TeamComputer({ live, team, py, onSwitch }: { live: Live; team: Live["te
         </button>
       </header>
       {index !== undefined && game === "puzzle" ? (
-        <LivePuzzle key={cardKey("puzzle", index)} live={live} teamId={team._id} index={index} remaining={remaining} py={py} />
+        <LivePuzzle
+          key={cardKey("puzzle", index)}
+          live={live}
+          teamId={team._id}
+          teamKey={teamKey}
+          index={index}
+          remaining={remaining}
+          py={py}
+        />
       ) : index !== undefined ? (
-        <LiveFix key={cardKey("fix", index)} live={live} teamId={team._id} index={index} remaining={remaining} py={py} />
+        <LiveFix key={cardKey("fix", index)} live={live} teamId={team._id} teamKey={teamKey} index={index} remaining={remaining} py={py} />
       ) : (
         <div className="card grid min-h-[50vh] place-items-center p-8 text-center">
           <div>
@@ -140,12 +186,14 @@ function TeamComputer({ live, team, py, onSwitch }: { live: Live; team: Live["te
 function LiveFix({
   live,
   teamId,
+  teamKey,
   index,
   remaining,
   py,
 }: {
   live: Live;
   teamId: Id<"teams">;
+  teamKey: string;
   index: number;
   remaining: number;
   py: Python;
@@ -165,8 +213,8 @@ function LiveFix({
       open={isOpen(live, key, remaining)}
       fixed={mine && { ms: mine.ms }}
       result={mine?.result ?? null}
-      saveKey={`hwc.fixCode.${live._id}.${key}`}
-      onFixed={(code) => report({ teamId, card: key, code })}
+      saveKey={`hwc.fixCode.${live._id}.${teamId}.${key}`}
+      onFixed={(code) => report({ teamKey, card: key, code })}
     />
   );
 }
@@ -187,12 +235,14 @@ const isOpen = (live: Live, key: string, remaining: number) =>
 function LivePuzzle({
   live,
   teamId,
+  teamKey,
   index,
   remaining,
   py,
 }: {
   live: Live;
   teamId: Id<"teams">;
+  teamKey: string;
   index: number;
   remaining: number;
   py: Python;
@@ -214,8 +264,8 @@ function LivePuzzle({
       stars={{ part1Ms: mine?.part1Ms ?? null, part2Ms: mine?.part2Ms ?? null }}
       lockedUntil={mine?.lockedUntil ?? null}
       result={mine?.result ?? null}
-      saveKey={`hwc.puzzleCode.${live._id}.${key}`}
-      onSubmit={(part, answer) => submit({ teamId, card: key, part, answer })}
+      saveKey={`hwc.puzzleCode.${live._id}.${teamId}.${key}`}
+      onSubmit={(part, answer) => submit({ teamKey, card: key, part, answer })}
     />
   );
 }

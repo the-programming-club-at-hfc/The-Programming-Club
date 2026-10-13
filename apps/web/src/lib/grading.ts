@@ -290,6 +290,8 @@ export interface CardWindow {
   key: string;
   at: number;
   endedAt?: number;
+  /** Double points were on when the card first went up. */
+  double?: boolean;
 }
 
 /** The shared clock. `card` is the card this run is timing; a clock started for another screen doesn't count. */
@@ -315,11 +317,11 @@ export const settle = (windows: CardWindow[], t: Clock, now: number) =>
  * The windows after the screen changes. The card leaving the screen keeps its window in `played`, and a card that
  * comes back picks its own window up again, so going away and back never restarts its early bonus or reopens it.
  */
-export function showCard(o: { card?: CardWindow; played: CardWindow[]; up?: string; now: number }) {
+export function showCard(o: { card?: CardWindow; played: CardWindow[]; up?: string; now: number; double?: boolean }) {
   if (o.card?.key === o.up) return { card: o.card, played: o.played };
   const leaving = o.card;
   const played = leaving ? [...o.played.filter((w) => w.key !== leaving.key), leaving] : o.played;
-  return { card: o.up ? (played.find((w) => w.key === o.up) ?? { key: o.up, at: o.now }) : undefined, played };
+  return { card: o.up ? (played.find((w) => w.key === o.up) ?? { key: o.up, at: o.now, double: o.double }) : undefined, played };
 }
 
 /** A clock that starts from full for the card on screen: a preset with autostart, or Start from full. Never +30s. */

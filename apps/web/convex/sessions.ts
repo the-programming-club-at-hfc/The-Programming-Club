@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { inTeamPool, openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
+import { CODE_LETTERS, inTeamPool, openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
@@ -16,8 +16,6 @@ import type { CardWindow } from "../src/lib/grading";
 function settled(s: Doc<"sessions">, now: number) {
   return { card: s.card && settle([s.card], s.timer, now)[0], played: settle(s.played ?? [], s.timer, now) };
 }
-
-const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
 
 /** Everything the TV and phones need. Names only: emails never leave officer queries, and the join code
  *  stays off this public query so nobody can join without seeing the TV in the room. */
@@ -125,7 +123,7 @@ async function putScreen(ctx: MutationCtx, s: Doc<"sessions">, screen: Doc<"sess
   const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
   // Each answerable card keeps its own window; anything else going up clears the current one.
   const now = Date.now();
-  const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now });
+  const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now, double: s.double });
   Object.assign(next, { card: w.card, played: w.played });
   await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
   // Revealing scores phone answers, Fix it for real fixes, puzzle stars, or a Wiki Race, once per card.
@@ -265,7 +263,8 @@ export const host = query({
       }),
     );
     rows.sort((a, b) => a.name.localeCompare(b.name));
-    return { session: s, rows, recent, used };
+    const keys = Object.fromEntries((await sessionTeams(ctx, s._id)).map((t) => [t._id, t.key ?? null]));
+    return { session: s, rows, recent, used, keys };
   },
 });
 

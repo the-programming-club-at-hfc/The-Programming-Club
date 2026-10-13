@@ -3,7 +3,7 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { openSession, requireOpenSession, sessionTeams } from "./lib";
+import { openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
 import { cardStart, isOpen, liveCard } from "./answers";
 import { puzzleCard } from "./puzzles";
 import { FIXES } from "../src/lib/fixes";
@@ -42,11 +42,12 @@ async function cardFixes(ctx: QueryCtx, s: Doc<"sessions">, card: string) {
 
 /** A team computer reports that its fix passes every test. The first report per team counts; later ones are ignored. */
 export const report = mutation({
-  args: { teamId: v.id("teams"), card: v.string(), code: v.string() },
-  handler: async (ctx, { teamId, card, code }) => {
+  args: { teamKey: v.string(), card: v.string(), code: v.string() },
+  handler: async (ctx, { teamKey, card, code }) => {
     const s = await requireOpenSession(ctx);
-    const team = await ctx.db.get(teamId);
-    if (!team || team.sessionId !== s._id) throw new ConvexError("That team isn’t playing tonight. Pick your team again.");
+    const team = await teamByKey(ctx, s._id, teamKey);
+    if (!team) throw new ConvexError("That team key isn’t playing tonight. Enter the key from your phones again.");
+    const teamId = team._id;
     const c = fixCard(s);
     if (!c || c.key !== card) throw new ConvexError("That card isn’t up anymore.");
     if (!isOpen(s, c.key)) throw new ConvexError("Time’s up. Fixes are closed for this card.");

@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { openSession, requireOpenSession, sessionTeams } from "./lib";
+import { openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { PUZZLES, puzzleSeed } from "../src/lib/puzzles";
 import { LOCKOUT_MS, cardKey, firstStars, puzzleAwardsFor, submitAnswer } from "../src/lib/grading";
@@ -42,11 +42,12 @@ async function cardStars(ctx: QueryCtx, s: Doc<"sessions">, card: string) {
 
 /** A team computer sends an answer. Wrong answers lock the team out for 30 seconds. */
 export const submit = mutation({
-  args: { teamId: v.id("teams"), card: v.string(), part: v.union(v.literal(1), v.literal(2)), answer: v.string() },
-  handler: async (ctx, { teamId, card, part, answer }) => {
+  args: { teamKey: v.string(), card: v.string(), part: v.union(v.literal(1), v.literal(2)), answer: v.string() },
+  handler: async (ctx, { teamKey, card, part, answer }) => {
     const s = await requireOpenSession(ctx);
-    const team = await ctx.db.get(teamId);
-    if (!team || team.sessionId !== s._id) throw new ConvexError("That team isn’t playing tonight. Pick your team again.");
+    const team = await teamByKey(ctx, s._id, teamKey);
+    if (!team) throw new ConvexError("That team key isn’t playing tonight. Enter the key from your phones again.");
+    const teamId = team._id;
     const c = puzzleCard(s);
     if (!c || c.key !== card) throw new ConvexError("That puzzle isn’t up anymore.");
     if (!isOpen(s, c.key)) throw new ConvexError("Time’s up. Answers are closed for this puzzle.");
@@ -132,9 +133,9 @@ export const answers = query({
 });
 
 /** Score one puzzle from tonight's stars, once per puzzle per night. Returns the scored list. */
-async function scorePuzzle(ctx: MutationCtx, s: Doc<"sessions">, index: number, scored: string[]) {
+async function scorePuzzle(ctx: MutationCtx, s: Doc<"sessions">, index: number, scored: string[], double = s.double) {
   const { rows } = await cardStars(ctx, s, cardKey("puzzle", index));
-  const r = puzzleAwardsFor({ index, double: s.double, scored, teams: rows.map((row) => ({ ...row, id: row })) });
+  const r = puzzleAwardsFor({ index, double, scored, teams: rows.map((row) => ({ ...row, id: row })) });
   if (!r) return scored;
   for (const { id: row, first1, first2, points } of r.awards) {
     const team = await ctx.db.get(row.teamId);
@@ -155,9 +156,9 @@ export async function scorePuzzleReveal(ctx: MutationCtx, s: Doc<"sessions">) {
 /** Score every puzzle played tonight that was never revealed, so ending the night never loses stars. Called by sessions.end. */
 export async function scoreUnrevealedPuzzles(ctx: MutationCtx, s: Doc<"sessions">) {
   let scored = s.scored ?? [];
-  const keys = new Set([...(s.card ? [s.card.key] : []), ...(s.played ?? []).map((w) => w.key)]);
-  for (const key of keys) {
-    const i = keyIndex(key);
-    if (i !== undefined && PUZZLES[i]) scored = await scorePuzzle(ctx, s, i, scored);
+  // Each puzzle keeps the double points it was played with, not whatever is on when the night ends.
+  for (const w of [...(s.played ?? []), ...(s.card ? [s.card] : [])]) {
+    const i = keyIndex(w.key);
+    if (i !== undefined && PUZZLES[i]) scored = await scorePuzzle(ctx, s, i, scored, w.double ?? s.double);
   }
 }

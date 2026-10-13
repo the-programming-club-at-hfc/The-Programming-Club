@@ -61,6 +61,7 @@ onmessage = (e) => {
     const [stdout, error] = JSON.parse(run(code, stdin, JSON.stringify(files ?? {})));
     postMessage({ type: "result", id, stdout, error });
   } catch (err) {
-    postMessage({ type: "result", id, stdout: "", error: String(err) });
+    // Python errors are caught inside the harness, so this is Pyodide itself failing: the page starts a fresh worker.
+    postMessage({ type: "result", id, stdout: "", error: String(err), fatal: true });
   }
 };

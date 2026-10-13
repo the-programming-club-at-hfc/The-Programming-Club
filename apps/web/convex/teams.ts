@@ -1,7 +1,17 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { addToSession, inTeamPool, requireOpenSession, sessionAttendance, sessionTeams, shuffle } from "./lib";
+import {
+  addToSession,
+  inTeamPool,
+  newTeamKey,
+  openSession,
+  requireOpenSession,
+  sessionAttendance,
+  sessionTeams,
+  shuffle,
+  teamByKey,
+} from "./lib";
 import { TEAM_NAMES } from "./teamNames";
 
 const unusedName = (taken: string[]) => shuffle(TEAM_NAMES).find((n) => !taken.includes(n)) ?? `Team ${taken.length + 1}`;
@@ -21,8 +31,22 @@ export const make = mutation({
     const n = Math.max(1, size === 3 ? Math.ceil(att.length / 3) : Math.floor(att.length / 2));
     const names = shuffle(TEAM_NAMES);
     const ids = [];
-    for (let i = 0; i < n; i++) ids.push(await ctx.db.insert("teams", { sessionId: s._id, name: names[i % names.length], score: 0 }));
+    const keys: string[] = [];
+    for (let i = 0; i < n; i++) {
+      keys.push(newTeamKey(keys));
+      ids.push(await ctx.db.insert("teams", { sessionId: s._id, name: names[i % names.length], score: 0, key: keys[i] }));
+    }
     for (let i = 0; i < att.length; i++) await ctx.db.patch(att[i]._id, { teamId: ids[i % n] });
+  },
+});
+
+/** For a team computer: the team with this key tonight, or null. */
+export const byKey = query({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const s = await openSession(ctx);
+    const t = s && (await teamByKey(ctx, s._id, key));
+    return t && { _id: t._id, name: t.name };
   },
 });
 
@@ -31,8 +55,13 @@ export const add = mutation({
   handler: async (ctx) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
-    const taken = (await sessionTeams(ctx, s._id)).map((t) => t.name);
-    await ctx.db.insert("teams", { sessionId: s._id, name: unusedName(taken), score: 0 });
+    const teams = await sessionTeams(ctx, s._id);
+    await ctx.db.insert("teams", {
+      sessionId: s._id,
+      name: unusedName(teams.map((t) => t.name)),
+      score: 0,
+      key: newTeamKey(teams.map((t) => t.key)),
+    });
   },
 });
 

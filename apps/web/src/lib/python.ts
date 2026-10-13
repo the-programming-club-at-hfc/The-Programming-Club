@@ -18,13 +18,18 @@ export interface PyRun {
 }
 
 type FromWorker =
-  { type: "ready" } | { type: "failed"; message: string } | { type: "result"; id: number; stdout: string; error: string | null };
+  | { type: "ready" }
+  | { type: "failed"; message: string }
+  // `fatal`: Pyodide itself broke (e.g. out of memory), so the worker has to start over.
+  | { type: "result"; id: number; stdout: string; error: string | null; fatal?: boolean };
 
 class Runner {
   private worker!: Worker;
   private ready!: Promise<void>;
   private next = 0;
   private pending = new Map<number, (r: PyRun) => void>();
+  private timers = new Set<ReturnType<typeof setTimeout>>();
+  private disposed = false;
 
   constructor(private onStatus: (s: PyStatus) => void) {
     this.start();
@@ -49,6 +54,7 @@ class Runner {
         else {
           this.pending.get(m.id)?.({ stdout: m.stdout, error: m.error, timedOut: false });
           this.pending.delete(m.id);
+          if (m.fatal) this.restart();
         }
       };
     });
@@ -60,20 +66,30 @@ class Runner {
     const id = ++this.next;
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
+        this.timers.delete(timer);
         this.pending.delete(id);
-        this.worker.terminate();
-        this.start();
+        this.restart();
         resolve({ stdout: "", error: null, timedOut: true });
       }, TIMEOUT_MS);
+      this.timers.add(timer);
       this.pending.set(id, (r) => {
         clearTimeout(timer);
+        this.timers.delete(timer);
         resolve(r);
       });
       this.worker.postMessage({ id, code, stdin, files });
     });
   }
 
+  private restart() {
+    this.worker.terminate();
+    if (!this.disposed) this.start();
+  }
+
   dispose() {
+    this.disposed = true;
+    for (const t of this.timers) clearTimeout(t);
+    this.timers.clear();
     this.worker.terminate();
   }
 }

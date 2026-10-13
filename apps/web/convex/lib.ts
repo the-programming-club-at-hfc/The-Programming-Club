@@ -29,6 +29,22 @@ export const sessionAttendance = (ctx: QueryCtx, sessionId: Id<"sessions">) =>
     .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
     .collect();
 
+export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O
+const randomCode = () => Array.from({ length: 4 }, () => CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)]).join("");
+
+/** A team key no other team has tonight. */
+export const newTeamKey = (taken: (string | undefined)[]) => {
+  let key = randomCode();
+  while (taken.includes(key)) key = randomCode();
+  return key;
+};
+
+/** The team a team computer speaks for, from the key on the team's phones. */
+export async function teamByKey(ctx: QueryCtx, sessionId: Id<"sessions">, key: string) {
+  const k = key.trim().toUpperCase();
+  return (await sessionTeams(ctx, sessionId)).find((t) => t.key === k) ?? null;
+}
+
 /** Whether this check-in goes into teams: everyone except officers who are running the night. */
 export const inTeamPool = (a: Doc<"attendance">) => !a.officer || !!a.playing;
 
