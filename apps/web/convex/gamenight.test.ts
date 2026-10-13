@@ -100,7 +100,7 @@ describe("joining", () => {
     const { t, startNight, join, attendance } = setup();
     const code = await startNight();
     await expect(join("ZZZZ", student(1))).rejects.toThrow("That code isn’t live");
-    await expect(join(code, { name: "Sam", email: "not-an-email" })).rejects.toThrow("valid email");
+    await expect(join(code, { name: "Sam", email: "sam@gmail.com" })).rejects.toThrow("Use your HawkMail");
     const token = await join(` ${code.toLowerCase()} `, student(1));
     const [a] = await attendance();
     expect(a.firstTime).toBe(true);
