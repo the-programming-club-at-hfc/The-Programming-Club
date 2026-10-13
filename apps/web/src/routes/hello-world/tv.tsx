@@ -21,6 +21,7 @@ export const Route = createFileRoute("/hello-world/tv")({
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type Board = NonNullable<FunctionReturnType<typeof api.answers.board>>;
 type FixBoard = NonNullable<FunctionReturnType<typeof api.fixes.board>>;
+type PuzzleBoard = NonNullable<FunctionReturnType<typeof api.puzzles.board>>;
 
 function useOrigin() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
@@ -129,9 +130,13 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const isFix = s.mode === "card" && s.game === "fix" && s.index !== undefined;
   const fixData = useQuery(api.fixes.board, isFix ? {} : "skip");
   const fixBoard = isFix && s.index !== undefined && fixData?.card === cardKey("fix", s.index) ? fixData : null;
-  useCountSound(board ? board.card : fixBoard?.card, board ? board.locked : (fixBoard?.fixed.length ?? null));
+  const isPuzzle = s.mode === "card" && s.game === "puzzle" && s.index !== undefined;
+  const puzzleData = useQuery(api.puzzles.board, isPuzzle ? {} : "skip");
+  const puzzleBoard = isPuzzle && s.index !== undefined && puzzleData?.card === cardKey("puzzle", s.index) ? puzzleData : null;
+  const stars = puzzleBoard?.teams.reduce((n, t) => n + Number(t.part1Ms !== null) + Number(t.part2Ms !== null), 0) ?? null;
+  useCountSound(board?.card ?? fixBoard?.card ?? puzzleBoard?.card, board ? board.locked : fixBoard ? fixBoard.fixed.length : stars);
   // A card already scored tonight shows as played (answer and results), like it does on phones.
-  const done = !!s.revealed || !!board?.results || !!fixBoard?.scored;
+  const done = !!s.revealed || !!board?.results || !!fixBoard?.scored || !!puzzleBoard?.scored;
 
   return (
     <>
@@ -162,11 +167,17 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                   <span className="narrow text-[2.6vw] font-extrabold">{fixBoard.fixed.length}</span> of {fixBoard.teams} teams fixed it
                 </span>
               )}
+              {puzzleBoard && !done && stars !== null && stars > 0 && (
+                <span className="ml-auto">
+                  <span className="narrow text-[2.6vw] font-extrabold text-gold">{stars}</span> star{stars === 1 ? "" : "s"} so far
+                </span>
+              )}
             </p>
-            <div className={board?.results || fixBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
+            <div className={board?.results || fixBoard || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
               <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" />
               {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
               {fixBoard && <FixList board={fixBoard} done={done} />}
+              {puzzleBoard && <StarBoard board={puzzleBoard} done={done} />}
             </div>
           </div>
         )}
@@ -225,7 +236,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   );
 }
 
-/** A pop each time another team locks in (or fixes it, in Fix it for real). */
+/** A pop each time another team locks in (or fixes it, in Fix it for real, or earns a puzzle star). */
 function useCountSound(card: string | undefined, n: number | null) {
   const prev = useRef<{ card: string; n: number | null } | null>(null);
   useEffect(() => {
@@ -256,6 +267,37 @@ function FixList({ board, done }: { board: FixBoard; done: boolean }) {
                 </span>
               </span>
               <span className="narrow text-[2.6vw] leading-none font-extrabold">{f.result ? `+${f.result.points}` : "✓"}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** Puzzles: every team's stars, most first, with times on the puzzle's clock. Points join them once it's scored. Never answers. */
+function StarBoard({ board, done }: { board: PuzzleBoard; done: boolean }) {
+  const star = (ms: number | null, first: boolean) => (
+    <span className={`block text-[1.2vw] ${ms === null ? "text-dim" : ""}`}>
+      <span className={ms === null ? "" : "text-gold"}>{ms === null ? "☆" : "★"}</span>
+      {ms === null ? " not yet" : ` ${fmtElapsed(ms)}${first ? " · first" : ""}`}
+    </span>
+  );
+  return (
+    <div>
+      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your team computer</p>}
+      {board.teams.length === 0 ? (
+        <p className="mt-[1vw] text-[1.6vw] text-dim">No teams yet.</p>
+      ) : (
+        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
+          {board.teams.map((t) => (
+            <li key={t.teamId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.7vw]">
+              <span className="min-w-0 truncate text-[1.8vw] leading-tight font-extrabold">{t.name}</span>
+              <span>
+                {star(t.part1Ms, t.first1)}
+                {star(t.part2Ms, t.first2)}
+              </span>
+              {done && <span className="narrow text-[2.6vw] leading-none font-extrabold">+{t.result?.points ?? 0}</span>}
             </li>
           ))}
         </ol>

@@ -121,8 +121,14 @@ export function FixRound({ index, py, revealed, hint, open, fixed, result, saveK
   );
 }
 
-function PyState({ status }: { status: Python["status"] }) {
-  if (status === "ready") return <p className="text-sm text-dim">Run tries the examples. Check my fix runs every test.</p>;
+export function PyState({
+  status,
+  ready = "Run tries the examples. Check my fix runs every test.",
+}: {
+  status: Python["status"];
+  ready?: string;
+}) {
+  if (status === "ready") return <p className="text-sm text-dim">{ready}</p>;
   if (status === "failed")
     return (
       <p role="alert" className="font-semibold text-signal">
@@ -181,7 +187,7 @@ function Examples({ tests }: { tests: FixTest[] }) {
 }
 
 /** A plain editor: line numbers, Tab adds 4 spaces (Esc, then Tab, moves on). */
-function Editor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function Editor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const n = value.split("\n").length;
   const escaped = useRef(false);
   return (
@@ -282,7 +288,7 @@ function problem(r: TestResult) {
 const lastLine = (s: string) => s.trimEnd().split("\n").at(-1) ?? "";
 
 /** The traceback as Python prints it, with the last line (what went wrong) big and bold. */
-function Traceback({ text }: { text: string }) {
+export function Traceback({ text }: { text: string }) {
   const all = text.trimEnd().split("\n");
   return (
     <div className="mt-3">

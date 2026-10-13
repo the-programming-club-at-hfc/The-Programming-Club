@@ -244,7 +244,8 @@ export const FINAL_AGENDA: Agenda[] = [
     t: "4:45",
     len: 15,
     what: "Officers set up",
-    detail: "Open /tv on the TV, /host on an officer laptop, and an editor (or onecompiler.com) on every team computer.",
+    detail:
+      "Open /tv on the TV, /host on an officer laptop, and /hello-world/fix on every team computer (pick each one’s team once teams are made). Teams who’d rather use another language can open an editor or onecompiler.com too.",
   },
   {
     t: "5:00",
@@ -257,13 +258,14 @@ export const FINAL_AGENDA: Agenda[] = [
     len: 3,
     what: "Opening",
     detail:
-      "Introduce the Midseason champions. Everyone starts at 0. Explain stars (one for each part you solve) and that Puzzle 2 counts double.",
+      "Introduce the Midseason champions. Everyone starts at 0. Explain stars (3 points for part 1, 5 for part 2, +2 for the first team to each), the 30-second lockout for a wrong answer, and that Puzzle 2 counts double.",
   },
   {
     t: "5:09",
     len: 13,
     what: "Puzzle 1: easy",
-    detail: "A relay: one keyboard per team, swap drivers every 2 minutes. Two short parts, and part 2 unlocks after part 1.",
+    detail:
+      "A relay: one keyboard per team, swap drivers every 2 minutes. Each team gets its own input on its team computer. Two short parts, and part 2 unlocks once part 1 is right.",
   },
   {
     t: "5:22",
@@ -275,7 +277,7 @@ export const FINAL_AGENDA: Agenda[] = [
     t: "5:24",
     len: 26,
     what: "Final round, double points: Puzzle 2",
-    detail: "Two parts, real code, and everyone on the team helps. A hint goes up on the TV halfway.",
+    detail: "Two parts, real code, and everyone on the team helps. A hint goes up halfway, for whichever part each team is on.",
   },
   {
     t: "5:50",
@@ -358,6 +360,7 @@ export const GAMES: Game[] = [
     variants: [
       "Whiteboard Relay (no laptops): each person writes one line, then passes the marker.",
       "Silent Relay: nobody talks. Comments in the code are the only way to communicate.",
+      "Advent-style puzzle (Code Relay Night’s final round and the Final): a story, a worked example, and a two-part puzzle. Each team gets its own input on its team computer at /hello-world/fix, solves it in any language, and types in the answer. Part 2 unlocks once part 1 is right, and a wrong answer locks the team out for 30 seconds. +3 for part 1, +5 for part 2, +2 more for the first team to each.",
     ],
     tip: "Any language works: Python, Java, C++, JavaScript, whatever your team knows. If the lab computers don’t have an editor set up, onecompiler.com runs most languages in the browser with no account.",
   },
@@ -498,7 +501,8 @@ export const PREP: string[] = [
   "Open programmingclub.dev/host on an officer laptop or phone and start tonight’s week.",
   "Put out markers, paper, and the prize stash.",
   "Code Relay or Cup nights: make sure every team computer has an editor or onecompiler.com open.",
-  "Fix it for real nights (Spooky Bugs, the Midseason Cup): open programmingclub.dev/hello-world/fix on every team computer and pick the team once teams are made. Python loads by itself.",
+  "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay Night, the Final): open programmingclub.dev/hello-world/fix on every team computer and pick the team once teams are made. Python loads by itself.",
+  "Puzzle nights: try the puzzle at /hello-world/test first, so you know the example and how part 2 twists part 1.",
 ];
 export const NEWCOMERS: string[] = [
   "Point them at the QR code on the TV. Joining takes about 20 seconds.",

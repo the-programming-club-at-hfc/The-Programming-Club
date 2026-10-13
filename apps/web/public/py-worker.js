@@ -1,10 +1,12 @@
-// Runs Python for Fix it for real, off the page's main thread. src/lib/python.ts starts this worker, sends it one
-// program and its stdin at a time, and terminates it (then starts a fresh one) if a program runs too long.
+// Runs Python for Fix it for real and puzzles, off the page's main thread. src/lib/python.ts starts this worker, sends
+// it one program at a time with its stdin (and any files, like a puzzle's input.txt), and terminates it (then starts a
+// fresh one) if a program runs too long.
 // Pyodide loads from its official CDN, pinned here. Nothing is bundled.
 /* global importScripts, loadPyodide */
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 
 // Runs a program as main.py with the test's input as stdin, and returns [stdout, traceback or None] as JSON.
+// `files` is JSON for {name: text}; each file is written to the working directory first, so open("input.txt") works.
 // The traceback starts at the program's own code, so it reads exactly like running `python main.py`.
 const HARNESS = `
 import io, json, linecache, sys, traceback
@@ -17,7 +19,10 @@ class _Out(io.StringIO):
             super().write(s[:room])
         return len(s)
 
-def _run(code, stdin):
+def _run(code, stdin, files):
+    for name, text in json.loads(files).items():
+        with open(name, "w") as f:
+            f.write(text)
     out = _Out()
     linecache.cache["main.py"] = (len(code), None, code.splitlines(True), "main.py")
     sys.stdin, sys.stdout = io.StringIO(stdin), out
@@ -51,9 +56,9 @@ let run = null;
 })();
 
 onmessage = (e) => {
-  const { id, code, stdin } = e.data;
+  const { id, code, stdin, files } = e.data;
   try {
-    const [stdout, error] = JSON.parse(run(code, stdin));
+    const [stdout, error] = JSON.parse(run(code, stdin, JSON.stringify(files ?? {})));
     postMessage({ type: "result", id, stdout, error });
   } catch (err) {
     postMessage({ type: "result", id, stdout: "", error: String(err) });

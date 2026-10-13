@@ -1,4 +1,4 @@
-// Python in the browser for Fix it for real. Pyodide runs in a Web Worker (public/py-worker.js, which pins the
+// Python in the browser for Fix it for real and puzzles. Pyodide runs in a Web Worker (public/py-worker.js, which pins the
 // version and loads it from the official CDN), so a program that never ends can be stopped: after TIMEOUT_MS the
 // worker is terminated and a fresh one starts loading.
 import { useEffect, useRef, useState } from "react";
@@ -55,7 +55,7 @@ class Runner {
     this.ready.catch(() => {});
   }
 
-  async run(code: string, stdin: string): Promise<PyRun> {
+  async run(code: string, stdin: string, files?: Record<string, string>): Promise<PyRun> {
     await this.ready;
     const id = ++this.next;
     return new Promise((resolve) => {
@@ -69,7 +69,7 @@ class Runner {
         clearTimeout(timer);
         resolve(r);
       });
-      this.worker.postMessage({ id, code, stdin });
+      this.worker.postMessage({ id, code, stdin, files });
     });
   }
 
@@ -80,7 +80,8 @@ class Runner {
 
 export interface Python {
   status: PyStatus;
-  run: (code: string, stdin: string) => Promise<PyRun>;
+  /** Runs a program with `stdin`. `files` are written next to it first, e.g. { "input.txt": "..." }. */
+  run: (code: string, stdin: string, files?: Record<string, string>) => Promise<PyRun>;
 }
 
 /** Starts loading Python as soon as `enabled` is true (the page opens), and keeps it ready for runs. */
@@ -98,7 +99,8 @@ export function usePython(enabled = true): Python {
   }, [enabled]);
   return {
     status,
-    run: (code, stdin) => (runner.current ? runner.current.run(code, stdin) : Promise.reject(new Error("Python isn’t running."))),
+    run: (code, stdin, files) =>
+      runner.current ? runner.current.run(code, stdin, files) : Promise.reject(new Error("Python isn’t running.")),
   };
 }
 

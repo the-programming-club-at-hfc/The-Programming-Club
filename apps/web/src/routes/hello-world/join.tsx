@@ -5,9 +5,10 @@ import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
-import { CardView, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { CardView, Hint, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { answersOpen, cardKey, isAnswerGame } from "#/lib/grading";
+import { PUZZLES } from "#/lib/puzzles";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
 import { useSchedule } from "#/lib/schedule";
@@ -295,6 +296,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
           ) : s.game === "fix" && me.team ? (
             <FixStatus live={live} index={s.index} teamId={me.team._id} />
+          ) : s.game === "puzzle" && me.team ? (
+            <PuzzleStatus live={live} index={s.index} teamId={me.team._id} />
           ) : (
             <div className="card p-5">
               <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} />
@@ -403,6 +406,38 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
       </div>
       <div className="card p-5">
         <CardView game="fix" index={index} answer={done} hint={!!live.screen.hint} />
+      </div>
+    </div>
+  );
+}
+
+/** Puzzles are answered on the team computer; the phone shows the story and the team's stars. */
+function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; teamId: Id<"teams"> }) {
+  const board = useQuery(api.puzzles.board);
+  const key = cardKey("puzzle", index);
+  const mine = board?.card === key ? board.teams.find((t) => t.teamId === teamId) : undefined;
+  const done = !!live.screen.revealed || live.scored.includes(key);
+  const times = [mine?.part1Ms ?? null, mine?.part2Ms ?? null];
+  const n = times.filter((ms) => ms !== null).length;
+  const status = done
+    ? n
+      ? `${"★".repeat(n)} +${mine?.result?.points ?? 0}`
+      : "No stars this time"
+    : ["No stars yet", "★ Part 1 done", "★★ Both stars!"][n];
+  const firsts = [mine?.first1, mine?.first2].flatMap((f, i) => (f ? [`part ${i + 1}`] : []));
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-[10px] p-5 ${n ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
+        <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">{status}</p>
+        <p className="mt-2 font-semibold">
+          {times.map((ms, i) => `Part ${i + 1}: ${ms === null ? "not yet" : `★ at ${fmtElapsed(ms)}`}`).join(" · ")}
+        </p>
+        {firsts.length > 0 && <p className="mt-1 font-semibold">First team to the {firsts.join(" and ")} star.</p>}
+        {!done && <p className="mt-1">Answers go in on your team computer. This phone keeps you posted.</p>}
+      </div>
+      {!done && live.screen.hint && <Hint text={`Part ${n ? 2 : 1}: ${PUZZLES[index].hint[n ? 1 : 0]}`} />}
+      <div className="card p-5">
+        <CardView game="puzzle" index={index} answer={done} />
       </div>
     </div>
   );

@@ -1,7 +1,14 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-export const gameV = v.union(v.literal("bug"), v.literal("output"), v.literal("relay"), v.literal("lang"), v.literal("fix"));
+export const gameV = v.union(
+  v.literal("bug"),
+  v.literal("output"),
+  v.literal("relay"),
+  v.literal("lang"),
+  v.literal("fix"),
+  v.literal("puzzle"),
+);
 
 // What the TV is showing. Cards are referenced by index into lib/content.ts.
 export const screenV = v.object({
@@ -16,7 +23,7 @@ export const screenV = v.object({
   game: v.optional(gameV),
   index: v.optional(v.number()),
   revealed: v.optional(v.boolean()),
-  // Fix it for real: the card's hint is up on the TV, phones, and team computers.
+  // Fix it for real and puzzles: the hint is up on the TV, phones, and team computers.
   hint: v.optional(v.boolean()),
   wikiFrom: v.optional(v.string()),
   wikiTo: v.optional(v.string()),
@@ -158,6 +165,25 @@ export default defineSchema({
     text: v.string(),
     createdAt: v.number(),
   }).index("by_createdAt", ["createdAt"]),
+
+  // Puzzles: a team's stars on one puzzle, from answers typed on its team computer. See convex/puzzles.ts.
+  stars: defineTable({
+    sessionId: v.id("sessions"),
+    teamId: v.id("teams"),
+    card: v.string(),
+    // Server times of each part's right answer.
+    part1At: v.optional(v.number()),
+    part2At: v.optional(v.number()),
+    // A wrong answer locks the team out until then.
+    lockedUntil: v.optional(v.number()),
+    wrong: v.number(),
+    // The last wrong answer, for officers.
+    lastWrong: v.optional(v.string()),
+    // Set when the puzzle is scored. `points` includes double points.
+    result: v.optional(v.object({ points: v.number(), first1: v.boolean(), first2: v.boolean() })),
+  })
+    .index("by_session_card", ["sessionId", "card"])
+    .index("by_team_card", ["teamId", "card"]),
 
   // Anonymous "I'm interested" hearts on events, one per browser (a random id kept in localStorage).
   interest: defineTable({

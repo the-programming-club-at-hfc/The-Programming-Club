@@ -99,6 +99,23 @@ const PICTOS = {
       <path {...S} strokeWidth="6" d="M58 32l7 7 13-13" pathLength={1} className="pa pa-draw" />
     </>
   ),
+  puzzle: (
+    <>
+      {/* Cheering at a star, like the ones Advent of Code gives for each solved part. */}
+      <g className="pa pa-hop">
+        <circle cx="28" cy="28" r="8" {...F} />
+        <path {...S} strokeWidth="10" d="M28 41v24M28 65l-8 21M28 65l8 21M28 46l-12-14M28 46l12-14" />
+      </g>
+      <path
+        {...S}
+        strokeWidth="4"
+        fill="currentColor"
+        d="M68 8l4.3 12.1 12.8.3-10.2 7.9 3.7 12.3L68 33.3l-10.6 7.3 3.7-12.3-10.2-7.9 12.8-.3Z"
+        className="pa pa-wobble"
+        style={at(68, 26)}
+      />
+    </>
+  ),
   keycap: (
     <>
       <path {...F} d="M22 16h52c3 0 5 2 5 5l9 58c1 4-2 7-6 7H14c-4 0-7-3-6-7l9-58c0-3 2-5 5-5Z" />
@@ -159,6 +176,7 @@ export const GAME_TILE: Record<string, { picto: PictoId; tile: string }> = {
   pictionary: { picto: "pictionary", tile: "tile-pine" },
   lang: { picto: "lang", tile: "tile-sky" },
   fix: { picto: "fix", tile: "tile-meadow" },
+  puzzle: { picto: "puzzle", tile: "tile-sun" },
 };
 
 /** The pictogram and color that stand for a week: its final-round game, or the keycap on Cup nights. */
