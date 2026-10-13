@@ -52,7 +52,7 @@ Contributors run their own free Convex and Clerk dev setups; nobody needs access
 
 Officers with access to the club's accounts can skip steps 2–5 with `bunx vercel env pull .env.local` and the club's dev deployment.
 
-Checks: `bun run typecheck`, `bun run lint`, and `bun test` (scoring rules and answer windows in `src/lib/grading.ts`, and the puzzles’ examples and the edge cases every generated input must have).
+Checks: `bun run typecheck`, `bun run lint`, and `bun test` (scoring rules and answer windows in `src/lib/grading.ts`, and the puzzles’ examples and the edge cases every generated input must have, plus a whole game night run against an in-memory Convex in `convex/gamenight.test.ts`).
 
 ## Deploying
 
