@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { addToSession, requireOpenSession, smallestTeam } from "./lib";
 import { isOfficerEmail, requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
+import { isHfcEmail } from "../src/lib/season";
 
 async function sessionByCode(ctx: QueryCtx, code: string) {
   const session = await ctx.db
@@ -48,6 +49,12 @@ async function saveIdea(ctx: MutationCtx, token: string, sessionId: Id<"sessions
   if (!ideas.some((i) => i.text === text)) await ctx.db.insert("ideas", { playerId: a.playerId, sessionId, text, createdAt: Date.now() });
 }
 
+/** Members join with an HFC email (officers can use any address on OFFICER_EMAILS). */
+function requireHfcEmail(email: string) {
+  if (!isHfcEmail(email) && !isOfficerEmail(email))
+    throw new ConvexError("Use your HawkMail (@hawkmail.hfcc.edu). The club is for currently enrolled HFC students.");
+}
+
 /** Marks a player's email as one that joins by signing in. */
 async function claimAccount(ctx: MutationCtx, email: string) {
   const p = await playerByEmail(ctx, email);
@@ -59,6 +66,7 @@ export const join = mutation({
   args: { code: v.string(), name: v.string(), email: v.string(), broughtBy: v.optional(v.string()), idea: v.optional(v.string()) },
   handler: async (ctx, { code, name, email, broughtBy, idea }) => {
     const session = await sessionByCode(ctx, code);
+    requireHfcEmail(email);
     // Once someone has joined signed in, their email only works signed in, so nobody can take their spot by typing it.
     if ((await playerByEmail(ctx, email))?.account && (await accountEmail(ctx)) !== email.trim().toLowerCase())
       throw new ConvexError("That email joins by signing in. Tap “Sign in” below.");
@@ -76,7 +84,7 @@ export const account = query({
     const email = identity?.email?.toLowerCase();
     if (!email) return null;
     const player = await playerByEmail(ctx, email);
-    return { email, name: player?.name ?? usableName(identity?.name) ?? null, officer: isOfficerEmail(email) };
+    return { email, name: player?.name ?? usableName(identity?.name) ?? null, officer: isOfficerEmail(email), hfc: isHfcEmail(email) };
   },
 });
 
@@ -88,6 +96,7 @@ export const joinSignedIn = mutation({
     const email = identity?.email?.toLowerCase();
     if (!email) throw new ConvexError("You’re signed out. Sign in again, or join with your name and HawkMail.");
     const session = await sessionByCode(ctx, code);
+    requireHfcEmail(email);
     // An existing player keeps their name (addToSession), so `name` only matters the first time.
     const known = (await playerByEmail(ctx, email))?.name;
     const token = await addToSession(ctx, session, known ?? name ?? usableName(identity?.name) ?? "", email, broughtBy);

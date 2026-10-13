@@ -105,10 +105,19 @@ function JoinForm({
   const joinSignedIn = useMutation(api.players.joinSignedIn);
   const checkInOfficer = useMutation(api.players.checkInOfficer);
   // A phone signed in to an account joins in one tap; an officer's account checks in to run the night instead.
-  const { isAuthenticated } = useConvexAuth();
+  const { isLoading, isAuthenticated } = useConvexAuth();
   const account = useQuery(api.players.account, isAuthenticated ? {} : "skip");
   const officer = !!account?.officer;
-  const member = !!account && !officer;
+  const member = !!account && !officer && account.hfc;
+  // Signed in, but not with an HFC email: they get the regular form, with a nudge to switch accounts.
+  const wrongAccount = !!account && !officer && !account.hfc;
+  // Give sign-in a moment to load, so a signed-in phone goes straight to "Join as…". If it's slow or blocked, guests
+  // get the form anyway.
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setWaited(true), 1500);
+    return () => clearTimeout(id);
+  }, []);
   const [code, setCode] = useState(initialCode.toUpperCase());
   const [profile, setProfile] = useState<Profile>({ name: "", email: "" });
   const [broughtBy, setBroughtBy] = useState("");
@@ -153,8 +162,7 @@ function JoinForm({
 
   const wk = useSchedule()[week - 1];
   const t = weekTile(wk);
-  // Guests never wait on sign-in: only a phone that's already signed in waits for its account.
-  if (isAuthenticated && account === undefined)
+  if ((isLoading && !waited) || (isAuthenticated && account === undefined))
     return (
       <Center>
         <p className="text-dim">Loading…</p>
@@ -184,7 +192,9 @@ function JoinForm({
               ? "You’re signed in as an officer. You’ll be counted here and kept off the teams so you can run the night."
               : member
                 ? `Signed in as ${account.email}.`
-                : `No account or password. Welcome to ${CLUB.name}!`}
+                : wrongAccount
+                  ? `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`
+                  : `No account or password. Welcome to ${CLUB.name}!`}
           </p>
         </div>
 

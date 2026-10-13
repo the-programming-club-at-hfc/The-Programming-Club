@@ -19,6 +19,9 @@ export const CLUB = {
   },
 };
 
+/** HFC student (@hawkmail.hfcc.edu) and staff (@hfcc.edu) emails: the only ones members join with, since the club is HFC-only. */
+export const isHfcEmail = (email: string) => /@(hawkmail\.)?hfcc\.edu$/i.test(email.trim());
+
 // Shown on the kickoff slides. Sign-in permissions come from OFFICER_EMAILS on the Convex deployment (see convex/officers.ts).
 export const OFFICERS = [
   { role: "President", name: "Gregory Thomas", fact: "" },
