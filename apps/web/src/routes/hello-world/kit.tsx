@@ -252,6 +252,10 @@ function GamePlan() {
               and we photograph it for the minutes.
             </li>
             <li>
+              <strong>New-member question.</strong> The first time someone joins, their phone asks what they’d like the club to do. Answers
+              show up on the officer dashboard.
+            </li>
+            <li>
               <strong>Quick polls.</strong> A short Microsoft Form posted in Teams after a night, or before planning Season 1.
             </li>
           </ul>

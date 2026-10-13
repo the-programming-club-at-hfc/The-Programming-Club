@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
 import { CardView, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { IdeaPrompt } from "#/components/idea";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { answersOpen, cardKey, isAnswerGame } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
@@ -292,6 +293,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         </div>
       )}
       {s.mode === "message" && s.message && <p className="card mt-8 p-6 text-2xl font-bold">{s.message}</p>}
+      <IdeaPrompt token={token} />
 
       <div className="mt-10 flex flex-wrap items-center justify-between gap-3 text-dim">
         <p>

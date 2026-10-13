@@ -1,9 +1,11 @@
-// The officer dashboard window: tonight's game, turnout for every night, the season plan, and event interest.
+// The officer dashboard window: tonight's game, turnout for every night, new members' ideas, the season plan, and event interest.
 // Officers only; the desktop hides its icon from everyone else, and every query checks on the server.
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { ExportButton, OfficerGate } from "#/components/officer";
+import { ideasText } from "#/lib/ideas";
 import { likelyWeek, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { api } from "../../../convex/_generated/api";
@@ -121,6 +123,8 @@ function Overview() {
         <p className="mt-2 text-xs text-dim">The CSV matches the Student Activities sign-in sheet: Full Name, Email, Status/Title.</p>
       </Section>
 
+      <Ideas />
+
       <Section
         title="Season plan"
         action={
@@ -158,5 +162,49 @@ function Overview() {
         </div>
       </Section>
     </div>
+  );
+}
+
+/** What new members said they'd like the club to do, asked once on their phone after their first join. */
+function Ideas() {
+  const ideas = useQuery(api.ideas.list);
+  const [copied, setCopied] = useState(false);
+  if (!ideas) return null;
+  const text = ideasText(ideas);
+  return (
+    <Section
+      title="Ideas from new members"
+      action={
+        ideas.length > 0 && (
+          <button
+            className="btn btn-sm"
+            onClick={() =>
+              void navigator.clipboard.writeText(text).then(
+                () => setCopied(true),
+                () => alert(text),
+              )
+            }
+          >
+            {copied ? "Copied" : "Copy all"}
+          </button>
+        )
+      }
+    >
+      {ideas.length === 0 ? (
+        <p className="text-dim">None yet. New members get asked on their phone after they join for the first time.</p>
+      ) : (
+        <ul className="max-h-96 divide-y divide-line overflow-y-auto">
+          {ideas.map((i) => (
+            <li key={i._id} className="py-2">
+              <p className="text-sm">
+                <strong>{i.name}</strong>{" "}
+                <span className="text-dim">· {fmtDate(new Date(i.createdAt), { month: "short", day: "numeric" })}</span>
+              </p>
+              <p className="whitespace-pre-line">{i.text}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }

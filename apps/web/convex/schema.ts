@@ -83,6 +83,8 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     createdAt: v.number(),
+    // The new-member "what should the club do?" prompt on the phone: answered or skipped, so it never comes back.
+    ideaPrompt: v.optional(v.union(v.literal("sent"), v.literal("skipped"))),
   }).index("by_email", ["email"]),
 
   attendance: defineTable({
@@ -148,6 +150,14 @@ export default defineSchema({
   })
     .index("by_session_card", ["sessionId", "card"])
     .index("by_team_card", ["teamId", "card"]),
+
+  // What new members would like the club to do, from the one-time prompt on their phone. See convex/ideas.ts.
+  ideas: defineTable({
+    playerId: v.id("players"),
+    sessionId: v.id("sessions"),
+    text: v.string(),
+    createdAt: v.number(),
+  }).index("by_createdAt", ["createdAt"]),
 
   // Anonymous "I'm interested" hearts on events, one per browser (a random id kept in localStorage).
   interest: defineTable({
