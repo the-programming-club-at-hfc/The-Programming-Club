@@ -113,7 +113,8 @@ function JoinForm({
   const [profile, setProfile] = useState<Profile>({ name: "", email: "" });
   const [broughtBy, setBroughtBy] = useState("");
   const [idea, setIdea] = useState("");
-  // Only a phone that has never joined gets the idea box ("Switch player" keeps the saved profile).
+  // Only a phone that has never joined gets the idea box (and, when signed in, "Who brought you?"). Joining leaves a
+  // token behind, so that's the test; the saved profile isn't, since the sign-in link saves it before any join.
   const [firstPhone, setFirstPhone] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -122,7 +123,7 @@ function JoinForm({
   useEffect(() => {
     const saved = localStorage.getItem("hwc.profile");
     if (saved) setProfile(JSON.parse(saved) as Profile);
-    setFirstPhone(!saved && !Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
+    setFirstPhone(!Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
   }, []);
 
   useEffect(() => {
