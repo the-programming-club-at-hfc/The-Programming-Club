@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { BUGS, LANGS, OUTPUTS } from "./content";
 import { FIXES } from "./fixes";
+import { PUZZLES, puzzleSeed } from "./puzzles";
 import {
   LANGUAGES,
+  answerKey,
   answersOpen,
   awardsFor,
   cardSeconds,
@@ -11,10 +13,12 @@ import {
   fixAwardsFor,
   grade,
   isFreshStart,
+  puzzleAwardsFor,
   sameOutput,
   searchLanguages,
   settle,
   showCard,
+  submitAnswer,
 } from "./grading";
 
 const T0 = 1_000_000;
@@ -355,5 +359,108 @@ describe("Fix it for real", () => {
     const fixes = [{ id: "a", at: sec(10) }];
     const first = fixAwardsFor({ index: 3, double: false, scored: [], fixes })!;
     expect(fixAwardsFor({ index: 3, double: false, scored: first.scored, fixes })).toBeNull();
+  });
+});
+
+describe("puzzles", () => {
+  const right = () => "MEXJPN";
+
+  test("clocks come from the deck: 10 and 13 minutes for the relays, 26 for the Final's second puzzle", () => {
+    expect(PUZZLES.map((_, i) => cardSeconds("puzzle", i))).toEqual([600, 780, 1560]);
+  });
+
+  test("answers match without caring about case, spaces, or commas", () => {
+    expect(answerKey(" mex, JPN ")).toBe("mexjpn");
+    expect(answerKey("1,234\n")).toBe("1234");
+    expect(submitAnswer({ wrong: 0 }, 1, "Mex Jpn", right, T0)).toEqual({ kind: "right", stars: { wrong: 0, part1At: T0 } });
+  });
+
+  test("a wrong answer locks the team out for 30 seconds, and answers in that time aren't even checked", () => {
+    const r = submitAnswer({ wrong: 0 }, 1, "MEXBRA", right, T0);
+    expect(r).toEqual({ kind: "wrong", stars: { wrong: 1, lockedUntil: sec(30) } });
+    const locked = r.kind === "wrong" ? r.stars : { wrong: 0 };
+    let checked = 0;
+    const counted = () => {
+      checked++;
+      return "MEXJPN";
+    };
+    expect(submitAnswer(locked, 1, "MEXJPN", counted, sec(29))).toEqual({ kind: "locked", waitMs: 1000 });
+    expect(checked).toBe(0);
+    expect(submitAnswer(locked, 1, "MEXJPN", counted, sec(30))).toEqual({
+      kind: "right",
+      stars: { wrong: 1, lockedUntil: sec(30), part1At: sec(30) },
+    });
+    expect(checked).toBe(1);
+  });
+
+  test("a second wrong answer starts a fresh 30 seconds", () => {
+    const r = submitAnswer({ wrong: 1, lockedUntil: sec(30) }, 1, "nope", right, sec(45));
+    expect(r).toEqual({ kind: "wrong", stars: { wrong: 2, lockedUntil: sec(75) } });
+  });
+
+  test("an empty answer is wrong, not a free pass", () => {
+    expect(submitAnswer({ wrong: 0 }, 1, " , ", () => "", T0).kind).toBe("wrong");
+  });
+
+  test("part 2 needs part 1 first, and a star can't be earned twice", () => {
+    expect(submitAnswer({ wrong: 0 }, 2, "MEXJPN", right, T0)).toEqual({ kind: "early" });
+    const one = { wrong: 0, part1At: T0 };
+    expect(submitAnswer(one, 1, "anything", right, sec(5))).toEqual({ kind: "done" });
+    expect(submitAnswer(one, 2, "MEXJPN", right, sec(5))).toEqual({ kind: "right", stars: { ...one, part2At: sec(5) } });
+  });
+
+  test("+3 per part 1 star, +5 per part 2 star, +2 more for the first team to each", () => {
+    const r = puzzleAwardsFor({
+      index: 2,
+      double: false,
+      scored: ["fix:0"],
+      teams: [
+        { id: "a", part1At: sec(60), part2At: sec(400) },
+        { id: "b", part1At: sec(30) },
+        { id: "c", part1At: sec(90), part2At: sec(300) },
+        { id: "d" },
+      ],
+    })!;
+    expect(r.scored).toEqual(["fix:0", "puzzle:2"]);
+    expect(r.awards).toEqual([
+      { id: "a", first1: false, first2: false, points: 8 },
+      { id: "b", first1: true, first2: false, points: 5 },
+      { id: "c", first1: false, first2: true, points: 10 },
+      { id: "d", first1: false, first2: false, points: 0 },
+    ]);
+  });
+
+  test("double points doubles everything, and one team can be first to both", () => {
+    const r = puzzleAwardsFor({ index: 0, double: true, scored: [], teams: [{ id: "a", part1At: sec(10), part2At: sec(20) }] })!;
+    expect(r.awards).toEqual([{ id: "a", first1: true, first2: true, points: 24 }]);
+  });
+
+  test("an exact tie goes to whoever's row came first", () => {
+    const r = puzzleAwardsFor({
+      index: 1,
+      double: false,
+      scored: [],
+      teams: [
+        { id: "a", part1At: sec(30) },
+        { id: "b", part1At: sec(30) },
+      ],
+    })!;
+    expect(r.awards.map((a) => a.first1)).toEqual([true, false]);
+  });
+
+  test("scoring twice scores once", () => {
+    const teams = [{ id: "a", part1At: sec(10) }];
+    const first = puzzleAwardsFor({ index: 1, double: false, scored: [], teams })!;
+    expect(puzzleAwardsFor({ index: 1, double: false, scored: first.scored, teams })).toBeNull();
+  });
+
+  test("the deck's own answers earn the stars, and part 1's answer never passes for part 2", () => {
+    for (const [i, p] of PUZZLES.entries()) {
+      const input = p.generate(puzzleSeed("night", "team", i));
+      const a = p.solve(input);
+      expect(submitAnswer({ wrong: 0 }, 1, a.part1, () => p.solve(input).part1, T0).kind).toBe("right");
+      expect(submitAnswer({ wrong: 0, part1At: T0 }, 2, a.part2, () => p.solve(input).part2, T0).kind).toBe("right");
+      expect(submitAnswer({ wrong: 0, part1At: T0 }, 2, a.part1, () => p.solve(input).part2, T0).kind).toBe("wrong");
+    }
   });
 });

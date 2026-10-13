@@ -1,9 +1,10 @@
-// Phone answers and automatic scoring for Bug Hunt, Output?, and Guess the Language, plus Fix it for real.
+// Phone answers and automatic scoring for Bug Hunt, Output?, and Guess the Language, plus Fix it for real and puzzles.
 // Pure functions shared by Convex (convex/answers.ts) and the officer test page, so both score the same way.
 // Keep imports relative: Convex bundles this file too.
 import { BUGS, LANGS, OUTPUTS } from "./content";
+import { PUZZLES } from "./puzzles";
 
-export type GameId = "bug" | "output" | "relay" | "lang" | "fix";
+export type GameId = "bug" | "output" | "relay" | "lang" | "fix" | "puzzle";
 export type AnswerGame = "bug" | "output" | "lang";
 
 export const isAnswerGame = (g: string | undefined): g is AnswerGame => g === "bug" || g === "output" || g === "lang";
@@ -13,7 +14,8 @@ export const cardKey = (game: GameId, index: number) => `${game}:${index}`;
 const SECONDS = { output: 30, relay: 720, lang: 45, fix: 240 };
 
 /** Seconds on the clock for a card. */
-export const cardSeconds = (game: GameId, index: number) => (game === "bug" ? (BUGS[index].level === "hard" ? 120 : 90) : SECONDS[game]);
+export const cardSeconds = (game: GameId, index: number) =>
+  game === "bug" ? (BUGS[index].level === "hard" ? 120 : 90) : game === "puzzle" ? PUZZLES[index].minutes * 60 : SECONDS[game];
 
 /** How long after the card goes up a lock still earns the early bonus. Output? has none. */
 export const earlyMs = (game: AnswerGame, index: number) =>
@@ -194,6 +196,86 @@ export function fixAwardsFor<T>(o: { index: number; double: boolean; scored: str
     awards: o.fixes.map(({ id }, i) => {
       const points = FIX_POINTS + (i === first ? FIRST_FIX_BONUS : 0);
       return { id, first: i === first, points: o.double ? points * 2 : points };
+    }),
+  };
+}
+
+// ---- Puzzles ---------------------------------------------------------------
+
+/** Points per star: part 1, part 2, and the extra for the first team to each star. */
+export const PART1_POINTS = 3;
+export const PART2_POINTS = 5;
+export const FIRST_STAR_BONUS = 2;
+/** How long a wrong answer locks a team out of answering. */
+export const LOCKOUT_MS = 30_000;
+
+/** An answer as it's compared: case, spaces, and punctuation don't matter, so "MEX, JPN" matches "MEXJPN". */
+export const answerKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** A team's progress on a puzzle. Times are server milliseconds. */
+export interface Stars {
+  part1At?: number;
+  part2At?: number;
+  lockedUntil?: number;
+  wrong: number;
+}
+
+export type Submission =
+  | { kind: "right"; stars: Stars }
+  | { kind: "wrong"; stars: Stars }
+  /** Still locked out from a wrong answer. Nothing changes. */
+  | { kind: "locked"; waitMs: number }
+  /** That part already has its star. Nothing changes. */
+  | { kind: "done" }
+  /** Part 2 before part 1. Nothing changes. */
+  | { kind: "early" };
+
+/**
+ * Checks one answer. A wrong answer locks the team out for LOCKOUT_MS, and answers during a lockout aren't checked.
+ * `expected` is only called when the answer is checked, since that means generating and solving the team's input.
+ */
+export function submitAnswer(stars: Stars, part: 1 | 2, answer: string, expected: () => string, now: number): Submission {
+  if ((part === 1 ? stars.part1At : stars.part2At) !== undefined) return { kind: "done" };
+  if (part === 2 && stars.part1At === undefined) return { kind: "early" };
+  if (stars.lockedUntil !== undefined && now < stars.lockedUntil) return { kind: "locked", waitMs: stars.lockedUntil - now };
+  if (answerKey(answer) !== "" && answerKey(answer) === answerKey(expected()))
+    return { kind: "right", stars: { ...stars, [part === 1 ? "part1At" : "part2At"]: now } };
+  return { kind: "wrong", stars: { ...stars, wrong: stars.wrong + 1, lockedUntil: now + LOCKOUT_MS } };
+}
+
+/** Position of the earliest time in a list, or -1 if there's none. An exact tie goes to whoever is first in the list. */
+const earliest = (times: (number | undefined)[]) =>
+  times.reduce<number>((best, t, i) => (t !== undefined && (best === -1 || t < times[best]!) ? i : best), -1);
+
+/** Which teams were first to each star, as positions in the list (-1 if nobody has it yet). */
+export const firstStars = (teams: { part1At?: number; part2At?: number }[]) => ({
+  first1: earliest(teams.map((t) => t.part1At)),
+  first2: earliest(teams.map((t) => t.part2At)),
+});
+
+/**
+ * What to award when a puzzle is scored: +3 per part-1 star, +5 per part-2 star, +2 more for the first team to each
+ * star, all doubled on a double-points round. `teams` are in the order their rows were made, so an exact tie goes to
+ * whoever got there first. Returns null if the puzzle was already scored tonight.
+ */
+export function puzzleAwardsFor<T>(o: {
+  index: number;
+  double: boolean;
+  scored: string[];
+  teams: { id: T; part1At?: number; part2At?: number }[];
+}) {
+  const key = cardKey("puzzle", o.index);
+  if (o.scored.includes(key)) return null;
+  const { first1, first2 } = firstStars(o.teams);
+  return {
+    scored: [...o.scored, key],
+    awards: o.teams.map(({ id, part1At, part2At }, i) => {
+      const points =
+        (part1At !== undefined ? PART1_POINTS : 0) +
+        (part2At !== undefined ? PART2_POINTS : 0) +
+        (i === first1 ? FIRST_STAR_BONUS : 0) +
+        (i === first2 ? FIRST_STAR_BONUS : 0);
+      return { id, first1: i === first1, first2: i === first2, points: o.double ? points * 2 : points };
     }),
   };
 }

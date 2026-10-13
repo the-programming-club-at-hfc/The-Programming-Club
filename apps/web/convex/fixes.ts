@@ -5,6 +5,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import { openSession, requireOpenSession, sessionTeams } from "./lib";
 import { cardStart, isOpen, liveCard } from "./answers";
+import { puzzleCard } from "./puzzles";
 import { FIXES } from "../src/lib/fixes";
 import { cardKey, fixAwardsFor } from "../src/lib/grading";
 
@@ -18,8 +19,8 @@ export function fixCard(s: Doc<"sessions">) {
   return { index, key: cardKey("fix", index) };
 }
 
-/** The card on the TV that teams answer against the clock: a phone-answered card or a Fix it for real card. */
-export const timedCard = (s: Doc<"sessions">) => liveCard(s) ?? fixCard(s);
+/** The card on the TV that teams answer against the clock: a phone-answered card, a Fix it for real card, or a puzzle. */
+export const timedCard = (s: Doc<"sessions">) => liveCard(s) ?? fixCard(s) ?? puzzleCard(s);
 
 /** Tonight's fixes for a card in the order they came in, leaving out teams that no longer exist. */
 async function cardFixes(ctx: QueryCtx, s: Doc<"sessions">, card: string) {

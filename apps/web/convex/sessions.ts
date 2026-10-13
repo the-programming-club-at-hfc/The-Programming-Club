@@ -5,6 +5,7 @@ import { openSession, placeXpFor, requireOpenSession, sessionAttendance, session
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
+import { scorePuzzleReveal, scoreUnrevealedPuzzles } from "./puzzles";
 import type { Doc } from "./_generated/dataModel";
 import { clockLeft, isFreshStart, settle, showCard } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
@@ -81,12 +82,13 @@ export const start = mutation({
   },
 });
 
-/** Close the night: award place XP from the final standings. */
+/** Close the night: score any puzzle that was never revealed, then award place XP from the final standings. */
 export const end = mutation({
   args: {},
   handler: async (ctx) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
+    await scoreUnrevealedPuzzles(ctx, s);
     const teams = await sessionTeams(ctx, s._id);
     const xp = placeXpFor(teams);
     for (const a of await sessionAttendance(ctx, s._id)) {
@@ -124,9 +126,10 @@ export const setScreen = mutation({
     const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now });
     Object.assign(next, { card: w.card, played: w.played });
     await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
-    // Revealing scores phone answers or Fix it for real fixes, once per card.
+    // Revealing scores phone answers, Fix it for real fixes, or puzzle stars, once per card.
     await scoreReveal(ctx, next);
     await scoreFixReveal(ctx, next);
+    await scorePuzzleReveal(ctx, next);
   },
 });
 
