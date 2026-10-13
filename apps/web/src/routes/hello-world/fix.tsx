@@ -1,18 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { FixRound } from "#/components/fix";
+import { PuzzleRound } from "#/components/puzzle";
 import { fmtClock, useRemaining } from "#/components/game";
 import { Picto, Wrap } from "#/components/ui";
 import { answersOpen, cardKey } from "#/lib/grading";
+import { PUZZLES, puzzleSeed } from "#/lib/puzzles";
 import { usePython } from "#/lib/python";
 import type { Python } from "#/lib/python";
 import { CLUB } from "#/lib/season";
 
-// A team's lab computer for Fix it for real. No sign-in: the computer picks its team from tonight's list.
+// A team's lab computer for Fix it for real and puzzles. No sign-in: the computer picks its team from tonight's list.
 export const Route = createFileRoute("/hello-world/fix")({
   head: () => ({ meta: [{ title: `Team computer · ${CLUB.season}` }, { name: "robots", content: "noindex" }] }),
   component: FixPage,
@@ -88,7 +90,8 @@ function TeamPicker({ live, onPick }: { live: Live; onPick: (id: string) => void
 function TeamComputer({ live, team, py, onSwitch }: { live: Live; team: Live["teams"][number]; py: Python; onSwitch: () => void }) {
   const remaining = useRemaining(live.timer);
   const s = live.screen;
-  const index = s.mode === "card" && s.game === "fix" ? s.index : undefined;
+  const game = s.mode === "card" && (s.game === "fix" || s.game === "puzzle") ? s.game : undefined;
+  const index = game ? s.index : undefined;
   return (
     <Wrap className="py-8">
       <header className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -108,7 +111,9 @@ function TeamComputer({ live, team, py, onSwitch }: { live: Live; team: Live["te
           Not {team.name}? Switch team
         </button>
       </header>
-      {index !== undefined ? (
+      {index !== undefined && game === "puzzle" ? (
+        <LivePuzzle key={cardKey("puzzle", index)} live={live} teamId={team._id} index={index} remaining={remaining} py={py} />
+      ) : index !== undefined ? (
         <LiveFix key={cardKey("fix", index)} live={live} teamId={team._id} index={index} remaining={remaining} py={py} />
       ) : (
         <div className="card grid min-h-[50vh] place-items-center p-8 text-center">
@@ -117,9 +122,7 @@ function TeamComputer({ live, team, py, onSwitch }: { live: Live; team: Live["te
               <Picto id="fix" animate="loop" className="absolute inset-[14%]" />
             </div>
             <p className="text-3xl font-extrabold tracking-[-0.03em]">Hang tight.</p>
-            <p className="mt-3 text-lg text-dim">
-              When Fix it for real starts, a buggy program shows up here. Fix it, run it, and check it.
-            </p>
+            <p className="mt-3 text-lg text-dim">When Fix it for real or a puzzle starts, it shows up here, with Python ready to run.</p>
             <p className="mt-6 text-sm text-dim">
               {py.status === "ready"
                 ? "Python is ready."
@@ -152,16 +155,6 @@ function LiveFix({
   const key = cardKey("fix", index);
   const mine = board?.card === key ? (board.fixed.find((f) => f.teamId === teamId) ?? null) : null;
   const scored = live.scored.includes(key);
-  const open = answersOpen({
-    revealed: !!live.screen.revealed,
-    scored,
-    endedAt: live.card?.key === key ? live.card.endedAt : undefined,
-    own: live.timer.card === key,
-    running: !!live.timer.startedAt,
-    remaining,
-    now: Date.now(),
-    grace: 0,
-  });
   return (
     <FixRound
       index={index}
@@ -169,11 +162,60 @@ function LiveFix({
       // Once scored, the result stays up even if an officer hides the answer again.
       revealed={!!live.screen.revealed || scored}
       hint={!!live.screen.hint}
-      open={open}
+      open={isOpen(live, key, remaining)}
       fixed={mine && { ms: mine.ms }}
       result={mine?.result ?? null}
       saveKey={`hwc.fixCode.${live._id}.${key}`}
       onFixed={(code) => report({ teamId, card: key, code })}
+    />
+  );
+}
+
+/** Whether the card on the TV still takes answers, as the server will see it (minus its grace). */
+const isOpen = (live: Live, key: string, remaining: number) =>
+  answersOpen({
+    revealed: !!live.screen.revealed,
+    scored: live.scored.includes(key),
+    endedAt: live.card?.key === key ? live.card.endedAt : undefined,
+    own: live.timer.card === key,
+    running: !!live.timer.startedAt,
+    remaining,
+    now: Date.now(),
+    grace: 0,
+  });
+
+function LivePuzzle({
+  live,
+  teamId,
+  index,
+  remaining,
+  py,
+}: {
+  live: Live;
+  teamId: Id<"teams">;
+  index: number;
+  remaining: number;
+  py: Python;
+}) {
+  const board = useQuery(api.puzzles.board);
+  const submit = useMutation(api.puzzles.submit);
+  const key = cardKey("puzzle", index);
+  const mine = board?.card === key ? board.teams.find((t) => t.teamId === teamId) : undefined;
+  // The same seed the server uses to check answers, so this is exactly the input it expects.
+  const input = useMemo(() => PUZZLES[index].generate(puzzleSeed(live._id, teamId, index)), [live._id, teamId, index]);
+  return (
+    <PuzzleRound
+      index={index}
+      input={input}
+      py={py}
+      revealed={!!live.screen.revealed || live.scored.includes(key)}
+      hint={!!live.screen.hint}
+      open={isOpen(live, key, remaining)}
+      stars={{ part1Ms: mine?.part1Ms ?? null, part2Ms: mine?.part2Ms ?? null }}
+      lockedUntil={mine?.lockedUntil ?? null}
+      result={mine?.result ?? null}
+      saveKey={`hwc.puzzleCode.${live._id}.${key}`}
+      onSubmit={(part, answer) => submit({ teamId, card: key, part, answer })}
     />
   );
 }
