@@ -76,7 +76,7 @@ export function WikiRound(p: RoundProps) {
             {finished.by && <span className="font-normal"> · tapped by {finished.by}</span>}
           </p>
           <p className="mt-1">
-            {finished.ok ? "The referee checked it. ✓" : "Hold up your screen with the target article so the referee can check it."}
+            {finished.ok ? "The referee checked it. ✓" : "Raise your hand and keep the target article open so the referee can check it."}
           </p>
           {finished.ok === null && (
             <button className="btn btn-sm mt-3" onClick={p.onUndo}>

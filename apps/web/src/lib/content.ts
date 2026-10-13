@@ -310,7 +310,7 @@ export const GAMES: Game[] = [
       "The TV shows a start and a target article. It’s on your phones too. Everyone opens the start article.",
       "On “Go,” click only the blue links inside the article. No search bar, no typing URLs.",
       "The back button is allowed. So is Ctrl+F (find on page).",
-      "When you land on the target, anyone on your team taps “We made it!” on a phone, then holds up the screen with the target article. A referee checks it. Tapped by mistake? Undo it until the referee checks.",
+      "When you land on the target, anyone on your team taps “We made it!” on a phone and raises a hand, keeping the target article open. A referee comes over to check it. Tapped by mistake? Undo it until the referee checks.",
     ],
     scoring:
       "1st place 5 points, 2nd 4, 3rd 3. Any other team that finishes before time runs out gets 2; teams that don’t finish get 1 for playing. Points add up on their own when the race ends.",
@@ -318,7 +318,7 @@ export const GAMES: Game[] = [
       "Fewest Clicks: speed doesn’t matter. The team with the lowest click count wins (6-minute cap), and teams with the same count share the place. Count every link you click (a list of the articles you land on helps), then enter the count on a phone when you land.",
       "Checkpoint: you must pass through a third article on the way.",
       "Reverse: swap the start and target from the last race.",
-      "Paper backup: if phones or Wi-Fi act up, shout “Wiki!” and hold up your screen (for Fewest Clicks, write each article down as you land on it), and officers score by hand.",
+      "Paper backup: if phones or Wi-Fi act up, shout “Wiki!” and raise your hand (for Fewest Clicks, write each article down as you land on it), and officers score by hand.",
     ],
     tip: "Teach the trick after race one: head for big hub pages (countries, “Science,” “Computer”), then narrow down.",
   },
