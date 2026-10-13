@@ -1,9 +1,9 @@
-# Rebuild public/trophy/golden-keycap.glb after changing the trophy in ~/hello-world-cup/trophy/build.py:
+# Rebuild public/trophy/golden-keycap.glb after changing the trophy in trophy/build.py (repo root):
 #   /Applications/Blender.app/Contents/MacOS/Blender -b -P apps/web/scripts/export-trophy-glb.py -- /tmp/golden-keycap.glb
 #   bunx @gltf-transform/cli optimize /tmp/golden-keycap.glb apps/web/public/trophy/golden-keycap.glb --compress quantize --texture-compress false --simplify false
 import math, os, sys
 import bpy
-SRC = os.path.expanduser("~/hello-world-cup/trophy/build.py")
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../trophy/build.py")
 OUT = sys.argv[sys.argv.index("--") + 1]
 code = open(SRC).read()
 code = code[: code.rindex("main()")]  # define everything, run nothing
