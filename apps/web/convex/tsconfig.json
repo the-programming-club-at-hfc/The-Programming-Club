@@ -21,6 +21,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["./**/*"],
+  "include": ["./**/*", "../src/lib/bun-test.d.ts"],
   "exclude": ["./_generated"]
 }
