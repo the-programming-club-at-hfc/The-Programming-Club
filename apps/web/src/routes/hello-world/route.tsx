@@ -2,7 +2,7 @@ import { Link, Outlet, createFileRoute, useRouterState } from "@tanstack/react-r
 import { Disclaimer } from "#/components/site";
 import { CLUB } from "#/lib/season";
 
-// Layout for every Hello, World Cup page. The TV and the kickoff slides run full screen without it.
+// Layout for every Hello, World Cup page. The TV, the kickoff slides and the phone join page run full screen without it.
 export const Route = createFileRoute("/hello-world")({
   head: () => ({
     meta: [
@@ -27,7 +27,7 @@ const STRIP = ["tile-sky", "tile-meadow", "tile-sun", "tile-silver", "tile-pine"
 
 function Layout() {
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const bare = path.startsWith("/hello-world/tv") || path.startsWith("/hello-world/kickoff");
+  const bare = ["/hello-world/tv", "/hello-world/kickoff", "/hello-world/join"].some((p) => path.startsWith(p));
   if (bare) return <Outlet />;
   return (
     <>

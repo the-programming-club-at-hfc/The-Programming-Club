@@ -83,7 +83,7 @@ function Join() {
 
 function Center({ children }: { children: React.ReactNode }) {
   return (
-    <Wrap className="grid min-h-[60vh] place-items-center text-center">
+    <Wrap className="grid min-h-dvh place-items-center py-8 text-center">
       <div>{children}</div>
     </Wrap>
   );
@@ -137,32 +137,31 @@ function JoinForm({
   const t = weekTile(wk);
   const letters = code.padEnd(4, " ").slice(0, 4).split("");
   return (
-    <Wrap className="max-w-xl py-10">
-      <form onSubmit={submit} className="space-y-7">
-        <div className="flex items-center gap-5">
-          <div className={`tile ${t.tile} size-20 shrink-0 rounded-[3px]`}>
+    <Wrap className="flex min-h-dvh max-w-xl flex-col py-5">
+      <form onSubmit={submit} className="flex flex-1 flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`tile ${t.tile} size-12 shrink-0 rounded-[3px]`}>
             <Picto id={t.picto} className="absolute inset-[14%]" />
           </div>
           <p className="leading-tight">
-            <span className="text-dim">Week {week}</span>
+            <span className="text-sm text-dim">Week {week}</span>
             <br />
-            <span className="text-lg font-bold">{wk.title}</span>
+            <span className="font-bold">{wk.title}</span>
           </p>
         </div>
         <div>
-          <p className="font-bold text-pine">Welcome to {CLUB.name}!</p>
-          <h1 className="mt-1 text-[clamp(2.6rem,9vw,3.8rem)] leading-[0.9] lowercase">join the game</h1>
-          <p className="mt-4 text-lg text-dim">No account or password. Type the code on the TV and your name, and you’re in.</p>
+          <h1 className="text-[clamp(2.2rem,10vw,3.2rem)] leading-[0.9] lowercase">join the game</h1>
+          <p className="mt-2 text-dim">No account or password. Welcome to {CLUB.name}!</p>
         </div>
 
         <label className="block">
           <span className="font-bold">Code on the TV</span>
-          <span className="relative mt-2 grid grid-cols-4 gap-[3px]">
+          <span className="relative mt-1.5 grid grid-cols-4 gap-[3px]">
             {letters.map((c, i) => (
               <span
                 key={i}
                 aria-hidden
-                className={`narrow grid h-20 place-items-center text-5xl font-extrabold ${c.trim() ? "bg-ink text-paper" : "bg-mist"} ${focused && i === Math.min(code.length, 3) ? "outline-[3px] -outline-offset-[3px] outline-sun" : ""}`}
+                className={`narrow grid h-14 place-items-center text-4xl font-extrabold ${c.trim() ? "bg-ink text-paper" : "bg-mist"} ${focused && i === Math.min(code.length, 3) ? "outline-[3px] -outline-offset-[3px] outline-sun" : ""}`}
               >
                 {c}
               </span>
@@ -186,7 +185,7 @@ function JoinForm({
         <label className="block">
           <span className="font-bold">Your name</span>
           <input
-            className="field mt-2"
+            className="field mt-1.5"
             value={profile.name}
             onChange={(e) => setProfile({ ...profile, name: e.target.value })}
             autoComplete="name"
@@ -195,9 +194,9 @@ function JoinForm({
           />
         </label>
         <label className="block">
-          <span className="font-bold">HawkMail</span> <span className="text-dim">Keeps your XP together week to week.</span>
+          <span className="font-bold">HawkMail</span> <span className="text-sm text-dim">Keeps your XP together week to week.</span>
           <input
-            className="field mt-2"
+            className="field mt-1.5"
             type="email"
             value={profile.email}
             onChange={(e) => setProfile({ ...profile, email: e.target.value })}
@@ -207,14 +206,14 @@ function JoinForm({
           />
         </label>
         <label className="block">
-          <span className="font-bold">Who brought you?</span> <span className="text-dim">Optional. Officers give you both +2 XP.</span>
-          <input className="field mt-2" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
+          <span className="font-bold">Who brought you?</span> <span className="text-sm text-dim">Optional. You both get +2 XP.</span>
+          <input className="field mt-1.5" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
         </label>
         {firstPhone && (
           <label className="block">
-            <span className="font-bold">Anything you’d like the club to do?</span> <span className="text-dim">Optional.</span>
+            <span className="font-bold">Anything you’d like the club to do?</span> <span className="text-sm text-dim">Optional.</span>
             <textarea
-              className="field mt-2 block"
+              className="field mt-1.5 block resize-none"
               rows={2}
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
@@ -233,9 +232,12 @@ function JoinForm({
             {error}
           </p>
         )}
-        <button className="btn btn-primary w-full text-lg" disabled={busy}>
-          {busy ? "Joining…" : "Join the game"}
-        </button>
+        {/* Pinned to the bottom of the screen so Join is always one tap away. */}
+        <div className="sticky bottom-0 mt-auto bg-paper pt-2 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          <button className="btn btn-primary w-full text-lg" disabled={busy}>
+            {busy ? "Joining…" : "Join the game"}
+          </button>
+        </div>
       </form>
     </Wrap>
   );
@@ -251,31 +253,31 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const t = weekTile(wk);
   const hot = remaining <= 10_000 && !!live.timer.startedAt;
   return (
-    <Wrap className="max-w-2xl py-10">
-      <p className="text-dim">
+    <Wrap className="flex min-h-dvh max-w-2xl flex-col py-5">
+      <p className="text-sm text-dim">
         Week {live.week}: {wk.title}
       </p>
-      <h1 className="mt-1 text-[clamp(2.4rem,8vw,3.4rem)] lowercase">{me.name}</h1>
+      <h1 className="mt-0.5 text-[clamp(2rem,8vw,3rem)] lowercase">{me.name}</h1>
       {me.practice && <p className="mt-2 font-semibold text-pine">Practice night: nothing tonight counts toward XP.</p>}
 
-      <div className="mt-8 grid grid-cols-[auto_1fr] gap-[3px]">
-        <div className={`tile ${t.tile} w-24 sm:w-32`}>
+      <div className="mt-4 grid grid-cols-[auto_1fr] gap-[3px]">
+        <div className={`tile ${t.tile} w-16 sm:w-32`}>
           <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
         </div>
-        <div className="theme-pine p-6">
+        <div className="theme-pine p-4 sm:p-6">
           {me.team ? (
             <>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-dim">Your team</p>
-                  <h2 className="mt-1 text-3xl">{me.team.name}</h2>
+                  <h2 className="mt-1 text-2xl sm:text-3xl">{me.team.name}</h2>
                   <p className="mt-2 font-semibold">
                     {ordinal(me.team.rank)} of {me.team.of}
                   </p>
                 </div>
-                <p className="narrow text-7xl leading-none font-extrabold">{me.team.score}</p>
+                <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
               </div>
-              <p className="mt-4 border-t border-line pt-3 text-dim">{me.team.members.join(", ")}</p>
+              <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>
             </>
           ) : (
             <p className="text-xl font-semibold">
@@ -286,13 +288,13 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       </div>
 
       {(live.timer.startedAt || s.mode === "timer") && (
-        <p className={`narrow mt-8 text-center text-8xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>
+        <p className={`narrow mt-5 text-center text-7xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>
           {remaining === 0 && live.timer.startedAt ? "time" : fmtClock(remaining)}
         </p>
       )}
 
       {s.mode === "card" && s.game && s.index !== undefined && (
-        <div className="mt-8">
+        <div className="mt-5">
           {isAnswerGame(s.game) && me.team ? (
             <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
           ) : s.game === "fix" && me.team ? (
@@ -307,7 +309,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         </div>
       )}
       {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
-        <div className="mt-8">
+        <div className="mt-5">
           {me.team ? (
             <TeamRace
               key={wikiKey(s.wikiFrom, s.wikiTo)}
@@ -323,11 +325,11 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           )}
         </div>
       )}
-      {s.mode === "message" && s.message && <p className="card mt-8 p-6 text-2xl font-bold">{s.message}</p>}
+      {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
 
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-3 text-dim">
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
         <p>
-          Season XP: <strong className="narrow text-2xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
+          Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
           {me.weeks === 1 ? "" : "s"}
         </p>
         <button onClick={onSwitch} className="link">
