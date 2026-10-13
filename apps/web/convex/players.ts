@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { addToSession } from "./lib";
+import { addToSession, requireOpenSession, smallestTeam } from "./lib";
+import { requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
 
 /** Members join from their phone with tonight's code. No account needed. First-timers can share an idea for the club too. */
@@ -23,6 +24,30 @@ export const join = mutation({
       if (a) await ctx.db.insert("ideas", { playerId: a.playerId, sessionId: session._id, text, createdAt: Date.now() });
     }
     return token;
+  },
+});
+
+/** A signed-in officer checks in to run the night: counted present, off the teams. */
+export const checkInOfficer = mutation({
+  args: { name: v.string(), email: v.string() },
+  handler: async (ctx, { name, email }) => {
+    await requireOfficer(ctx);
+    const session = await requireOpenSession(ctx);
+    return await addToSession(ctx, session, name, email, undefined, true);
+  },
+});
+
+/** An officer's "Play tonight" switch: on puts them on the smallest team, off takes them back off the teams. */
+export const setPlaying = mutation({
+  args: { token: v.string(), playing: v.boolean() },
+  handler: async (ctx, { token, playing }) => {
+    const a = await ctx.db
+      .query("attendance")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    const session = a && (await ctx.db.get(a.sessionId));
+    if (!a?.officer || session?.status !== "open") throw new ConvexError("Only officers can switch that, during the night.");
+    await ctx.db.patch(a._id, { playing, teamId: playing ? (a.teamId ?? (await smallestTeam(ctx, a.sessionId))) : undefined });
   },
 });
 
@@ -77,6 +102,8 @@ export const me = query({
       ended: session.status === "ended",
       week: session.week,
       practice: !!session.practice,
+      officer: !!a.officer,
+      playing: !!a.playing,
       team,
       seasonXp,
       weeks: history.length,

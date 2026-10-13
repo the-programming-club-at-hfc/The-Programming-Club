@@ -1166,6 +1166,7 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
                 <p className="font-bold">
                   {r.name}
                   {r.firstTime && <span className="chip ml-2 text-pine">New</span>}
+                  {r.officer && <span className="chip ml-2">{r.teamId ? "Officer, playing" : "Officer"}</span>}
                 </p>
                 <p className="text-xs text-dim">
                   {r.email}

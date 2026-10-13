@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 
-/** Season high scores: XP per player, names only. Practice nights don't count. */
+/** Season high scores: XP per player, names only. Practice nights and officers' check-ins don't count. */
 export const leaderboard = query({
   args: {},
   handler: async (ctx) => {
@@ -8,7 +8,7 @@ export const leaderboard = query({
     const weekOf = new Map(sessions.map((s) => [s._id, s.week]));
     const byPlayer = new Map<string, { xp: number; weeks: number; firstWeek: number }>();
     for (const a of await ctx.db.query("attendance").collect()) {
-      if (!weekOf.has(a.sessionId)) continue;
+      if (!weekOf.has(a.sessionId) || a.officer) continue;
       const cur = byPlayer.get(a.playerId) ?? { xp: 0, weeks: 0, firstWeek: 99 };
       cur.xp += a.showXp + (a.placeXp ?? 0) + a.bonusXp;
       cur.weeks += 1;

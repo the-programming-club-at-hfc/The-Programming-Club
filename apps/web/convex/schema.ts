@@ -109,6 +109,9 @@ export default defineSchema({
     showXp: v.number(),
     placeXp: v.optional(v.number()),
     bonusXp: v.number(),
+    // An officer's check-in: counts for attendance but stays out of teams and the leaderboard unless they opt in to play.
+    officer: v.optional(v.boolean()),
+    playing: v.optional(v.boolean()),
   })
     .index("by_session", ["sessionId"])
     .index("by_player", ["playerId"])

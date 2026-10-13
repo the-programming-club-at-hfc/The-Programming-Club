@@ -1,19 +1,22 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { addToSession, requireOpenSession, sessionAttendance, sessionTeams, shuffle } from "./lib";
+import { addToSession, inTeamPool, requireOpenSession, sessionAttendance, sessionTeams, shuffle } from "./lib";
 import { TEAM_NAMES } from "./teamNames";
 
 const unusedName = (taken: string[]) => shuffle(TEAM_NAMES).find((n) => !taken.includes(n)) ?? `Team ${taken.length + 1}`;
 
-/** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo). Resets tonight's teams. */
+/** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo). Resets tonight's teams.
+ *  Officers running the night stay off the teams. */
 export const make = mutation({
   args: { size: v.union(v.literal(2), v.literal(3)) },
   handler: async (ctx, { size }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     for (const t of await sessionTeams(ctx, s._id)) await ctx.db.delete(t._id);
-    const att = shuffle(await sessionAttendance(ctx, s._id));
+    const all = await sessionAttendance(ctx, s._id);
+    for (const a of all) if (a.teamId && !inTeamPool(a)) await ctx.db.patch(a._id, { teamId: undefined });
+    const att = shuffle(all.filter(inTeamPool));
     if (!att.length) return;
     const n = Math.max(1, size === 3 ? Math.ceil(att.length / 3) : Math.floor(att.length / 2));
     const names = shuffle(TEAM_NAMES);
@@ -78,7 +81,10 @@ export const move = mutation({
   args: { attendanceId: v.id("attendance"), teamId: v.union(v.id("teams"), v.null()) },
   handler: async (ctx, { attendanceId, teamId }) => {
     await requireOfficer(ctx);
-    await ctx.db.patch(attendanceId, { teamId: teamId ?? undefined });
+    const a = await ctx.db.get(attendanceId);
+    if (!a) return;
+    // Putting an officer on a team means they're playing tonight.
+    await ctx.db.patch(attendanceId, { teamId: teamId ?? undefined, ...(a.officer && { playing: !!teamId }) });
   },
 });
 

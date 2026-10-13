@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
+import { inTeamPool, openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
@@ -26,7 +26,9 @@ export const live = query({
   handler: async (ctx) => {
     const s = await openSession(ctx);
     if (!s) return null;
-    const [teams, att] = await Promise.all([sessionTeams(ctx, s._id), sessionAttendance(ctx, s._id)]);
+    const [teams, all] = await Promise.all([sessionTeams(ctx, s._id), sessionAttendance(ctx, s._id)]);
+    // Officers running the night aren't players on the TV.
+    const att = all.filter(inTeamPool);
     const players = await Promise.all(att.map((a) => ctx.db.get(a.playerId)));
     const roster = att.map((a, i) => ({ name: players[i]?.name ?? "?", teamId: a.teamId ?? null, firstTime: a.firstTime }));
     return {
@@ -258,6 +260,7 @@ export const host = query({
           firstTime: a.firstTime,
           broughtBy: a.broughtBy ?? null,
           bonusXp: a.bonusXp,
+          officer: !!a.officer,
         };
       }),
     );

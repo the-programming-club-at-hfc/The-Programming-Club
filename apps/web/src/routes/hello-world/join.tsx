@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
@@ -101,6 +101,11 @@ function JoinForm({
   onJoined: (t: string) => void;
 }) {
   const join = useMutation(api.players.join);
+  const checkInOfficer = useMutation(api.players.checkInOfficer);
+  // A phone signed in as an officer checks in to run the night instead of joining a team.
+  const { isAuthenticated } = useConvexAuth();
+  const account = useQuery(api.officers.me, isAuthenticated ? {} : "skip");
+  const officer = !!account?.officer;
   const [code, setCode] = useState(initialCode.toUpperCase());
   const [profile, setProfile] = useState<Profile>({ name: "", email: "" });
   const [broughtBy, setBroughtBy] = useState("");
@@ -117,12 +122,18 @@ function JoinForm({
     setFirstPhone(!saved && !Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
   }, []);
 
+  useEffect(() => {
+    if (officer && account.email) setProfile((p) => (p.email ? p : { ...p, email: account.email ?? "" }));
+  }, [officer, account?.email]);
+
   async function submit(e: { preventDefault: () => void }) {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      const token = await join({ code, ...profile, broughtBy: broughtBy || undefined, idea: (firstPhone && idea) || undefined });
+      const token = officer
+        ? await checkInOfficer(profile)
+        : await join({ code, ...profile, broughtBy: broughtBy || undefined, idea: (firstPhone && idea) || undefined });
       localStorage.setItem("hwc.profile", JSON.stringify(profile));
       localStorage.setItem(tokenKey(sessionId), token);
       onJoined(token);
@@ -150,37 +161,43 @@ function JoinForm({
           </p>
         </div>
         <div>
-          <h1 className="text-[clamp(2.2rem,10vw,3.2rem)] leading-[0.9] lowercase">join the game</h1>
-          <p className="mt-2 text-dim">No account or password. Welcome to {CLUB.name}!</p>
+          <h1 className="text-[clamp(2.2rem,10vw,3.2rem)] leading-[0.9] lowercase">{officer ? "officer check-in" : "join the game"}</h1>
+          <p className="mt-2 text-dim">
+            {officer
+              ? "You’re signed in as an officer. You’ll be counted here and kept off the teams so you can run the night."
+              : `No account or password. Welcome to ${CLUB.name}!`}
+          </p>
         </div>
 
-        <label className="block">
-          <span className="font-bold">Code on the TV</span>
-          <span className="relative mt-1.5 grid grid-cols-4 gap-[3px]">
-            {letters.map((c, i) => (
-              <span
-                key={i}
-                aria-hidden
-                className={`narrow grid h-14 place-items-center text-4xl font-extrabold ${c.trim() ? "bg-ink text-paper" : "bg-mist"} ${focused && i === Math.min(code.length, 3) ? "outline-[3px] -outline-offset-[3px] outline-sun" : ""}`}
-              >
-                {c}
-              </span>
-            ))}
-            <input
-              className="absolute inset-0 h-full w-full cursor-text uppercase opacity-0"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/[^a-z]/gi, "").toUpperCase())}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              maxLength={4}
-              autoComplete="off"
-              autoCapitalize="characters"
-              spellCheck={false}
-              required
-              aria-label="Code on the TV"
-            />
-          </span>
-        </label>
+        {!officer && (
+          <label className="block">
+            <span className="font-bold">Code on the TV</span>
+            <span className="relative mt-1.5 grid grid-cols-4 gap-[3px]">
+              {letters.map((c, i) => (
+                <span
+                  key={i}
+                  aria-hidden
+                  className={`narrow grid h-14 place-items-center text-4xl font-extrabold ${c.trim() ? "bg-ink text-paper" : "bg-mist"} ${focused && i === Math.min(code.length, 3) ? "outline-[3px] -outline-offset-[3px] outline-sun" : ""}`}
+                >
+                  {c}
+                </span>
+              ))}
+              <input
+                className="absolute inset-0 h-full w-full cursor-text uppercase opacity-0"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/[^a-z]/gi, "").toUpperCase())}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                maxLength={4}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                required
+                aria-label="Code on the TV"
+              />
+            </span>
+          </label>
+        )}
 
         <label className="block">
           <span className="font-bold">Your name</span>
@@ -205,11 +222,13 @@ function JoinForm({
             placeholder="jsmith@hawkmail.hfcc.edu"
           />
         </label>
-        <label className="block">
-          <span className="font-bold">Who brought you?</span> <span className="text-sm text-dim">Optional. You both get +2 XP.</span>
-          <input className="field mt-1.5" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
-        </label>
-        {firstPhone && (
+        {!officer && (
+          <label className="block">
+            <span className="font-bold">Who brought you?</span> <span className="text-sm text-dim">Optional. You both get +2 XP.</span>
+            <input className="field mt-1.5" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
+          </label>
+        )}
+        {firstPhone && !officer && (
           <label className="block">
             <span className="font-bold">Anything you’d like the club to do?</span> <span className="text-sm text-dim">Optional.</span>
             <textarea
@@ -235,7 +254,7 @@ function JoinForm({
         {/* Pinned to the bottom of the screen so Join is always one tap away. */}
         <div className="sticky bottom-0 mt-auto bg-paper pt-2 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <button className="btn btn-primary w-full text-lg" disabled={busy}>
-            {busy ? "Joining…" : "Join the game"}
+            {busy ? "Joining…" : officer ? "Check in" : "Join the game"}
           </button>
         </div>
       </form>
@@ -265,7 +284,16 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
         </div>
         <div className="theme-pine p-4 sm:p-6">
-          {me.team ? (
+          {me.officer && !me.playing ? (
+            <>
+              <p className="text-dim">Officer</p>
+              <h2 className="mt-1 text-2xl sm:text-3xl">You’re running tonight</h2>
+              <p className="mt-2 text-dim">Checked in and off the teams.</p>
+              <Link to="/hello-world/host" className="btn btn-primary mt-4 w-full">
+                Open host controls
+              </Link>
+            </>
+          ) : me.team ? (
             <>
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -328,15 +356,38 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
-        <p>
-          Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
-          {me.weeks === 1 ? "" : "s"}
-        </p>
+        {me.officer ? (
+          <PlayTonight token={token} playing={me.playing} />
+        ) : (
+          <p>
+            Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
+            {me.weeks === 1 ? "" : "s"}
+          </p>
+        )}
         <button onClick={onSwitch} className="link">
           Not {me.name}? Switch player
         </button>
       </div>
     </Wrap>
+  );
+}
+
+/** An officer's switch for nights when a team is short: on puts them on the smallest team. */
+function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
+  const setPlaying = useMutation(api.players.setPlaying);
+  const [error, setError] = useState("");
+  return (
+    <label className="flex items-center gap-2 font-semibold text-ink">
+      <input
+        type="checkbox"
+        className="size-5 accent-pine"
+        checked={playing}
+        onChange={(e) => sender(setError)(setPlaying({ token, playing: e.target.checked }))}
+      />
+      Play tonight
+      {!playing && <span className="font-normal text-dim">(when a team is short)</span>}
+      {error && <span className="font-normal text-signal">{error}</span>}
+    </label>
   );
 }
 
