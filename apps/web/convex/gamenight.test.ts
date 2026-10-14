@@ -466,6 +466,23 @@ describe("points", () => {
     await expect(t.mutation(api.wiki.finish, { token: d.tokens[0], card })).rejects.toThrow("race is over");
   });
 
+  test("Wiki Race get-ready: no finishes or scoring until Start", async () => {
+    const { t, nightWithTeams, show, score } = setup();
+    const { teams } = await nightWithTeams(4);
+    const [a] = teams;
+    const race = { mode: "wiki", wikiFrom: "Pizza", wikiTo: "Moon" } as const;
+    const card = "wiki:Pizza>Moon";
+    await show({ ...race, wikiReady: true });
+    await expect(t.mutation(api.wiki.finish, { token: a.tokens[0], card })).rejects.toThrow("hasn’t started");
+    await show({ ...race, wikiReady: true, revealed: true });
+    expect(await score(a._id)).toBe(0);
+    // Started, the race takes finishes and scores as usual.
+    await show(race);
+    await t.mutation(api.wiki.finish, { token: a.tokens[0], card });
+    await show({ ...race, revealed: true });
+    expect(await score(a._id)).toBe(5);
+  });
+
   test("the officer score buttons: only gains double on double points", async () => {
     const { officer, signedInStudent, nightWithTeams, score } = setup();
     const { teams } = await nightWithTeams(4);

@@ -142,10 +142,11 @@ export const board = query({
   },
 });
 
-/** Score the ended race, once per race per night: by place, or 1 for playing. Called by sessions.setScreen on reveal. */
+/** Score the ended race, once per race per night: by place, or 1 for playing. Called by sessions.setScreen on reveal.
+ *  A race still on its get-ready screen hasn't started, so it never scores. */
 export async function scoreWikiReveal(ctx: MutationCtx, s: Doc<"sessions">) {
   const w = wikiCard(s);
-  if (!w || !s.screen.revealed) return;
+  if (!w || !s.screen.revealed || s.screen.wikiReady) return;
   const { teams, rows, finished } = await raceRows(ctx, s, w.key);
   const r = wikiAwardsFor<Id<"teams">>({
     key: w.key,
