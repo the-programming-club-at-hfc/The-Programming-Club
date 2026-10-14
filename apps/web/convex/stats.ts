@@ -1,27 +1,26 @@
 import { query } from "./_generated/server";
 import { inTeamPool } from "./lib";
 
-/** Season high scores: XP per player, names only. Practice nights don't count, and officers only when they played. */
+/** Season high scores: XP per player with each night's show-up, place, and bonus XP. Names only.
+ *  Practice nights don't count, and officers only when they played. */
 export const leaderboard = query({
   args: {},
   handler: async (ctx) => {
     const sessions = (await ctx.db.query("sessions").collect()).filter((s) => !s.practice);
     const weekOf = new Map(sessions.map((s) => [s._id, s.week]));
-    const byPlayer = new Map<string, { xp: number; weeks: number; firstWeek: number }>();
+    const byPlayer = new Map<string, { week: number; show: number; place: number; bonus: number }[]>();
     for (const a of await ctx.db.query("attendance").collect()) {
-      if (!weekOf.has(a.sessionId) || !inTeamPool(a)) continue;
-      const cur = byPlayer.get(a.playerId) ?? { xp: 0, weeks: 0, firstWeek: 99 };
-      cur.xp += a.showXp + (a.placeXp ?? 0) + a.bonusXp;
-      cur.weeks += 1;
-      cur.firstWeek = Math.min(cur.firstWeek, weekOf.get(a.sessionId) ?? 99);
-      byPlayer.set(a.playerId, cur);
+      const week = weekOf.get(a.sessionId);
+      if (week === undefined || !inTeamPool(a)) continue;
+      byPlayer.set(a.playerId, [...(byPlayer.get(a.playerId) ?? []), { week, show: a.showXp, place: a.placeXp ?? 0, bonus: a.bonusXp }]);
     }
     const players = await ctx.db.query("players").collect();
     return players
       .filter((p) => byPlayer.has(p._id))
       .map((p) => {
-        const s = byPlayer.get(p._id)!;
-        return { name: p.name, xp: s.xp, weeks: s.weeks, founder: s.firstWeek === 1, rookie: s.firstWeek > 1 };
+        const nights = byPlayer.get(p._id)!.sort((a, b) => a.week - b.week);
+        const xp = nights.reduce((n, x) => n + x.show + x.place + x.bonus, 0);
+        return { name: p.name, xp, weeks: nights.length, founder: nights[0].week === 1, rookie: nights[0].week > 1, nights };
       })
       .sort((a, b) => b.xp - a.xp || b.weeks - a.weeks || a.name.localeCompare(b.name));
   },

@@ -608,5 +608,8 @@ describe("ending the night", () => {
     }
     const [row] = await t.query(api.stats.leaderboard, {});
     expect([row.xp, row.weeks, row.founder]).toEqual([2 * (3 + 3), 2, true]);
+    // Each night's breakdown, for /scores. Names only: no emails on this public query.
+    expect(row.nights).toEqual([1, 2].map((week) => ({ week, show: 3, place: 3, bonus: 0 })));
+    expect(JSON.stringify(await t.query(api.stats.leaderboard, {}))).not.toContain("@");
   });
 });
