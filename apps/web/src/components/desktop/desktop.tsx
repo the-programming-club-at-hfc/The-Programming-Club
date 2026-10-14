@@ -5,7 +5,7 @@ import { Show, SignInButton, UserButton } from "@clerk/tanstack-react-start";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import { useOfficer } from "#/components/officer";
+import { useLikelyOfficer } from "#/components/officer";
 import { ClubLogo } from "#/components/site";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, isHalloweenMonth } from "#/lib/season";
@@ -45,7 +45,7 @@ function flyTo(id: AppId): Pt | undefined {
 
 /** Desktop and phone icons: everything but the footer-linked "About this site", plus officer apps for officers. */
 const useIconApps = () => {
-  const officer = useOfficer();
+  const officer = useLikelyOfficer();
   return APPS.filter((a) => a.id !== "site" && (!a.officer || officer));
 };
 
@@ -472,7 +472,8 @@ function Account() {
   return (
     <span className="flex h-9 shrink-0 items-center rounded-[8px] px-1.5 hover:bg-white/10">
       <Show when="signed-in">
-        <UserButton>
+        {/* Holds the avatar's place while Clerk's scripts load, so the taskbar doesn't jump. */}
+        <UserButton fallback={<span className="block size-7 rounded-full bg-white/20" />}>
           <UserButton.MenuItems>
             <UserButton.Link label="Host console" labelIcon={<ClubLogo className="size-4" />} href="/hello-world/host" />
           </UserButton.MenuItems>

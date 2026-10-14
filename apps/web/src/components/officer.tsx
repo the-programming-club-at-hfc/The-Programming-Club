@@ -1,4 +1,4 @@
-import { Show, SignInButton, SignOutButton } from "@clerk/tanstack-react-start";
+import { Show, SignInButton, SignOutButton, useAuth } from "@clerk/tanstack-react-start";
 import { useConvex, useConvexAuth, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import type { ReactNode } from "react";
@@ -21,6 +21,18 @@ export function useOfficer() {
   const { isAuthenticated } = useConvexAuth();
   const me = useQuery(api.officers.me, isAuthenticated ? {} : "skip");
   return !!me?.officer;
+}
+
+/**
+ * For officer-only icons: true for any signed-in user until the database says they aren't an officer.
+ * Clerk's sign-in state is known from the server's first render, so officers don't wait on the Convex round trips.
+ */
+export function useLikelyOfficer() {
+  const { isSignedIn } = useAuth();
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  const me = useQuery(api.officers.me, isAuthenticated ? {} : "skip");
+  if (!isSignedIn) return false;
+  return isLoading || (isAuthenticated && me === undefined) || !!me?.officer;
 }
 
 /** Tonight's join code, or null until an officer is signed in and a night is running. */

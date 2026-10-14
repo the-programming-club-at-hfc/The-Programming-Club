@@ -1,8 +1,13 @@
+import { clerkJSScriptUrl, clerkUIScriptUrl } from "@clerk/shared/loadClerkJsScript";
 import { HeadContent, Link, Scripts, createRootRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Providers } from "#/components/providers";
 import { CLUB } from "#/lib/season";
 import appCss from "../styles.css?url";
+
+// Clerk only injects its scripts after the app hydrates; preloading the same URLs downloads them alongside the app instead.
+const publishableKey = import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY as string;
+const clerkScripts = [clerkJSScriptUrl({ publishableKey }), clerkUIScriptUrl({ publishableKey })];
 
 export const Route = createRootRoute({
   head: () => ({
@@ -24,6 +29,7 @@ export const Route = createRootRoute({
         href: "https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@75..125,200..900&family=Atkinson+Hyperlegible+Mono:wght@400;700&display=swap",
       },
       { rel: "stylesheet", href: appCss },
+      ...clerkScripts.map((href) => ({ rel: "preload", as: "script", href, crossOrigin: "anonymous" as const })),
       // The CRT prompt logo at tab sizes, plus an .ico for older browsers.
       { rel: "icon", href: "/favicon-32.png", sizes: "32x32", type: "image/png" },
       { rel: "icon", href: "/favicon-48.png", sizes: "48x48", type: "image/png" },
