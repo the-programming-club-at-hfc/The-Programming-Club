@@ -491,36 +491,6 @@ export const NEWCOMERS: string[] = [
   "If they arrive mid-round, they watch with their team and play from the next round.",
   "Before they leave, make sure they’re in the club’s Teams group.",
 ];
-export const SUPPLIES: { tier: string; items: string[] }[] = [
-  {
-    tier: "Free",
-    items: [
-      "The TV and lab computers in Room E-178",
-      "Phones for joining (anyone without one can be added from /host)",
-      "Whiteboard, markers, scrap paper, pens",
-      "Index cards and sticky notes, if Student Activities has a supply closet",
-    ],
-  },
-  {
-    tier: "About $30",
-    items: [
-      "A giant novelty Enter key and a can of gold spray paint: this becomes the Golden Keycap trophy",
-      "Blank keycaps or programming stickers for the weekly winning team",
-      "Sticky notes for the kickoff feedback wall",
-      "Sheet protectors with white paper inside: cheap reusable mini whiteboards",
-    ],
-  },
-  {
-    tier: "If there’s funding",
-    items: [
-      "Pizza on the two championship nights and Study & Snacks (ask Student Activities about event food funding). Order halal and vegetarian options.",
-      "Candy for weekly winners and Pictionary steals",
-      "Printed posters (ask whether Student Activities prints for clubs)",
-    ],
-  },
-];
-export const MONEY_NOTE =
-  "Under the constitution (Article 10), spending has to be approved at a meeting and recorded in the minutes, and needs College approval before money is committed. The Treasurer collects the signatures. Put a vote on the prize budget in the kickoff minutes.";
 export const PROMO: { idea: string; how: string }[] = [
   {
     idea: "Ask instructors to announce it",

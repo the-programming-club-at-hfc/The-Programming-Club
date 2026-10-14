@@ -2,22 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { TrophyViewer } from "#/components/trophy";
 import { AgendaList, Wrap } from "#/components/ui";
-import {
-  ANNOUNCEMENT,
-  AWARDS,
-  CAPTIONS,
-  FEEDBACK,
-  KICKOFF_AGENDA,
-  MATCH_AGENDA,
-  MONEY_NOTE,
-  NEWCOMERS,
-  POSTER_LINES,
-  PREP,
-  PROMO,
-  ROLES,
-  SUPPLIES,
-  WALL_CATEGORIES,
-} from "#/lib/content";
+import { ANNOUNCEMENT, AWARDS, CAPTIONS, KICKOFF_AGENDA, MATCH_AGENDA, NEWCOMERS, POSTER_LINES, PREP, PROMO, ROLES } from "#/lib/content";
 import { useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 
@@ -49,30 +34,6 @@ const PRIZE_IDEAS = [
   "Weekly winning team picks from a prize stash: programming stickers, blank keycaps, or candy.",
   "Season awards for MVP, Rookie of the Season, and Best Bug: a printed certificate, or a mini keycap.",
   "Or swap the trophy for something else entirely if the team prefers. Ideas welcome.",
-];
-
-const RISKS = [
-  ["Low turnout", "Every game works with two teams of two. Officers can play to fill a team."],
-  [
-    "Beginners feel out of their depth",
-    "Teams are reshuffled every week, showing up is worth more XP than winning, and the first rounds are easy.",
-  ],
-  ["Tech problems in the room", "Every game has a whiteboard or paper version. The site isn’t required to run a night."],
-  ["Officer time", "The plan, slides, scoring, and attendance are already built. Officers can swap any week’s games in the planner."],
-  [
-    "Nov 25 is the night before Thanksgiving",
-    "Campus is open, but it’s planned as a short, relaxed night. We can cancel it in the planner.",
-  ],
-];
-
-const QUESTIONS = [
-  "Does the overall idea work for this semester, or should we change it up?",
-  "Do the dates work: Midseason Cup Nov 4, Final and awards Nov 18, Demo Night Nov 25, Study & Snacks Dec 2?",
-  "Keep the Nov 25 Demo Night, or skip it for Thanksgiving?",
-  "Golden Keycap as the prize? Any of the other prize ideas?",
-  "About $30 for trophy paint and prizes, and should we ask Student Activities about pizza?",
-  "Do the roles above work for everyone?",
-  "Want to go to Hack The Nest (Nov 14–15 at EMU) together?",
 ];
 
 function GamePlan() {
@@ -222,74 +183,6 @@ function GamePlan() {
             </div>
           ))}
         </dl>
-      </Section>
-
-      <Section title="what it costs">
-        <div className="grid gap-5 md:grid-cols-3">
-          {SUPPLIES.map((t) => (
-            <div key={t.tier} className="card p-6">
-              <h3 className="text-xl text-ink">{t.tier}</h3>
-              <ul className="prose-list mt-3">
-                {t.items.map((i) => (
-                  <li key={i}>{i}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <p className="mt-4 border-l-4 border-signal bg-signal/10 px-4 py-3">{MONEY_NOTE}</p>
-      </Section>
-
-      <Section title="staying in touch">
-        <div className="grid gap-10 lg:grid-cols-2">
-          <ul className="prose-list text-lg">
-            <li>
-              <strong>Teams is the hub.</strong> Members are already in the club’s Microsoft Teams group: reminders go out Tuesday and
-              Wednesday at noon, and the leaderboard goes up every Thursday.
-            </li>
-            <li>
-              <strong>Kickoff feedback wall.</strong> Four sheets labeled {WALL_CATEGORIES.join(", ")}. Everyone posts at least one idea,
-              and we photograph it for the minutes.
-            </li>
-            <li>
-              <strong>New-member ideas.</strong> The first time someone joins, the join form has an optional box for what they’d like the
-              club to do. Answers show up on the officer dashboard.
-            </li>
-            <li>
-              <strong>Quick polls.</strong> A short Microsoft Form posted in Teams after a night, or before planning Season 1.
-            </li>
-          </ul>
-          <div className="card p-6">
-            <h3 className="text-lg tracking-normal">Kickoff questions</h3>
-            <ol className="steps mt-3 text-dim">
-              {FEEDBACK.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      </Section>
-
-      <Section title="open questions">
-        <div className="grid gap-10 lg:grid-cols-2">
-          <ol className="steps space-y-2 text-lg">
-            {QUESTIONS.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ol>
-          <div>
-            <h3 className="text-lg tracking-normal">If something goes wrong</h3>
-            <dl className="mt-3 divide-y divide-line border-y border-line">
-              {RISKS.map(([risk, fallback]) => (
-                <div key={risk} className="py-3">
-                  <dt className="font-bold">{risk}</dt>
-                  <dd className="text-dim">{fallback}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
-        <p className="mt-8 rounded-[10px] bg-mist p-5 text-lg">Thoughts, ideas, or changes? Post them in the officers’ Teams chat.</p>
       </Section>
 
       <div className="mx-auto mt-28 w-[min(1240px,100%-2.5rem)] border-t-2 border-ink pt-10">
