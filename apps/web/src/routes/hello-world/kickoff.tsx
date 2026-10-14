@@ -157,9 +157,9 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <p className="m-rise mt-10 text-[clamp(1.6rem,2.6vw,2.8rem)]" style={at(4)}>
         Because programmers start counting at zero.
       </p>
-      <p className="m-rise mx-auto mt-6 max-w-[48ch] text-[clamp(1.2rem,1.7vw,1.8rem)] text-dim" style={at(6)}>
-        We’re starting halfway through the semester, so the rest of it is for getting the club up and running. Tell us the projects,
-        events, and trips you want, and we’ll do our best to plan them into Season 1 next semester.
+      <p className="m-rise mx-auto mt-6 max-w-[48ch] text-[clamp(1.2rem,1.7vw,1.8rem)] text-balance text-dim" style={at(6)}>
+        We’re starting mid-semester, so the rest of it is for getting the club up and running. Tell us the projects, events, and trips
+        you want, and we’ll do our best to plan them into Season 1.
       </p>
     </div>,
     <div>
