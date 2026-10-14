@@ -264,14 +264,17 @@ function JoinForm({
         )}
         {!officer && firstPhone && (
           <label className="block">
-            <span className="font-bold">Anything you’d like the club to do?</span> <span className="text-sm text-dim">Optional.</span>
+            <span className="font-bold">What do you want from this club?</span>
+            <span className="block text-sm text-dim">
+              Optional. Things to learn or build, events to run, hackathons or trips to go to together.
+            </span>
             <textarea
               className="field mt-1.5 block resize-none"
-              rows={2}
+              rows={3}
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
               maxLength={IDEA_MAX}
-              placeholder="Events, projects, games, workshops…"
+              placeholder="A Python workshop, a group trip to a hackathon, a game jam…"
             />
             {idea.length > IDEA_MAX - 100 && (
               <span className="mt-1 block text-right text-sm text-dim">

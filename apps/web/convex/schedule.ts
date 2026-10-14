@@ -17,11 +17,10 @@ export const weeks = query({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("weeks").collect();
-    return rows.map(({ week, title, pitch, lesson, bonus, startsAt, cancelled, lineup }) => ({
+    return rows.map(({ week, title, pitch, bonus, startsAt, cancelled, lineup }) => ({
       week,
       title,
       pitch,
-      lesson,
       bonus,
       startsAt,
       cancelled,
@@ -41,7 +40,6 @@ export const save = mutation({
     week: v.number(),
     title: v.string(),
     pitch: v.string(),
-    lesson: v.optional(v.string()),
     bonus: v.optional(v.string()),
     startsAt: v.number(),
     cancelled: v.boolean(),
@@ -58,7 +56,6 @@ export const save = mutation({
       week: a.week,
       title,
       pitch: clean(a.pitch, 400),
-      lesson: clean(a.lesson, 400) || undefined,
       bonus: clean(a.bonus, 300) || undefined,
       startsAt: a.startsAt,
       cancelled: a.cancelled,

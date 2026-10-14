@@ -189,6 +189,36 @@ describe("teams", () => {
     expect(att.find((a) => a.officer)!.teamId).toBe(undefined);
   });
 
+  test("auto teams, on by default: joiners fill teams of up to 3, then start a new one", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    for (let i = 1; i <= 7; i++) await join(code, student(i));
+    await join(code, { name: "Grace", email: GRACE });
+    const att = await attendance();
+    const sizes = (await teams()).map((tm) => att.filter((a) => a.teamId === tm._id).length);
+    expect(sizes.sort()).toEqual([1, 3, 3]);
+    expect(att.find((a) => a.officer)!.teamId).toBe(undefined);
+    expect((await t.query(api.sessions.live, {}))!.autoTeams).toBe(true);
+    // Make teams still reshuffles everyone (2, 2, 3), and auto keeps placing late joiners on the smallest team.
+    await officer.mutation(api.teams.make, { size: 2 });
+    await join(code, student(8));
+    const after = await attendance();
+    expect((await teams()).map((tm) => after.filter((a) => a.teamId === tm._id).length).sort()).toEqual([2, 3, 3]);
+  });
+
+  test("with auto teams off, joiners wait for Make teams; turning it back on places them", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    await officer.mutation(api.teams.setAuto, { on: false });
+    for (let i = 1; i <= 4; i++) await join(code, student(i));
+    expect(await teams()).toHaveLength(0);
+    expect((await t.query(api.sessions.live, {}))!.autoTeams).toBe(false);
+    await expect(t.mutation(api.teams.setAuto, { on: true })).rejects.toThrow("Only club officers");
+    await officer.mutation(api.teams.setAuto, { on: true });
+    expect((await attendance()).every((a) => a.teamId)).toBe(true);
+    expect(await teams()).toHaveLength(2);
+  });
+
   test("Play tonight puts an officer on a team, and off again", async () => {
     const { t, officer, startNight, join, attendance } = setup();
     const code = await startNight();

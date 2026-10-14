@@ -7,7 +7,7 @@ import { Disclaimer } from "#/components/site";
 import { GAME_TILE, Picto, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
-import { CLUB, OFFICERS, fmtDate, isHalloweenMonth } from "#/lib/season";
+import { CLUB, OFFICERS, fmtDate } from "#/lib/season";
 import { api } from "../../../convex/_generated/api";
 import { Dashboard } from "./dashboard";
 
@@ -99,7 +99,6 @@ function Meetings() {
   const plan = useSchedule();
   const now = useNow();
   const next = now === null ? null : nextMeeting(plan, now);
-  const costume = plan.find((w) => w.bonus && /costume/i.test(w.bonus) && !w.cancelled);
   return (
     <div>
       {next && now !== null && (
@@ -117,9 +116,6 @@ function Meetings() {
             </p>
           </div>
         </div>
-      )}
-      {isHalloweenMonth() && costume && (
-        <p className="mb-4 text-sm font-semibold text-[#c2410c]">Come to {costume.title} in costume for +1 XP.</p>
       )}
       <ol className="divide-y divide-line">
         {plan.map((w, i) => {

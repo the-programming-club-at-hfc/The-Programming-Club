@@ -19,6 +19,8 @@ export const screenV = v.object({
     v.literal("card"),
     v.literal("wiki"),
     v.literal("message"),
+    // The kickoff deck, at `slide`.
+    v.literal("slides"),
   ),
   game: v.optional(gameV),
   index: v.optional(v.number()),
@@ -30,6 +32,8 @@ export const screenV = v.object({
   // Wiki Race, Fewest Clicks: teams send their click count instead of racing the clock.
   wikiClicks: v.optional(v.boolean()),
   message: v.optional(v.string()),
+  // Kickoff deck position (from 0), kept apart from `index` so the challenge on the go survives the slides going up.
+  slide: v.optional(v.number()),
 });
 
 // Running when startedAt is set: remaining = remainingMs - (now - startedAt).
@@ -55,7 +59,6 @@ export default defineSchema({
     week: v.number(),
     title: v.string(),
     pitch: v.string(),
-    lesson: v.optional(v.string()),
     bonus: v.optional(v.string()),
     startsAt: v.number(),
     cancelled: v.boolean(),
@@ -87,6 +90,8 @@ export default defineSchema({
     practice: v.optional(v.boolean()),
     // The lineup round being played (0-based), so /host's Next button picks up where it left off.
     round: v.optional(v.number()),
+    // false when officers turned auto teams off for tonight. Missing means on: joiners land on a team of up to 3.
+    autoTeams: v.optional(v.boolean()),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),

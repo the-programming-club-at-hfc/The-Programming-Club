@@ -33,7 +33,6 @@ export function mergePlan(stored: Stored[] | undefined): WeekPlan[] {
       ...d,
       title: s.title,
       pitch: s.pitch,
-      lesson: s.lesson,
       bonus: s.bonus,
       start: new Date(s.startsAt),
       cancelled: s.cancelled,
@@ -101,7 +100,7 @@ const VARIANTS = GAMES.flatMap((g) =>
 
 /**
  * Everything officers can add to a night, grouped by game: each game on its own, every entry
- * from the original plan, the named variants from each game's rules, and the kickoff dot-vote menu.
+ * from the original plan, the named variants from each game's rules, and the remix ideas.
  */
 export const CATALOG: { id: string | null; name: string; items: string[] }[] = (() => {
   const all = new Set<string>([

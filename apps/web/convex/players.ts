@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { addToSession, requireOpenSession, smallestTeam } from "./lib";
+import { addToSession, requireOpenSession, teamFor } from "./lib";
 import { isOfficerEmail, requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
 import { isHfcEmail } from "../src/lib/season";
@@ -119,7 +119,7 @@ export const checkInOfficer = mutation({
   },
 });
 
-/** An officer's "Play tonight" switch: on puts them on the smallest team, off takes them back off the teams. */
+/** An officer's "Play tonight" switch: on puts them on a team the way joining does, off takes them back off the teams. */
 export const setPlaying = mutation({
   args: { token: v.string(), playing: v.boolean() },
   handler: async (ctx, { token, playing }) => {
@@ -129,7 +129,7 @@ export const setPlaying = mutation({
       .unique();
     const session = a && (await ctx.db.get(a.sessionId));
     if (!a?.officer || session?.status !== "open") throw new ConvexError("Only officers can switch that, during the night.");
-    await ctx.db.patch(a._id, { playing, teamId: playing ? (a.teamId ?? (await smallestTeam(ctx, a.sessionId))) : undefined });
+    await ctx.db.patch(a._id, { playing, teamId: playing ? (a.teamId ?? (await teamFor(ctx, session))) : undefined });
   },
 });
 

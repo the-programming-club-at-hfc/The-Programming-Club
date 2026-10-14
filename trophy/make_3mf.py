@@ -1,8 +1,7 @@
 """Pack STLs from stl/ into a Bambu Studio project for the P1S.
 
-  python3 trophy/make_3mf.py           # stl/plate.stl  -> golden-keycap-p1s.3mf (base, switch, keycap; sliced)
-  python3 trophy/make_3mf.py switch    # stl/switch.stl -> switch-p1s.3mf (sliced)
-  python3 trophy/make_3mf.py parts     # every part     -> trophy-parts.3mf (one object each, not sliced)
+  python3 trophy/make_3mf.py base      # stl/base.stl -> base-p1s.3mf (sliced; likewise switch, keycap)
+  python3 trophy/make_3mf.py parts     # every part   -> trophy-parts.3mf (one object each, not sliced)
 
 Black PLA (white for the plaque text) with Bambu's own P1S presets. Needs a Bambu Studio whose
 CLI works (2.8+): set BAMBU_APP to its .app, or it uses ~/.local/share/bambu-cli/BambuStudio.app.
@@ -19,11 +18,10 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = os.environ.get("BAMBU_APP", os.path.expanduser("~/.local/share/bambu-cli/BambuStudio.app"))
 PROFILES = os.path.join(APP, "Contents/Resources/profiles/BBL")
-PART = sys.argv[1] if len(sys.argv) > 1 else "plate"
-OUT = os.path.join(HERE, {"plate": "golden-keycap-p1s.3mf", "parts": "trophy-parts.3mf"}.get(PART, f"{PART}-p1s.3mf"))
+PART = sys.argv[1] if len(sys.argv) > 1 else "parts"
+OUT = os.path.join(HERE, "trophy-parts.3mf" if PART == "parts" else f"{PART}-p1s.3mf")
 # Objects in the project: (name, [(stl, filament)]). An object's volumes keep their shared STL coordinates.
 OBJECTS = {
-    "plate": [("Golden Keycap", [("plate", 1)])],
     "parts": [
         ("Base", [("base", 1)]),
         ("Switch", [("switch", 1)]),
@@ -38,6 +36,7 @@ PROCESS = "0.20mm Standard @BBL X1C"
 FILAMENT = "Bambu PLA Basic @BBL X1C"
 COLOURS = ["#000000", "#FFFFFF"]
 CENTRE = 128  # centre of the 256 mm bed
+CLEAR_Y = 30  # nearest the front edge a big part may come, clear of the bed's 18 x 28 mm front-left exclusion zone
 
 
 def presets():
@@ -91,7 +90,9 @@ def write_unsliced(path):
     for n, (name, stls) in enumerate(OBJECTS, 1):
         volumes = [(stl, extruder, read_stl(os.path.join(HERE, "stl", f"{stl}.stl"))) for stl, extruder in stls]
         verts = [v for _, _, (vs, _) in volumes for v in vs]
-        cx, cy = ((min(v[i] for v in verts) + max(v[i] for v in verts)) / 2 for i in (0, 1))  # centre the object, not each volume
+        lo, hi = ([f(v[i] for v in verts) for i in (0, 1)] for f in (min, max))
+        cx, cy = ((lo[i] + hi[i]) / 2 for i in (0, 1))  # centre the object, not each volume
+        y = max(CENTRE, CLEAR_Y + (hi[1] - lo[1]) / 2)
         model = f"/3D/Objects/object_{n}.model"
         ids = list(range(next_id, next_id + len(volumes)))
         meshes = "".join(mesh_xml(i, *mesh, cx, cy) for i, (_, _, mesh) in zip(ids, volumes))
@@ -101,7 +102,7 @@ def write_unsliced(path):
         next_id = obj + 1
         components = "".join(f'<component p:path="{model}" objectid="{i}" transform="{identity}"/>' for i in ids)
         resources.append(f'<object id="{obj}" type="model"><components>{components}</components></object>')
-        items.append(f'<item objectid="{obj}" transform="1 0 0 0 1 0 0 0 1 {CENTRE} {CENTRE} 0" printable="1"/>')
+        items.append(f'<item objectid="{obj}" transform="1 0 0 0 1 0 0 0 1 {CENTRE} {y:.3f} 0" printable="1"/>')
         parts = "".join(
             f'<part id="{i}" subtype="normal_part"><metadata key="name" value="{stl}"/><metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/><metadata key="extruder" value="{extruder}"/></part>'
             for i, (stl, extruder, _) in zip(ids, volumes)

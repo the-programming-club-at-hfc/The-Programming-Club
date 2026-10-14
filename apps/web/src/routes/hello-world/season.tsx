@@ -124,12 +124,6 @@ function Season() {
                     })}
                   </ol>
                 </div>
-                {w.lesson && (
-                  <div>
-                    <h3 className="text-sm tracking-normal text-dim">Mini-lesson</h3>
-                    <p className="mt-1">{w.lesson}</p>
-                  </div>
-                )}
                 {w.bonus && (
                   <div>
                     <h3 className="text-sm tracking-normal text-dim">Bonus</h3>

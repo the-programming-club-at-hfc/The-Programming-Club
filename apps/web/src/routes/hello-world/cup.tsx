@@ -34,7 +34,7 @@ function Cup() {
 
       <Night
         title="the midseason cup"
-        intro="Four rounds: Output?, Wiki Race, Code Relay, and Fix it for real. Like every night, the last round counts double."
+        intro="Four rounds: Output?, Wiki Race, Code Relay, and Fix it for real. Like every game night, the last round counts double."
         rows={noSetup(CUP_AGENDA)}
       />
       <Night

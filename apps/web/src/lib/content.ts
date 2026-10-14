@@ -7,21 +7,20 @@ export const WEEKS: Week[] = [
     kind: "kickoff",
     title: "Kickoff: Hello, World",
     pitch: "Meet the officers, find out how Season 0 works, tell us what you want from the club, then play the first Wiki Race.",
-    games: ["Meet the officers", "Feedback wall", "Wiki Race (first match)"],
+    games: ["Meet the officers", "What should the club be?", "Wiki Race (first match)"],
     bonus: "Everyone here tonight is a Founding Member and goes on the Season 0 roster.",
     showXp: 3,
   },
   {
     kind: "match",
-    title: "Wiki Race Night",
-    pitch: "Get from Pizza to the Moon using only Wikipedia links. Fastest team wins.",
-    lesson:
-      "Wikipedia is a graph (3 min): articles are nodes, links are edges, and the fastest route is a shortest-path problem. Hub pages like “United States” are the highways.",
+    title: "Tech Pictionary Night",
+    pitch:
+      "Draw a tech word on the whiteboard while your team guesses: no letters, numbers, or symbols. Miss it, and the other teams get a shot to steal.",
     games: [
-      "Tech Pictionary (warm-up)",
-      "Wiki Race: Classic",
-      "Wiki Race: Fewest Clicks",
-      "Final round, double points: Wiki Race, CS edition",
+      "Guess the Language (warm-up)",
+      "Tech Pictionary: round 1",
+      "Tech Pictionary: round 2",
+      "Final round, double points: Tech Pictionary, round 3",
     ],
     showXp: 3,
   },
@@ -29,9 +28,7 @@ export const WEEKS: Week[] = [
     kind: "match",
     title: "Spooky Bugs",
     pitch: "Halloween Bug Hunt. Every snippet hides exactly one bug, and your team has 90 seconds to find it.",
-    lesson: "How to read an error message (3 min): the last line tells you what went wrong, and the line number tells you where to look.",
     games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round, double points: Fix it for real, spooky"],
-    bonus: "Come in costume for +1 XP.",
     showXp: 3,
   },
   {
@@ -46,7 +43,6 @@ export const WEEKS: Week[] = [
     title: "Code Relay Night",
     pitch:
       "One keyboard per team. Only the driver types, and you swap every two minutes. A dress rehearsal for the Final’s Advent of Code–style puzzles.",
-    lesson: "Pair programming (3 min): the driver types, the navigators think ahead. Real teams work this way.",
     games: [
       "Whiteboard Relay (warm-up)",
       "Code Relay: round 1",
@@ -59,34 +55,27 @@ export const WEEKS: Week[] = [
     kind: "cup",
     title: "The Final",
     pitch:
-      "The Season 0 championship: two Advent of Code–style puzzles, a warm-up for the real thing in December. Everyone starts at zero, the Midseason champions defend the Keycap, and the winners sign it.",
+      "The Season 0 championship: two Advent of Code–style puzzles, a warm-up for the real thing in December. Everyone starts at zero, the Midseason champions defend the Keycap, and the winners sign it. Then the Season 0 awards.",
     games: ["Puzzle 1: easy, played as a relay", "Final round, double points: Puzzle 2, medium"],
-    bonus: "Stay to the end for an invite to the club’s Advent of Code private leaderboard. It starts Dec 1.",
+    bonus: "Stay to the end for the awards and an invite to the club’s Advent of Code private leaderboard. It starts Dec 1.",
     showXp: 3,
   },
   {
-    kind: "match",
-    title: "Boss Battle",
+    kind: "showcase",
+    title: "Demo Night",
     pitch:
-      "The Final is done, so this one is just for fun. Every team takes on the officers in the games you voted for at the kickoff. A short, relaxed night before Thanksgiving.",
-    games: ["Top-voted game vs. officers", "Second-voted game vs. officers", "Final round, double points: crowd’s choice"],
-    bonus: "Double show-up XP (+6) for coming the night before a holiday. If nobody votes: Wiki Race, Bug Hunt, Guess the Language.",
+      "Show off what you’ve been building: a class project, a side project, something half-finished. Two minutes each, any skill level, no judging. A short, relaxed night before Thanksgiving.",
+    games: ["Officers demo first", "Your demos: 2 minutes each", "Hang out and trade feedback"],
     note: "Campus is open (the College closes Thursday and Friday for Thanksgiving), but expect a smaller crowd.",
-    showXp: 6,
+    showXp: 3,
   },
   {
     kind: "wrap",
-    title: "Wrap Party & Study Hall",
+    title: "Study & Snacks",
     pitch:
-      "No competition the week before finals. Snacks (pizza if funding comes through), the Season 0 awards, show-and-tell for anything you’ve been building, then stay to study or get help with class projects.",
-    games: [
-      "Season 0 awards",
-      "Show & tell: 2-minute demos",
-      "Season 1 brainstorm",
-      "Advent of Code together (club leaderboard)",
-      "Study hall & project help",
-    ],
-    bonus: "Awards count XP through week 7, so tonight is just for celebrating.",
+      "No competition the week before finals. Snacks (pizza if funding comes through), then study, get help with class projects, or just hang out.",
+    games: ["Snacks", "Study hall & project help", "Advent of Code together (club leaderboard)", "Season 1 brainstorm"],
+    bonus: "Advent of Code starts Dec 1, so bring your Day 1 solution to compare.",
     showXp: 3,
   },
 ];
@@ -94,26 +83,20 @@ export const WEEKS: Week[] = [
 export const MATCH_AGENDA: Agenda[] = [
   {
     t: "5:00",
-    len: 8,
+    len: 10,
     what: "Lobby",
     detail:
-      "Scan the QR to join, squad up into teams of 2–3, warm-up game on screen. Late joiners land on the smallest team automatically.",
+      "Scan the QR to join and you land on a team of up to 3, warm-up game on screen, then a one-minute rules recap. Late joiners get a team automatically too.",
   },
   {
-    t: "5:08",
-    len: 4,
-    what: "Mini-lesson",
-    detail: "One beginner concept tied to tonight’s game, then a one-minute rules recap.",
-  },
-  {
-    t: "5:12",
-    len: 15,
+    t: "5:10",
+    len: 16,
     what: "Round 1",
     detail: "Tonight’s main game, easy version.",
   },
   {
-    t: "5:27",
-    len: 15,
+    t: "5:26",
+    len: 16,
     what: "Round 2",
     detail: "Same game, harder or with a twist. Late arrivals join here.",
   },
@@ -141,7 +124,8 @@ export const KICKOFF_AGENDA: Agenda[] = [
     t: "5:00",
     len: 5,
     what: "Lobby",
-    detail: "Scan the QR code to join, grab a seat. The title slide shows a warm-up question.",
+    detail:
+      "Start Week 1 in /host and put the kickoff slides on the TV. Everyone scans the QR code to join and grabs a seat. The title slide shows a warm-up question.",
   },
   {
     t: "5:05",
@@ -163,15 +147,15 @@ export const KICKOFF_AGENDA: Agenda[] = [
   },
   {
     t: "5:26",
-    len: 10,
+    len: 6,
     what: "Your turn: feedback",
-    detail: "Sticky-note wall and dot vote, or the feedback form on phones.",
+    detail: "Talk through the questions on the slide. Ideas from the join form land on the officer dashboard.",
   },
   {
-    t: "5:36",
-    len: 16,
+    t: "5:32",
+    len: 20,
     what: "First match: Wiki Race",
-    detail: "One practice race, then two scored races.",
+    detail: "Teams open programmingclub.dev/wiki. One practice race, then two scored races.",
   },
   {
     t: "5:52",
@@ -193,7 +177,7 @@ export const CUP_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone, then make teams in /host.",
+    detail: "Join on your phone. Auto teams fill teams of up to 3; Make teams in /host reshuffles if you want new ones.",
   },
   {
     t: "5:06",
@@ -251,7 +235,7 @@ export const FINAL_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone, then make teams in /host.",
+    detail: "Join on your phone. Auto teams fill teams of up to 3; Make teams in /host reshuffles if you want new ones.",
   },
   {
     t: "5:06",
@@ -281,21 +265,22 @@ export const FINAL_AGENDA: Agenda[] = [
   },
   {
     t: "5:50",
-    len: 2,
-    what: "How we solved it",
-    detail: "An officer walks through the solution. Skip it if you’re running late.",
-  },
-  {
-    t: "5:52",
     len: 3,
     what: "Final standings",
     detail: "Reveal from last place to first. If there’s a tie, play one sudden-death question.",
   },
   {
-    t: "5:55",
-    len: 5,
-    what: "Trophy + what’s next",
-    detail: "Winners sign the Golden Keycap. Invite everyone to the club’s Advent of Code private leaderboard, which starts Dec 1.",
+    t: "5:53",
+    len: 3,
+    what: "Trophy",
+    detail: "Winners sign the Golden Keycap. Post the puzzle solutions in the Teams group afterward.",
+  },
+  {
+    t: "5:56",
+    len: 4,
+    what: "Season 0 awards",
+    detail:
+      "Season MVP, Rookie of the Season, and Best Bug. Then invite everyone to the club’s Advent of Code private leaderboard, which starts Dec 1.",
   },
 ];
 
@@ -307,7 +292,7 @@ export const GAMES: Game[] = [
     need: "1 phone or laptop per team to race on, internet, and a phone to tap “We made it!”",
     time: "5 min per race",
     steps: [
-      "The TV shows a start and a target article. It’s on your phones too. Everyone opens the start article.",
+      "The TV shows a start and a target article. It’s on your phones too. Open programmingclub.dev/wiki on your team’s computer and it jumps to the start article.",
       "On “Go,” click only the blue links inside the article. No search bar, no typing URLs.",
       "The back button is allowed. So is Ctrl+F (find on page).",
       "When you land on the target, anyone on your team taps “We made it!” on a phone and raises a hand, keeping the target article open. A referee comes over to check it. Tapped by mistake? Undo it until the referee checks.",
@@ -342,7 +327,7 @@ export const GAMES: Game[] = [
       "Paper backup: if phones or Wi-Fi act up, teams write the line and the fix, hold them up together, and officers score by hand.",
       "Fix it for real (the double-points final on Bug Hunt nights): one buggy Python program, 4 minutes. Each team edits and runs it on its team computer at /hello-world/fix, and the site marks the team Fixed! once every test passes. +3 for a fix, +2 more for the first team to fix it, all doubled.",
     ],
-    tip: "Keep a note of the best wrong answer each week, and read it out without naming the team. It decides the “Best Bug” award at the Wrap Party.",
+    tip: "Keep a note of the best wrong answer each week, and read it out without naming the team. It decides the “Best Bug” award at the Final.",
   },
   {
     id: "relay",
@@ -395,7 +380,7 @@ export const GAMES: Game[] = [
       "Your team has 60 seconds. After that, other teams get one guess each to steal.",
     ],
     scoring: "2 points for a correct guess, 1 for a steal.",
-    variants: ["Speed round: teams take turns, with one minute on the clock per team."],
+    variants: [],
     tip: "Zero prep and works with any number of people. Use it to fill the time while the room fills up.",
   },
   {
@@ -434,19 +419,9 @@ export const XP: Xp[] = [
     what: "Bring someone new",
     note: "You and the classmate you bring each get +2.",
   },
-  {
-    pts: "+1",
-    what: "Theme bonus",
-    note: "Costume at Spooky Bugs, and similar.",
-  },
-  {
-    pts: "+6",
-    what: "Show up to Boss Battle",
-    note: "Double the usual show-up XP, for coming the night before Thanksgiving.",
-  },
 ];
 export const COMEBACKS: string[] = [
-  "The final round of every night is worth double, championships included.",
+  "The final round of every game night is worth double, championships included.",
   "Weekly results become XP by finishing place, not by margin. Winning by 1 point or by 20 is worth the same.",
   "Showing up (+3) is worth as much as winning (+3 to +1). Someone who never misses a week will outrank someone who wins twice and then stops coming.",
   "Championship nights reset everyone to 0. A first-timer can win the Golden Keycap.",
@@ -459,7 +434,7 @@ export const AWARDS: Award[] = [
   },
   {
     name: "Season MVP",
-    how: "Most XP through week 7. Being there every week is how you get it.",
+    how: "Most XP through the Final. Being there every week is how you get it.",
   },
   {
     name: "Rookie of the Season",
@@ -507,41 +482,11 @@ export const PREP: string[] = [
 ];
 export const NEWCOMERS: string[] = [
   "Point them at the QR code on the TV. Joining takes about 20 seconds.",
-  "If teams already exist, the app puts them on the smallest team automatically. Move them in /host if needed.",
+  "The app puts them on a team automatically. Move them in /host if needed.",
   "One-sentence pitch: “Tonight’s game is ___. Your team scores points together. No experience needed.”",
   "If they arrive mid-round, they watch with their team and play from the next round.",
   "Before they leave, make sure they’re in the club’s Teams group.",
 ];
-export const SUPPLIES: { tier: string; items: string[] }[] = [
-  {
-    tier: "Free",
-    items: [
-      "The TV and lab computers in Room E-178",
-      "Phones for joining (anyone without one can be added from /host)",
-      "Whiteboard, markers, scrap paper, pens",
-      "Index cards and sticky notes, if Student Activities has a supply closet",
-    ],
-  },
-  {
-    tier: "About $30",
-    items: [
-      "A giant novelty Enter key and a can of gold spray paint: this becomes the Golden Keycap trophy",
-      "Blank keycaps or programming stickers for the weekly winning team",
-      "Sticky notes for the kickoff feedback wall",
-      "Sheet protectors with white paper inside: cheap reusable mini whiteboards",
-    ],
-  },
-  {
-    tier: "If there’s funding",
-    items: [
-      "Pizza on the two championship nights and the Wrap Party (ask Student Activities about event food funding). Order halal and vegetarian options.",
-      "Candy for weekly winners and Pictionary steals",
-      "Printed posters (ask whether Student Activities prints for clubs)",
-    ],
-  },
-];
-export const MONEY_NOTE =
-  "Under the constitution (Article 10), spending has to be approved at a meeting and recorded in the minutes, and needs College approval before money is committed. The Treasurer collects the signatures. Put a vote on the prize budget in the kickoff minutes.";
 export const PROMO: { idea: string; how: string }[] = [
   {
     idea: "Ask instructors to announce it",
@@ -581,7 +526,7 @@ export const ANNOUNCEMENT =
   "Hi everyone, quick announcement from the Programming Club. We meet Wednesdays from 5 to 6 in Room E-178, and this semester we’re running a team game league called the Hello, World Cup: Wikipedia races, bug hunts, code relays. You don’t need any experience and there’s no homework. It’s free, and you can join any week. Come play. Details are at programmingclub.dev.";
 export const CAPTIONS: string[] = [
   "Week {n} high scores are up 🕹️ Come knock them off the board Wednesday, 5–6, Room E-178.",
-  "Pizza → Moon in 4 clicks. Think you can beat it? Wiki Race Night, Wednesday 5–6.",
+  "Pizza → Moon in 4 clicks. Think you can beat it? Wednesdays 5–6, Room E-178.",
   "Never coded before? Most of us hadn’t either. Wednesdays 5–6, Room E-178, no experience needed.",
 ];
 export const FEEDBACK: string[] = [
@@ -591,7 +536,6 @@ export const FEEDBACK: string[] = [
   "Does Wednesday 5–6 work for you?",
   "What one thing would make you come back every week?",
 ];
-export const WALL_CATEGORIES: string[] = ["Learn", "Build", "Compete", "Hang out"];
 export const REMIX_MENU: string[] = [
   "Guess the Language",
   "Output? Showdown",
@@ -600,6 +544,8 @@ export const REMIX_MENU: string[] = [
   "Bug Bounty (write bugs for other teams)",
   "More Code Relay",
 ];
+
+export const wikiUrl = (title: string) => `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 
 export const WIKI_RACES: WikiRace[] = [
   {

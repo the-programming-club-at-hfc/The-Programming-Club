@@ -195,7 +195,7 @@ function Home() {
         <dl className="grid gap-x-12 gap-y-12 md:grid-cols-3">
           {[
             ["no homework", "Everything happens in the room, in one hour."],
-            ["join any week", "Scan the code on the TV and you’re on a team. Late arrivals land on the smallest team."],
+            ["join any week", "Scan the code on the TV and you’re on a team, even if you walk in late."],
             [
               "any level",
               "Code Relay takes any language you’re learning in class. Bug Hunt and Output? use short Python snippets, and we explain every answer.",

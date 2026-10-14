@@ -74,12 +74,16 @@ function Rules() {
                   <strong>Scoring.</strong> {g.scoring}
                 </p>
                 <details className="mt-5 text-[0.95rem]">
-                  <summary className="cursor-pointer font-semibold text-dim hover:text-ink">Variants and an officer tip</summary>
-                  <ul className="prose-list mt-3">
-                    {g.variants.map((v) => (
-                      <li key={v}>{v}</li>
-                    ))}
-                  </ul>
+                  <summary className="cursor-pointer font-semibold text-dim hover:text-ink">
+                    {g.variants.length ? "Variants and an officer tip" : "Officer tip"}
+                  </summary>
+                  {g.variants.length > 0 && (
+                    <ul className="prose-list mt-3">
+                      {g.variants.map((v) => (
+                        <li key={v}>{v}</li>
+                      ))}
+                    </ul>
+                  )}
                   <p className="text-dim italic">{g.tip}</p>
                 </details>
               </div>
@@ -92,7 +96,7 @@ function Rules() {
         <div>
           <h2 className="text-[clamp(2.4rem,5vw,4rem)] lowercase">scoring</h2>
           <p className="mt-5 max-w-[52ch] text-lg">
-            Teams earn points in each game, and the last round of every night counts double. Team points reset every week.
+            Teams earn points in each game, and the last round of every game night counts double. Team points reset every week.
           </p>
           <p className="mt-3 max-w-[52ch] text-dim">
             Season XP is yours, not your team’s, so switching teams never costs you anything. The app tracks it when you join.

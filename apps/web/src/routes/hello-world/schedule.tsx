@@ -73,14 +73,13 @@ function Planner() {
   );
 }
 
-type Draft = { title: string; pitch: string; lesson: string; bonus: string; start: string; cancelled: boolean; lineup: LineupItem[] };
+type Draft = { title: string; pitch: string; bonus: string; start: string; cancelled: boolean; lineup: LineupItem[] };
 
 // <input type="datetime-local"> works in the browser's time zone.
 const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 const draftOf = (w: WeekPlan): Draft => ({
   title: w.title,
   pitch: w.pitch,
-  lesson: w.lesson ?? "",
   bonus: w.bonus ?? "",
   start: toLocal(w.start),
   cancelled: w.cancelled,
@@ -122,7 +121,6 @@ function Editor({ w }: { w: WeekPlan }) {
         week: w.week,
         title: d.title,
         pitch: d.pitch,
-        lesson: d.lesson,
         bonus: d.bonus,
         startsAt: new Date(d.start).getTime(),
         cancelled: d.cancelled,
@@ -174,11 +172,7 @@ function Editor({ w }: { w: WeekPlan }) {
           <span className="ml-2 text-sm text-dim">One or two sentences for the home page and the season page.</span>
           <textarea className="field mt-1.5 min-h-20" value={d.pitch} onChange={(e) => set({ pitch: e.target.value })} maxLength={400} />
         </label>
-        <label className="block">
-          <span className="font-bold">Mini-lesson</span> <span className="text-sm text-dim">Optional</span>
-          <textarea className="field mt-1.5 min-h-24" value={d.lesson} onChange={(e) => set({ lesson: e.target.value })} maxLength={400} />
-        </label>
-        <label className="block">
+        <label className="block sm:col-span-2">
           <span className="font-bold">Bonus</span> <span className="text-sm text-dim">Optional</span>
           <textarea className="field mt-1.5 min-h-24" value={d.bonus} onChange={(e) => set({ bonus: e.target.value })} maxLength={300} />
         </label>

@@ -13,10 +13,6 @@ export const CLUB = {
   eligibility: "Open to all currently enrolled HFC students",
   advisor: { name: "Sreya Sadasivapetkar", email: "ssadasivapetkar@hfcc.edu", office: "E-162I" },
   timeZone: "America/Detroit",
-  links: {
-    feedbackForm: "", // Microsoft Form for kickoff feedback (shown as a QR code on the slides)
-    teams: "", // Invite link to the club's Microsoft Teams group (QR code on the last kickoff slide)
-  },
 };
 
 /** HFC student (@hawkmail.hfcc.edu) and staff (@hfcc.edu) emails: the only ones members join with, since the club is HFC-only. */

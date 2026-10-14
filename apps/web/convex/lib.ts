@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { WEEKS } from "../src/lib/content";
 import { isOfficerEmail } from "./officers";
+import { TEAM_NAMES } from "./teamNames";
 
 export const openSession = (ctx: QueryCtx) =>
   ctx.db
@@ -69,16 +70,37 @@ export function cleanPlayer(name: string, email: string) {
   return { name: n, email: e };
 }
 
-/** The team with the fewest players tonight, for late joiners. */
-export async function smallestTeam(ctx: QueryCtx, sessionId: Id<"sessions">) {
+export const unusedName = (taken: string[]) => shuffle(TEAM_NAMES).find((n) => !taken.includes(n)) ?? `Team ${taken.length + 1}`;
+
+/** A new, empty team with its own name and team key. */
+export async function newTeam(ctx: MutationCtx, sessionId: Id<"sessions">) {
   const teams = await sessionTeams(ctx, sessionId);
-  if (!teams.length) return undefined;
-  const att = await sessionAttendance(ctx, sessionId);
-  const size = (t: Id<"teams">) => att.filter((a) => a.teamId === t).length;
-  return teams.reduce((best, t) => (size(t._id) < size(best._id) ? t : best))._id;
+  return ctx.db.insert("teams", {
+    sessionId,
+    name: unusedName(teams.map((t) => t.name)),
+    score: 0,
+    key: newTeamKey(teams.map((t) => t.key)),
+  });
 }
 
-/** Add a player to the session (or return their existing spot). Late joiners go on the smallest team.
+/** Auto teams fill each team up to this, then start a new one. */
+const AUTO_TEAM_SIZE = 3;
+
+/**
+ * Where a student who just joined goes. With auto teams (the default), the smallest team that isn't full, or a new
+ * one. With auto teams off, the smallest team once officers have made teams, and no team before that.
+ */
+export async function teamFor(ctx: MutationCtx, session: Doc<"sessions">) {
+  const teams = await sessionTeams(ctx, session._id);
+  const att = await sessionAttendance(ctx, session._id);
+  const size = (t: Id<"teams">) => att.filter((a) => a.teamId === t).length;
+  const auto = session.autoTeams !== false;
+  const open = auto ? teams.filter((t) => size(t._id) < AUTO_TEAM_SIZE) : teams;
+  if (open.length) return open.reduce((best, t) => (size(t._id) < size(best._id) ? t : best))._id;
+  return auto ? newTeam(ctx, session._id) : undefined;
+}
+
+/** Add a player to the session (or return their existing spot), on a team as teamFor decides.
  *  Officers (signed in, or by an email on OFFICER_EMAILS) check in to run the night, off the teams. */
 export async function addToSession(
   ctx: MutationCtx,
@@ -116,7 +138,7 @@ export async function addToSession(
     .collect();
   const prior = (await Promise.all(history.map((h) => ctx.db.get(h.sessionId)))).some((s) => s && !s.practice);
 
-  const teamId = officer ? undefined : await smallestTeam(ctx, session._id);
+  const teamId = officer ? undefined : await teamFor(ctx, session);
 
   const token = randomToken();
   await ctx.db.insert("attendance", {

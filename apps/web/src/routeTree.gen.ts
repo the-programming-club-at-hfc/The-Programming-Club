@@ -14,6 +14,7 @@ import { Route as HelloWorldRouteRouteImport } from './routes/hello-world/route'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as DesktopIndexRouteImport } from './routes/_desktop/index'
 import { Route as DesktopAboutRouteImport } from './routes/_desktop/about'
 import { Route as DesktopAiBusinessConferenceRouteImport } from './routes/_desktop/ai-business-conference'
@@ -38,6 +39,7 @@ import { Route as HelloWorldSeasonRouteImport } from './routes/hello-world/seaso
 import { Route as HelloWorldSoundsRouteImport } from './routes/hello-world/sounds'
 import { Route as HelloWorldTestRouteImport } from './routes/hello-world/test'
 import { Route as HelloWorldTvRouteImport } from './routes/hello-world/tv'
+import { Route as HelloWorldWikiRouteImport } from './routes/hello-world/wiki'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 
 const DesktopRoute = DesktopRouteImport.update({
@@ -62,6 +64,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WikiRoute = WikiRouteImport.update({
+  id: '/wiki',
+  path: '/wiki',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesktopIndexRoute = DesktopIndexRouteImport.update({
@@ -185,6 +192,11 @@ const HelloWorldTvRoute = HelloWorldTvRouteImport.update({
   path: '/tv',
   getParentRoute: () => HelloWorldRouteRoute,
 } as any)
+const HelloWorldWikiRoute = HelloWorldWikiRouteImport.update({
+  id: '/wiki',
+  path: '/wiki',
+  getParentRoute: () => HelloWorldRouteRoute,
+} as any)
 const SignInSplatRoute = SignInSplatRouteImport.update({
   id: '/sign-in/$',
   path: '/sign-in/$',
@@ -197,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/wiki': typeof WikiRoute
   '/about': typeof DesktopAboutRoute
   '/ai-business-conference': typeof DesktopAiBusinessConferenceRoute
   '/dashboard': typeof DesktopDashboardRoute
@@ -219,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
   '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
+  '/hello-world/wiki': typeof HelloWorldWikiRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/hello-world/': typeof HelloWorldIndexRoute
 }
@@ -226,6 +240,7 @@ export interface FileRoutesByTo {
   '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/wiki': typeof WikiRoute
   '/about': typeof DesktopAboutRoute
   '/ai-business-conference': typeof DesktopAiBusinessConferenceRoute
   '/dashboard': typeof DesktopDashboardRoute
@@ -248,6 +263,7 @@ export interface FileRoutesByTo {
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
   '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
+  '/hello-world/wiki': typeof HelloWorldWikiRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/': typeof DesktopIndexRoute
   '/hello-world': typeof HelloWorldIndexRoute
@@ -259,6 +275,7 @@ export interface FileRoutesById {
   '/join': typeof JoinRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/wiki': typeof WikiRoute
   '/_desktop/about': typeof DesktopAboutRoute
   '/_desktop/ai-business-conference': typeof DesktopAiBusinessConferenceRoute
   '/_desktop/dashboard': typeof DesktopDashboardRoute
@@ -281,6 +298,7 @@ export interface FileRoutesById {
   '/hello-world/sounds': typeof HelloWorldSoundsRoute
   '/hello-world/test': typeof HelloWorldTestRoute
   '/hello-world/tv': typeof HelloWorldTvRoute
+  '/hello-world/wiki': typeof HelloWorldWikiRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/_desktop/': typeof DesktopIndexRoute
   '/hello-world/': typeof HelloWorldIndexRoute
@@ -293,6 +311,7 @@ export interface FileRouteTypes {
     | '/join'
     | '/privacy'
     | '/terms'
+    | '/wiki'
     | '/about'
     | '/ai-business-conference'
     | '/dashboard'
@@ -315,6 +334,7 @@ export interface FileRouteTypes {
     | '/hello-world/sounds'
     | '/hello-world/test'
     | '/hello-world/tv'
+    | '/hello-world/wiki'
     | '/sign-in/$'
     | '/hello-world/'
   fileRoutesByTo: FileRoutesByTo
@@ -322,6 +342,7 @@ export interface FileRouteTypes {
     | '/join'
     | '/privacy'
     | '/terms'
+    | '/wiki'
     | '/about'
     | '/ai-business-conference'
     | '/dashboard'
@@ -344,6 +365,7 @@ export interface FileRouteTypes {
     | '/hello-world/sounds'
     | '/hello-world/test'
     | '/hello-world/tv'
+    | '/hello-world/wiki'
     | '/sign-in/$'
     | '/'
     | '/hello-world'
@@ -354,6 +376,7 @@ export interface FileRouteTypes {
     | '/join'
     | '/privacy'
     | '/terms'
+    | '/wiki'
     | '/_desktop/about'
     | '/_desktop/ai-business-conference'
     | '/_desktop/dashboard'
@@ -376,6 +399,7 @@ export interface FileRouteTypes {
     | '/hello-world/sounds'
     | '/hello-world/test'
     | '/hello-world/tv'
+    | '/hello-world/wiki'
     | '/sign-in/$'
     | '/_desktop/'
     | '/hello-world/'
@@ -387,6 +411,7 @@ export interface RootRouteChildren {
   JoinRoute: typeof JoinRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  WikiRoute: typeof WikiRoute
   SignInSplatRoute: typeof SignInSplatRoute
 }
 
@@ -425,6 +450,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wiki': {
+      id: '/wiki'
+      path: '/wiki'
+      fullPath: '/wiki'
+      preLoaderRoute: typeof WikiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_desktop/': {
@@ -595,6 +627,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelloWorldTvRouteImport
       parentRoute: typeof HelloWorldRouteRoute
     }
+    '/hello-world/wiki': {
+      id: '/hello-world/wiki'
+      path: '/wiki'
+      fullPath: '/hello-world/wiki'
+      preLoaderRoute: typeof HelloWorldWikiRouteImport
+      parentRoute: typeof HelloWorldRouteRoute
+    }
     '/sign-in/$': {
       id: '/sign-in/$'
       path: '/sign-in/$'
@@ -619,6 +658,7 @@ interface HelloWorldRouteRouteChildren {
   HelloWorldSoundsRoute: typeof HelloWorldSoundsRoute
   HelloWorldTestRoute: typeof HelloWorldTestRoute
   HelloWorldTvRoute: typeof HelloWorldTvRoute
+  HelloWorldWikiRoute: typeof HelloWorldWikiRoute
   HelloWorldIndexRoute: typeof HelloWorldIndexRoute
 }
 
@@ -636,6 +676,7 @@ const HelloWorldRouteRouteChildren: HelloWorldRouteRouteChildren = {
   HelloWorldSoundsRoute: HelloWorldSoundsRoute,
   HelloWorldTestRoute: HelloWorldTestRoute,
   HelloWorldTvRoute: HelloWorldTvRoute,
+  HelloWorldWikiRoute: HelloWorldWikiRoute,
   HelloWorldIndexRoute: HelloWorldIndexRoute,
 }
 
@@ -678,6 +719,7 @@ const rootRouteChildren: RootRouteChildren = {
   JoinRoute: JoinRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  WikiRoute: WikiRoute,
   SignInSplatRoute: SignInSplatRoute,
 }
 export const routeTree = rootRouteImport
