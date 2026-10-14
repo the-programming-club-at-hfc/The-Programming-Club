@@ -136,15 +136,17 @@ export interface ScreenState {
   revealed?: boolean;
   hint?: boolean;
   wikiFrom?: string;
+  wikiReady?: boolean;
 }
 
 /**
  * What the big button does next:
  * start a round → show a card (race, drawing) → reveal → show scores → another one, or the next round.
+ * A Wiki Race goes up as a get-ready screen first, then Start shows the race and starts the clock.
  * A puzzle round plays its one puzzle: show it → show the hint once it unlocks → reveal → show scores → next round.
  * Rounds that aren't games (like "Meet the officers") just show scores, then move on.
  */
-export type Step = "start" | "show" | "hint" | "reveal" | "scores" | "choose" | "next";
+export type Step = "start" | "show" | "go" | "hint" | "reveal" | "scores" | "choose" | "next";
 
 export function stepFor(o: {
   round: Round | null;
@@ -167,6 +169,8 @@ export function stepFor(o: {
     // that's still unrevealed always comes back for its reveal and is never skipped unscored.
     const mine = r.kind === "deck" ? s.game === r.game : !!s.wikiFrom;
     if (!mine) return "show";
+    // A race on its get-ready screen waits for Start.
+    if (r.kind === "wiki" && s.wikiReady && !s.revealed) return "go";
     if (!s.revealed && revealable(r)) return "reveal";
     return s.mode === "scoreboard" ? "choose" : "scores";
   }

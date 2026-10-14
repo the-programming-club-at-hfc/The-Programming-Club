@@ -140,9 +140,10 @@ describe("the big button", () => {
     expect(step(relay, { mode: "scoreboard", game: "relay" })).toBe("choose");
   });
 
-  test("a Wiki Race: show, end and score, scores, then another", () => {
+  test("a Wiki Race: get ready, start, end and score, scores, then another", () => {
     const wiki = round("Wiki Race: Classic");
     expect(step(wiki, { mode: "message" })).toBe("show");
+    expect(step(wiki, { mode: "wiki", wikiFrom: "Pizza", wikiReady: true })).toBe("go");
     expect(step(wiki, { mode: "wiki", wikiFrom: "Pizza" })).toBe("reveal");
     expect(step(wiki, { mode: "wiki", wikiFrom: "Pizza", revealed: true })).toBe("scores");
     expect(step(wiki, { mode: "scoreboard", wikiFrom: "Pizza", revealed: true })).toBe("choose");

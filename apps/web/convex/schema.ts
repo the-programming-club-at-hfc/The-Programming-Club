@@ -31,6 +31,9 @@ export const screenV = v.object({
   wikiTo: v.optional(v.string()),
   // Wiki Race, Fewest Clicks: teams send their click count instead of racing the clock.
   wikiClicks: v.optional(v.boolean()),
+  // Wiki Race picked but not started: the TV shows only the /wiki address so teams get there, then Start reveals
+  // the race and starts the clock for everyone at once.
+  wikiReady: v.optional(v.boolean()),
   message: v.optional(v.string()),
   // Kickoff deck position (from 0), kept apart from `index` so the challenge on the go survives the slides going up.
   slide: v.optional(v.number()),

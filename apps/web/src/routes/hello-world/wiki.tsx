@@ -15,7 +15,8 @@ export const Route = createFileRoute("/hello-world/wiki")({
 function Wiki() {
   const live = useQuery(api.sessions.live);
   const s = live?.screen;
-  const from = s?.mode === "wiki" && !s.revealed ? s.wikiFrom : undefined;
+  const from = s?.mode === "wiki" && !s.revealed && !s.wikiReady ? s.wikiFrom : undefined;
+  const ready = s?.mode === "wiki" && !!s.wikiReady;
   // replace, not assign, so the race's back button doesn't land here and bounce forward again.
   useEffect(() => {
     if (from) window.location.replace(wikiUrl(from));
@@ -39,7 +40,9 @@ function Wiki() {
         <p className="mt-4 text-lg text-dim">
           {live === undefined
             ? "Checking for a race…"
-            : "Keep this page open. It jumps to the start article as soon as the next race is on the TV."}
+            : ready
+              ? "You’re ready. Keep this page open: it jumps to the start article the moment the race starts."
+              : "Keep this page open. It jumps to the start article as soon as the next race is on the TV."}
         </p>
       )}
     </Wrap>

@@ -394,7 +394,12 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           )}
         </div>
       )}
-      {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
+      {s.mode === "wiki" && s.wikiReady && (
+        <p className="card mt-5 p-6 text-xl font-bold">
+          Wiki Race next! Open {CLUB.url}/wiki on your team computer. It jumps to the start article when the race starts.
+        </p>
+      )}
+      {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
         <div className="mt-5">
           {me.team ? (
             <TeamRace

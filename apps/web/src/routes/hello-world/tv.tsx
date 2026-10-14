@@ -198,7 +198,17 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
             </div>
           </div>
         )}
-        {s.mode === "wiki" && s.wikiFrom && s.wikiTo && (
+        {s.mode === "wiki" && s.wikiReady && (
+          <div className="grid h-full place-items-center text-center">
+            <div>
+              <p className="text-[2vw] font-bold text-dim">Wiki Race{s.wikiClicks ? ": Fewest Clicks" : ""} · get ready</p>
+              <p className="mt-[1.5vw] text-[2.4vw]">Team computers, open</p>
+              <p className="mt-[0.5vw] text-[6vw] leading-[1] font-extrabold tracking-[-0.03em]">{CLUB.url}/wiki</p>
+              <p className="mt-[2vw] text-[1.8vw] text-dim">The start and target go up when the race starts, for every team at once.</p>
+            </div>
+          </div>
+        )}
+        {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
           <div className={`grid h-full items-center gap-[3vw] ${wikiBoard && wikiBoard.teams > 0 ? "grid-cols-[minmax(0,1fr)_26vw]" : ""}`}>
             <div className="flex flex-col gap-[3vw]">
               <div className={`grid gap-[0.3vw] ${wikiBoard && wikiBoard.teams > 0 ? "" : "grid-cols-2"}`}>
@@ -429,7 +439,14 @@ function useTvSound(live: Live, remaining: number, on: boolean) {
     const moved = live.roster.filter((r, i) => p.roster[i] && r.teamId !== p.roster[i].teamId).length;
     if (moved >= 3) sfx.shuffle();
 
-    if (s.mode !== ps.mode || s.game !== ps.game || s.index !== ps.index || s.wikiFrom !== ps.wikiFrom || s.message !== ps.message) {
+    if (
+      s.mode !== ps.mode ||
+      s.game !== ps.game ||
+      s.index !== ps.index ||
+      s.wikiFrom !== ps.wikiFrom ||
+      s.wikiReady !== ps.wikiReady ||
+      s.message !== ps.message
+    ) {
       if (s.mode === "scoreboard") sfx.scoreboard();
       else if (s.mode === "card" || s.mode === "wiki" || s.mode === "message") sfx.card();
     } else if (s.revealed && !ps.revealed) sfx.reveal();

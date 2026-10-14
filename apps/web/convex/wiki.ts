@@ -62,6 +62,7 @@ export const finish = mutation({
   args: { token: v.string(), card: v.string(), clicks: v.optional(v.number()) },
   handler: async (ctx, { token, card, clicks }) => {
     const { s, w, teamId, name, row } = await teamRace(ctx, token, card);
+    if (s.screen.wikiReady) throw new ConvexError("The race hasn’t started yet.");
     if (!isOpen(s, w.key)) throw new ConvexError("Time’s up. The race is closed.");
     if (w.clicks && (clicks === undefined || !Number.isInteger(clicks) || clicks < 1 || clicks > 999))
       throw new ConvexError("Enter your click count, like 7.");

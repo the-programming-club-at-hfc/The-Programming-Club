@@ -5,6 +5,7 @@ import type { FunctionReturnType } from "convex/server";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { DECKS, fmtClock, useRemaining } from "./game";
+import type { Screen } from "./game";
 import { run } from "./officer";
 import { BUGS, GAMES, PICTIONARY, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
@@ -14,6 +15,7 @@ import { cardKey, cardSeconds, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
 import type { GameId } from "#/lib/grading";
 import type { LineupItem } from "#/lib/schedule";
+import { CLUB } from "#/lib/season";
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type Action = { label: string; go: () => Promise<unknown> | undefined; keys?: false };
@@ -50,6 +52,16 @@ export function WordPeek({ word }: { word: string }) {
 const level = (game: GameId, i: number) =>
   game === "bug" ? BUGS[i].level : game === "fix" ? FIXES[i].level : game === "relay" ? RELAYS[i].level : null;
 
+/** Start a Wiki Race from its get-ready screen: the race goes up and its clock starts, for every team at once. */
+export function useStartRace() {
+  const setScreen = useMutation(api.sessions.setScreen);
+  const timer = useMutation(api.sessions.timer);
+  return async (s: Screen) => {
+    await setScreen({ screen: { ...s, mode: "wiki", wikiReady: undefined } });
+    await timer({ action: "set", seconds: wikiSeconds(!!s.wikiClicks), relay: false, autostart: true });
+  };
+}
+
 export function NextPanel({
   live,
   lineup,
@@ -68,6 +80,7 @@ export function NextPanel({
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const end = useMutation(api.sessions.end);
+  const startRace = useStartRace();
   const remaining = useRemaining(live.timer);
   const [busy, setBusy] = useState(false);
   const [word, setWord] = useState<string | null>(null);
@@ -130,8 +143,10 @@ export function NextPanel({
       await setScreen({ screen: { mode: "card", game: "puzzle", index: r.puzzle, revealed: false } });
       await timer({ action: "set", seconds: cardSeconds("puzzle", r.puzzle), relay: !!PUZZLES[r.puzzle].relay, autostart: true });
     } else if (race) {
-      await setScreen({ screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: race.clicks || undefined } });
-      await timer({ action: "set", seconds: wikiSeconds(race.clicks), relay: false, autostart: true });
+      // The get-ready screen: Start (the "go" step) shows the race and starts the clock.
+      await setScreen({
+        screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: race.clicks || undefined, wikiReady: true },
+      });
     } else if (r?.kind === "pictionary") {
       setWord(nextWord());
       await setScreen({ screen: { mode: "timer" } });
@@ -170,13 +185,18 @@ export function NextPanel({
   } else if (step === "show") {
     const label =
       r.kind === "wiki" && race
-        ? `Show the race: ${race.from} → ${race.to}`
+        ? "Get ready: team computers to /wiki"
         : r.kind === "puzzle" && r.puzzle !== undefined
           ? `Show the puzzle: ${puzzleTitle(r.puzzle)}`
           : r.kind === "pictionary"
             ? "New drawing: start 1:00"
             : `Show ${s.mode === "message" ? "the first" : "next"} ${thing}`;
     primary = { label, go: show };
+  } else if (step === "go") {
+    primary = {
+      label: `Start the race: ${fmtClock(wikiSeconds(!!s.wikiClicks) * 1000)}`,
+      go: () => startRace(s),
+    };
   } else if (step === "hint") {
     // The same hint the Puzzles deck puts up: on the TV, phones, and team computers.
     primary = { label: "Show hint", go: () => setScreen({ screen: { ...s, mode: "card", hint: true } }) };
@@ -304,6 +324,11 @@ export function NextPanel({
           </p>
         )}
         {step === "hint" && <p>Half the time is gone, so the hint is unlocked.</p>}
+        {step === "go" && (
+          <p>
+            On the TV: open {CLUB.url}/wiki. Start shows {s.wikiFrom} → {s.wikiTo} and sends every team computer there at once.
+          </p>
+        )}
         {race && (step === "show" || step === "choose") && (
           <p>
             Next race: {race.from} → {race.to}, {race.clicks ? "Fewest Clicks, " : ""}

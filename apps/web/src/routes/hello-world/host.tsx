@@ -8,7 +8,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
-import { NextPanel, WordPeek, nextWord } from "#/components/next";
+import { NextPanel, WordPeek, nextWord, useStartRace } from "#/components/next";
 import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { WIKI_RACES, wikiUrl } from "#/lib/content";
@@ -1121,6 +1121,7 @@ function WikiStatus({ live }: { live: Live }) {
 function WikiTool({ live, used }: { live: Live; used: string[] }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
+  const startRace = useStartRace();
   const s = live.screen;
   const [cs, setCs] = useState(false);
   const [clicks, setClicks] = useState(!!s.wikiClicks);
@@ -1188,7 +1189,11 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
             </a>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {onTv ? (
+            {onTv && s.wikiReady ? (
+              <button className="btn btn-sm btn-coin" onClick={() => run(startRace(s))}>
+                Start the race: {fmtClock(wikiSeconds(clicks) * 1000)}
+              </button>
+            ) : onTv ? (
               <button
                 className={`btn btn-sm ${s.revealed ? "" : "btn-coin"}`}
                 disabled={!!s.revealed}
@@ -1199,8 +1204,13 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
             ) : (
               <button
                 className="btn btn-sm btn-neon"
+                // The get-ready screen first, so every team is on /wiki before the race shows.
                 onClick={() =>
-                  run(setScreen({ screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: clicks || undefined } }))
+                  run(
+                    setScreen({
+                      screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: clicks || undefined, wikiReady: true },
+                    }),
+                  )
                 }
               >
                 Show on TV
@@ -1209,14 +1219,21 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
             <button className="btn btn-sm" onClick={() => setRace({ from: race.to, to: race.from })}>
               Reverse
             </button>
-            <button
-              className="btn btn-sm"
-              onClick={() => run(timer({ action: "set", seconds: wikiSeconds(clicks), relay: false, autostart: true }))}
-            >
-              Start {fmtClock(wikiSeconds(clicks) * 1000)}
-            </button>
+            {!(onTv && s.wikiReady) && (
+              <button
+                className="btn btn-sm"
+                onClick={() => run(timer({ action: "set", seconds: wikiSeconds(clicks), relay: false, autostart: true }))}
+              >
+                Start {fmtClock(wikiSeconds(clicks) * 1000)}
+              </button>
+            )}
           </div>
-          {onTv && <WikiStatus live={live} />}
+          {onTv && s.wikiReady && (
+            <p className="mt-3 text-sm text-dim">
+              On the TV: open {CLUB.url}/wiki. Start shows the race and sends every team computer to the start article at once.
+            </p>
+          )}
+          {onTv && !s.wikiReady && <WikiStatus live={live} />}
         </>
       )}
     </div>
