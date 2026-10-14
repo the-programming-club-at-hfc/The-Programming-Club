@@ -573,6 +573,10 @@ describe("ending the night", () => {
     expect(board.filter((r) => r.xp === 3)).toHaveLength(4);
     expect((await t.query(api.players.me, { token: ada }))!.seasonXp).toBe(0);
     expect((await t.query(api.players.me, { token: grace }))!.seasonXp).toBe(3);
+    // Phones after End night: what tonight earned, nothing for an officer who ran it.
+    expect((await t.query(api.players.me, { token: a.tokens[0] }))!.tonight).toEqual({ show: 3, place: 3, bonus: 0 });
+    expect((await t.query(api.players.me, { token: d.tokens[0] }))!.tonight).toEqual({ show: 3, place: 0, bonus: 2 });
+    expect((await t.query(api.players.me, { token: ada }))!.tonight).toBe(null);
     expect((await t.query(api.players.me, { token: a.tokens[0] }))!.seasonXp).toBe(6);
 
     // Officers still count for attendance.

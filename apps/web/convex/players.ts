@@ -133,7 +133,7 @@ export const setPlaying = mutation({
   },
 });
 
-/** A member's own view: their team, its rank, and their XP so far. */
+/** A member's own view: their team, its rank, their XP so far, and tonight's. */
 export const me = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
@@ -190,6 +190,8 @@ export const me = query({
       team,
       seasonXp,
       weeks: history.length,
+      // This night's XP by the same rules (place XP lands when the night ends); null when it doesn't count.
+      tonight: !session.practice && inTeamPool(a) ? { show: a.showXp, place: a.placeXp ?? 0, bonus: a.bonusXp } : null,
     };
   },
 });
