@@ -69,7 +69,7 @@ function TeamKeyForm({ live, wrong, onKey }: { live: Live; wrong: boolean; onKey
       <h1 className="text-[clamp(2.4rem,7vw,3.6rem)] lowercase">which team is this?</h1>
       {live.teams.length === 0 ? (
         <p className="mt-4 text-lg text-dim">
-          Teams aren’t made yet. Once they are, your team key shows up on your phones.<span className="blink"> _</span>
+          Teams aren’t made yet. Your team key shows up on your phones once the game starts.<span className="blink"> _</span>
         </p>
       ) : (
         <form
@@ -80,7 +80,10 @@ function TeamKeyForm({ live, wrong, onKey }: { live: Live; wrong: boolean; onKey
           }}
         >
           <label className="block">
-            <span className="text-lg text-dim">Type the team key from any teammate’s phone. This computer remembers it for tonight.</span>
+            <span className="text-lg text-dim">
+              Type the team key from any teammate’s phone (it shows once the game starts, and an officer has it too). This computer
+              remembers it for tonight.
+            </span>
             <input
               className="field narrow mt-4 text-center text-5xl font-extrabold tracking-[0.3em] uppercase"
               value={key}

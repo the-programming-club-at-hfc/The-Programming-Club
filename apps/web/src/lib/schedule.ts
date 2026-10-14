@@ -84,6 +84,9 @@ const GAME_NAMES: [RegExp, string][] = [
 /** Which games a lineup entry refers to, e.g. "Final round, double points: Bug Hunt, hard" is Bug Hunt. */
 export const gamesIn = (line: string) => GAME_NAMES.filter(([re]) => re.test(line)).map(([, id]) => id);
 
+/** Games played on team computers at /hello-world/fix, which need the team key. */
+export const usesTeamComputer = (game: string) => game === "fix" || game === "puzzle";
+
 const PLANNED = [...DEFAULT_PLAN.flatMap((w) => w.lineup.map((g) => g.label)), ...REMIX_MENU];
 
 /**

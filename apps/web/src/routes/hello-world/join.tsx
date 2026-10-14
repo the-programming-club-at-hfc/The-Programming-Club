@@ -13,7 +13,7 @@ import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
-import { useSchedule } from "#/lib/schedule";
+import { gamesIn, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import { CLUB, isHfcEmail } from "#/lib/season";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -321,6 +321,9 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const wk = useSchedule()[live.week - 1];
   const t = weekTile(wk);
   const hot = remaining <= 10_000 && !!live.timer.startedAt;
+  // The team key only matters while a team-computer game is the round being played or the card on the TV.
+  const round = live.round !== null && live.round < wk.lineup.length ? wk.lineup[live.round].label : "";
+  const teamComputer = gamesIn(round).some(usesTeamComputer) || (s.mode === "card" && !!s.game && usesTeamComputer(s.game));
   return (
     <Wrap className="flex min-h-dvh max-w-2xl flex-col py-5">
       <p className="text-sm text-dim">
@@ -356,7 +359,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
               </div>
               <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>
-              {me.team.key && (
+              {me.team.key && teamComputer && (
                 <p className="mt-1 text-sm text-dim">
                   Team computer key: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
                 </p>

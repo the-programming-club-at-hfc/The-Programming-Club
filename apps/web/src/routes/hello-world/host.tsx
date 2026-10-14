@@ -16,7 +16,7 @@ import { deckFor, filtersFor } from "#/lib/flow";
 import type { Filter } from "#/lib/flow";
 import { isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
-import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule } from "#/lib/schedule";
+import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB, fmtDate, isCupWeek } from "#/lib/season";
 
@@ -116,7 +116,7 @@ function Running({
           {(week.kind === "kickoff" || live.screen.mode === "slides") && <SlidesPanel live={live} />}
           <ScreenPanel live={live} />
           <TimerPanel live={live} />
-          <TeamsPanel live={live} keys={keys} />
+          <TeamsPanel live={live} keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}} />
         </div>
         <div className="space-y-6">
           <div ref={deck} className="scroll-mt-6">
