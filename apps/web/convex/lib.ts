@@ -83,19 +83,17 @@ export async function newTeam(ctx: MutationCtx, sessionId: Id<"sessions">) {
   });
 }
 
-/** Auto teams fill each team up to this, then start a new one. */
-const AUTO_TEAM_SIZE = 3;
-
 /**
- * Where a student who just joined goes. With auto teams (the default), the smallest team that isn't full, or a new
- * one. With auto teams off, the smallest team once officers have made teams, and no team before that.
+ * Where a student who just joined goes. With auto teams (the default), the smallest team that isn't full (2, or
+ * tonight's last Make teams size), or a new one. With auto teams off, the smallest team once officers have made teams, and no team before that.
  */
 export async function teamFor(ctx: MutationCtx, session: Doc<"sessions">) {
   const teams = await sessionTeams(ctx, session._id);
   const att = await sessionAttendance(ctx, session._id);
   const size = (t: Id<"teams">) => att.filter((a) => a.teamId === t).length;
   const auto = session.autoTeams !== false;
-  const open = auto ? teams.filter((t) => size(t._id) < AUTO_TEAM_SIZE) : teams;
+  const full = session.teamSize ?? 2;
+  const open = auto ? teams.filter((t) => size(t._id) < full) : teams;
   if (open.length) return open.reduce((best, t) => (size(t._id) < size(best._id) ? t : best))._id;
   return auto ? newTeam(ctx, session._id) : undefined;
 }

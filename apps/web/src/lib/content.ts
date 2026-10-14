@@ -86,7 +86,7 @@ export const MATCH_AGENDA: Agenda[] = [
     len: 10,
     what: "Lobby",
     detail:
-      "Scan the QR to join and you land on a team of up to 3, warm-up game on screen, then a one-minute rules recap. Late joiners get a team automatically too.",
+      "Scan the QR to join and you land on a team of 2, warm-up game on screen, then a one-minute rules recap. Late joiners get a team automatically too.",
   },
   {
     t: "5:10",
@@ -177,7 +177,7 @@ export const CUP_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone. Auto teams fill teams of up to 3; Make teams in /host reshuffles if you want new ones.",
+    detail: "Join on your phone. Auto teams fill teams of 2; Teams of 3 in /host reshuffles into 3s if the room fills up.",
   },
   {
     t: "5:06",
@@ -235,7 +235,7 @@ export const FINAL_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone. Auto teams fill teams of up to 3; Make teams in /host reshuffles if you want new ones.",
+    detail: "Join on your phone. Auto teams fill teams of 2; Teams of 3 in /host reshuffles into 3s if the room fills up.",
   },
   {
     t: "5:06",

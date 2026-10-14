@@ -41,6 +41,7 @@ export const live = query({
       practice: !!s.practice,
       round: s.round ?? null,
       autoTeams: s.autoTeams !== false,
+      teamSize: s.teamSize ?? 2,
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),

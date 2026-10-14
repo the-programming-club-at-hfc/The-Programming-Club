@@ -176,34 +176,37 @@ describe("teams", () => {
     expect(live.teams.flatMap((tm) => tm.members)).toHaveLength(7);
   });
 
-  test("late joiners: students go on the smallest team, officers stay off", async () => {
+  test("late joiners: students go on the smallest team with room, officers stay off", async () => {
     const { officer, startNight, join, attendance, teams } = setup();
     const code = await startNight();
-    for (let i = 1; i <= 5; i++) await join(code, student(i));
-    await officer.mutation(api.teams.make, { size: 2 }); // 3 + 2
-    await join(code, student(6));
+    for (let i = 1; i <= 7; i++) await join(code, student(i));
+    await officer.mutation(api.teams.make, { size: 3 }); // 3 + 2 + 2
+    await join(code, student(8));
     await join(code, { name: "Grace", email: GRACE });
     const att = await attendance();
     const sizes = (await teams()).map((tm) => att.filter((a) => a.teamId === tm._id).length);
-    expect(sizes.sort()).toEqual([3, 3]);
+    expect(sizes.sort()).toEqual([2, 3, 3]);
     expect(att.find((a) => a.officer)!.teamId).toBe(undefined);
   });
 
-  test("auto teams, on by default: joiners fill teams of up to 3, then start a new one", async () => {
+  test("auto teams, on by default: joiners fill teams of up to 2, then up to the last Make teams size", async () => {
     const { t, officer, startNight, join, attendance, teams } = setup();
     const code = await startNight();
     for (let i = 1; i <= 7; i++) await join(code, student(i));
     await join(code, { name: "Grace", email: GRACE });
     const att = await attendance();
     const sizes = (await teams()).map((tm) => att.filter((a) => a.teamId === tm._id).length);
-    expect(sizes.sort()).toEqual([1, 3, 3]);
+    expect(sizes.sort()).toEqual([1, 2, 2, 2]);
     expect(att.find((a) => a.officer)!.teamId).toBe(undefined);
-    expect((await t.query(api.sessions.live, {}))!.autoTeams).toBe(true);
-    // Make teams still reshuffles everyone (2, 2, 3), and auto keeps placing late joiners on the smallest team.
-    await officer.mutation(api.teams.make, { size: 2 });
+    const live = (await t.query(api.sessions.live, {}))!;
+    expect([live.autoTeams, live.teamSize]).toEqual([true, 2]);
+    // Teams of 3 reshuffles the 7 into 3, 2, 2, and late joiners then fill teams up to 3.
+    await officer.mutation(api.teams.make, { size: 3 });
+    expect((await t.query(api.sessions.live, {}))!.teamSize).toBe(3);
     await join(code, student(8));
+    await join(code, student(9));
     const after = await attendance();
-    expect((await teams()).map((tm) => after.filter((a) => a.teamId === tm._id).length).sort()).toEqual([2, 3, 3]);
+    expect((await teams()).map((tm) => after.filter((a) => a.teamId === tm._id).length).sort()).toEqual([3, 3, 3]);
   });
 
   test("with auto teams off, joiners wait for Make teams; turning it back on places them", async () => {

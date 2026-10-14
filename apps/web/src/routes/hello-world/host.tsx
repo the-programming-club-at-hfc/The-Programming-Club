@@ -410,11 +410,11 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
   return (
     <Panel title="Teams & scores">
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-sm btn-coin" onClick={() => shuffleTeams(3)}>
-          Make teams of 3
+        <button className="btn btn-sm btn-coin" onClick={() => shuffleTeams(2)}>
+          Make teams of 2
         </button>
-        <button className="btn btn-sm" onClick={() => shuffleTeams(2)}>
-          Teams of 2
+        <button className="btn btn-sm" onClick={() => shuffleTeams(3)}>
+          Teams of 3
         </button>
         <button className="btn btn-sm" onClick={() => run(add())}>
           Add team
@@ -428,7 +428,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
       </div>
       <p className="mt-2 text-sm text-dim">
         {live.autoTeams
-          ? "Everyone who joins lands on a team of up to 3. Make teams reshuffles everyone."
+          ? `Everyone who joins lands on a team of up to ${live.teamSize}. Make teams reshuffles everyone, and late joiners then fill teams up to that size.`
           : "Joiners wait without a team until you make teams. Late joiners then go on the smallest team."}
       </p>
       {live.teams.length === 0 ? (

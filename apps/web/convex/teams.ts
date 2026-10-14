@@ -17,12 +17,13 @@ import {
 import { TEAM_NAMES } from "./teamNames";
 
 /** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo). Resets tonight's teams.
- *  Officers running the night stay off the teams. */
+ *  Officers running the night stay off the teams. Auto teams fill up to `size` from then on. */
 export const make = mutation({
   args: { size: v.union(v.literal(2), v.literal(3)) },
   handler: async (ctx, { size }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
+    await ctx.db.patch(s._id, { teamSize: size });
     for (const t of await sessionTeams(ctx, s._id)) await ctx.db.delete(t._id);
     const all = await sessionAttendance(ctx, s._id);
     for (const a of all) if (a.teamId && !inTeamPool(a)) await ctx.db.patch(a._id, { teamId: undefined });
