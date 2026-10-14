@@ -551,6 +551,17 @@ describe("ending the night", () => {
     expect(xpOf(ada)).toBe(0);
     expect(await score(d._id)).toBe(0);
 
+    // The TV's final standings: each team's points and place XP, names only.
+    const final = (await t.query(api.sessions.final, {}))!;
+    expect(final.teams.map((tm) => [tm.score, tm.xp])).toEqual([
+      [10, 3],
+      [10, 3],
+      [0, 0],
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(JSON.stringify(final)).not.toContain("@");
+
     const board = await t.query(api.stats.leaderboard, {});
     // Ada ran the night; Grace played, so she counts like everyone else.
     expect(board).toHaveLength(9);
@@ -577,6 +588,7 @@ describe("ending the night", () => {
     const token = await join(code, student(1));
     await officer.mutation(api.sessions.end, {});
     expect(await t.query(api.stats.leaderboard, {})).toEqual([]);
+    expect((await t.query(api.sessions.final, {}))!.teams.every((tm) => tm.xp === undefined)).toBe(true);
     expect((await t.query(api.players.me, { token }))!.seasonXp).toBe(0);
     await expect(officer.query(api.sessions.attendanceExport, { sessionId: (await attendance())[0].sessionId })).rejects.toThrow(
       "Practice nights",

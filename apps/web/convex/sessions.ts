@@ -50,6 +50,40 @@ export const live = query({
   },
 });
 
+/** The last night that ended: final standings and the place XP each team's players earned (none on practice nights).
+ *  Names only, like `live`. The TV shows it after End night, and phones look up their XP for it. */
+export const final = query({
+  args: {},
+  handler: async (ctx) => {
+    const s = await ctx.db
+      .query("sessions")
+      .withIndex("by_status", (q) => q.eq("status", "ended"))
+      .order("desc")
+      .first();
+    if (!s) return null;
+    const [teams, att] = await Promise.all([sessionTeams(ctx, s._id), sessionAttendance(ctx, s._id)]);
+    const xp = placeXpFor(teams);
+    const roster = await Promise.all(
+      att.filter((a) => a.teamId).map(async (a) => ({ name: (await ctx.db.get(a.playerId))?.name ?? "?", teamId: a.teamId })),
+    );
+    return {
+      _id: s._id,
+      week: s.week,
+      endedAt: s.endedAt ?? s.startedAt,
+      practice: !!s.practice,
+      teams: teams
+        .map((t) => ({
+          _id: t._id,
+          name: t.name,
+          score: t.score,
+          xp: s.practice ? undefined : (xp.get(t._id) ?? 0),
+          members: roster.filter((r) => r.teamId === t._id).map((r) => r.name),
+        }))
+        .sort((a, b) => b.score - a.score),
+    };
+  },
+});
+
 /** Tonight's join code, for officer screens only (the TV, /host, and the kickoff slides). */
 export const joinCode = query({
   args: {},
