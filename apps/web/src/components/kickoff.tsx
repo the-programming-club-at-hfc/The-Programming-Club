@@ -53,7 +53,7 @@ function Teams() {
   if (!live.teams.length)
     return (
       <p className="m-rise mt-10 text-xl text-dim" style={at(4)}>
-        {live.autoTeams ? "Join on your phone and you’ll land on a team." : `${live.roster.length} here. Officers: make teams in /host.`}
+        {live.autoTeams ? "Teams show up here as people join." : `${live.roster.length} here. Officers: make teams in /host.`}
       </p>
     );
   return (
@@ -340,10 +340,10 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
         className="m-slam text-[clamp(3rem,6vw,6.5rem)] leading-[0.9] tracking-[-0.045em] lowercase"
         style={{ "--base": "200ms" } as CSSProperties}
       >
-        Find your team.
+        Find your teammates.
       </h2>
-      <p className="m-rise mt-6 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(3)}>
-        Sit together, then open {CLUB.url}/wiki on one computer per team.
+      <p className="m-rise mx-auto mt-6 max-w-[44ch] text-[clamp(1.4rem,2.2vw,2.4rem)] text-balance" style={at(3)}>
+        Joining puts you on a team. It’s on your phone and listed below. Sit together, then open {CLUB.url}/wiki on one computer per team.
       </p>
       <div className="m-rise mx-auto mt-10 w-fit" style={at(4)}>
         <JoinBox />
