@@ -49,7 +49,7 @@ function Home() {
             </span>
           </h1>
           <p className="mt-9 max-w-[42ch] text-[1.3rem] leading-relaxed">
-            Eight Wednesdays of team games for programmers of every level. No experience, no homework, any language.
+            Eight Wednesdays of coding games for programmers of every level. No experience, no homework, any language.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Link to="/hello-world/join" className="btn btn-primary text-lg">
@@ -109,7 +109,7 @@ function Home() {
                 id="people"
                 className="absolute inset-x-[16%] top-[8%] bottom-[22%] m-auto transition-transform duration-200 group-hover:-translate-y-1"
               />
-              <span className="absolute bottom-2.5 left-3 text-sm font-bold max-sm:hidden">join a team</span>
+              <span className="absolute bottom-2.5 left-3 text-sm font-bold max-sm:hidden">join the game</span>
             </Link>
           </li>
         </ul>
@@ -183,7 +183,7 @@ function Home() {
         <div>
           <h2 className="text-[clamp(2.4rem,5vw,4rem)] lowercase">one hour, every week</h2>
           <p className="mt-4 max-w-[48ch] text-lg text-dim">
-            Every match night follows the same clock. The last round counts double, so a team in last place can still win.
+            Every match night follows the same clock. The last round counts double, so whoever’s in last place can still win.
           </p>
           <div className="mt-8">
             <AgendaList rows={MATCH_AGENDA} compact />
@@ -195,7 +195,7 @@ function Home() {
         <dl className="grid gap-x-12 gap-y-12 md:grid-cols-3">
           {[
             ["no homework", "Everything happens in the room, in one hour."],
-            ["join any week", "Scan the code on the TV and you’re on a team, even if you walk in late."],
+            ["join any week", "Scan the code on the TV and you’re in, even if you walk in late."],
             [
               "any level",
               "Code Relay takes any language you’re learning in class. Bug Hunt and Output? use short Python snippets, and we explain every answer.",

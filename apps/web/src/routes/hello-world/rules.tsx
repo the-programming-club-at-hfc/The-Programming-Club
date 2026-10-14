@@ -30,7 +30,7 @@ function Rules() {
   return (
     <>
       <PageHead title="six games">
-        One way to score, and each game takes less than a minute to explain. Teams of 2–3, any language.
+        One way to score, and each game takes less than a minute to explain. Solo by default, teams of 2–3 some nights, any language.
       </PageHead>
 
       <Wrap>
@@ -96,10 +96,12 @@ function Rules() {
         <div>
           <h2 className="text-[clamp(2.4rem,5vw,4rem)] lowercase">scoring</h2>
           <p className="mt-5 max-w-[52ch] text-lg">
-            Teams earn points in each game, and the last round of every game night counts double. Team points reset every week.
+            You (or your team, on team nights) earn points in each game, and the last round of every game night counts double. Points reset
+            every week.
           </p>
           <p className="mt-3 max-w-[52ch] text-dim">
-            Season XP is yours, not your team’s, so switching teams never costs you anything. The app tracks it when you join.
+            Season XP is always yours, even on team nights, so who you team up with never costs you anything. The app tracks it when you
+            join.
           </p>
           <div className="mt-8">
             <XpTable />
