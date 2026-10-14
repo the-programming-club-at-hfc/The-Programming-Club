@@ -6,7 +6,7 @@ export const WEEKS: Week[] = [
   {
     kind: "kickoff",
     title: "Kickoff: Hello, World",
-    pitch: "Meet the officers, find out how Season 0 works, tell us what you want from the club, then play the first Wiki Race.",
+    pitch: "Meet the officers, tell us what you want from the club, find out how Season 0 works, then play the first Wiki Race.",
     games: ["Meet the officers", "What should the club be?", "Wiki Race (first match)"],
     bonus: "Everyone here tonight is a Founding Member and goes on the Season 0 roster.",
     showXp: 3,
@@ -141,15 +141,15 @@ export const KICKOFF_AGENDA: Agenda[] = [
   },
   {
     t: "5:16",
+    len: 6,
+    what: "Your turn: feedback",
+    detail: "Why “Season 0,” then talk through the questions on the slide. Ideas from the join form land on the officer dashboard.",
+  },
+  {
+    t: "5:22",
     len: 10,
     what: "How Season 0 works",
     detail: "The 8 weeks, teams, XP, and the Golden Keycap.",
-  },
-  {
-    t: "5:26",
-    len: 6,
-    what: "Your turn: feedback",
-    detail: "Talk through the questions on the slide. Ideas from the join form land on the officer dashboard.",
   },
   {
     t: "5:32",

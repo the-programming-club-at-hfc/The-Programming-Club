@@ -241,6 +241,29 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
         want, and we’ll do our best to plan them into next semester.
       </p>
     </div>,
+    <div className="grid gap-12 lg:grid-cols-[1fr_1.15fr]">
+      <div>
+        <H>Your turn: what should this club be?</H>
+        <ol className="steps space-y-3 text-[clamp(1.2rem,1.7vw,1.8rem)]">
+          {FEEDBACK.map((q, k) => (
+            <li key={q} className="m-rise" style={at(3 + k)}>
+              {q}
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="m-pop tile tile-sky self-center p-8" style={at(5)}>
+        <p className="text-[clamp(1.6rem,2.6vw,2.8rem)] leading-tight font-extrabold tracking-[-0.02em] text-balance">
+          Not joined yet? Join now and add your ideas.
+        </p>
+        <div className="mt-8">
+          <JoinBox />
+        </div>
+        <p className="mt-8 text-[clamp(1.1rem,1.5vw,1.6rem)]">
+          Every answer goes straight to the officers. Think of something later? Tell any of us.
+        </p>
+      </div>
+    </div>,
     <div>
       <H>This semester’s game plan</H>
       <WeekTiles plan={plan} />
@@ -285,28 +308,20 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
         </div>
       </div>
     </div>,
-    <div className="grid gap-12 lg:grid-cols-[1fr_1.15fr]">
-      <div>
-        <H>Your turn: what should this club be?</H>
-        <ol className="steps space-y-3 text-[clamp(1.2rem,1.7vw,1.8rem)]">
-          {FEEDBACK.map((q, k) => (
-            <li key={q} className="m-rise" style={at(3 + k)}>
-              {q}
-            </li>
-          ))}
-        </ol>
+    <div className="text-center">
+      <h2
+        className="m-slam text-[clamp(3rem,6vw,6.5rem)] leading-[0.9] tracking-[-0.045em] lowercase"
+        style={{ "--base": "200ms" } as CSSProperties}
+      >
+        Find your teammates.
+      </h2>
+      <p className="m-rise mx-auto mt-6 max-w-[44ch] text-[clamp(1.4rem,2.2vw,2.4rem)] text-balance" style={at(3)}>
+        Joining puts you on a team. It’s on your phone and listed below. Sit together, one computer per team.
+      </p>
+      <div className="m-rise mx-auto mt-10 w-fit" style={at(4)}>
+        <JoinBox />
       </div>
-      <div className="m-pop tile tile-sky self-center p-8" style={at(5)}>
-        <p className="text-[clamp(1.6rem,2.6vw,2.8rem)] leading-tight font-extrabold tracking-[-0.02em] text-balance">
-          Not joined yet? Join now and add your ideas.
-        </p>
-        <div className="mt-8">
-          <JoinBox />
-        </div>
-        <p className="mt-8 text-[clamp(1.1rem,1.5vw,1.6rem)]">
-          Every answer goes straight to the officers. Think of something later? Tell any of us.
-        </p>
-      </div>
+      <Teams />
     </div>,
     <div className="grid items-center gap-12 lg:grid-cols-[1.4fr_1fr]">
       <div>
@@ -335,21 +350,6 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
           Teams of 2–3, one computer per team.
         </p>
       </div>
-    </div>,
-    <div className="text-center">
-      <h2
-        className="m-slam text-[clamp(3rem,6vw,6.5rem)] leading-[0.9] tracking-[-0.045em] lowercase"
-        style={{ "--base": "200ms" } as CSSProperties}
-      >
-        Find your teammates.
-      </h2>
-      <p className="m-rise mx-auto mt-6 max-w-[44ch] text-[clamp(1.4rem,2.2vw,2.4rem)] text-balance" style={at(3)}>
-        Joining puts you on a team. It’s on your phone and listed below. Sit together, then open {CLUB.url}/wiki on one computer per team.
-      </p>
-      <div className="m-rise mx-auto mt-10 w-fit" style={at(4)}>
-        <JoinBox />
-      </div>
-      <Teams />
     </div>,
   );
   return s;
