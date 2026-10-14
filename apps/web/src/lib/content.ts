@@ -425,7 +425,7 @@ export const XP: Xp[] = [
   },
 ];
 export const COMEBACKS: string[] = [
-  "The final round of every night is worth double, championships included.",
+  "The final round of every game night is worth double, championships included.",
   "Weekly results become XP by finishing place, not by margin. Winning by 1 point or by 20 is worth the same.",
   "Showing up (+3) is worth as much as winning (+3 to +1). Someone who never misses a week will outrank someone who wins twice and then stops coming.",
   "Championship nights reset everyone to 0. A first-timer can win the Golden Keycap.",

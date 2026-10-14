@@ -186,7 +186,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
     </div>,
     <div className="grid gap-12 lg:grid-cols-2">
       <div>
-        <H>How a night works</H>
+        <H>How a game night works</H>
         <div className="m-rise text-2xl" style={at(3)}>
           <AgendaList rows={MATCH_AGENDA.slice(0, 5)} compact />
         </div>
@@ -223,7 +223,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
             Everyone starts at zero, so a first-timer can win.
           </li>
           <li className="m-rise" style={at(5)}>
-            The last round counts double, just like every night.
+            The last round counts double, just like on game nights.
           </li>
           <li className="m-rise" style={at(6)}>
             The Final is two Advent of Code–style puzzles.

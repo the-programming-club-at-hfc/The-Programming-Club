@@ -92,7 +92,7 @@ function Rules() {
         <div>
           <h2 className="text-[clamp(2.4rem,5vw,4rem)] lowercase">scoring</h2>
           <p className="mt-5 max-w-[52ch] text-lg">
-            Teams earn points in each game, and the last round of every night counts double. Team points reset every week.
+            Teams earn points in each game, and the last round of every game night counts double. Team points reset every week.
           </p>
           <p className="mt-3 max-w-[52ch] text-dim">
             Season XP is yours, not your team’s, so switching teams never costs you anything. The app tracks it when you join.

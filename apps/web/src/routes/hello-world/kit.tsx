@@ -123,8 +123,8 @@ function GamePlan() {
           <AgendaList rows={MATCH_AGENDA} compact />
           <div className="space-y-4 text-lg">
             <p>
-              Members scan a QR code on the TV and land on a team. Each night is one main game played over a few rounds, and the last round
-              counts double so anyone can still win.
+              Members scan a QR code on the TV and land on a team. Each game night is one main game played over a few rounds, and the last
+              round counts double so anyone can still win.
             </p>
             <p>
               Showing up earns more XP than winning, and teams are reshuffled every week. Two Cup nights reset everyone to zero, so a
