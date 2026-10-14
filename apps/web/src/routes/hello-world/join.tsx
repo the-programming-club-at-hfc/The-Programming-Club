@@ -414,6 +414,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
+        {!me.officer && me.team && <p className="w-full">Want to team up with a friend? Ask an officer to switch your team.</p>}
         {me.officer ? (
           <PlayTonight token={token} playing={me.playing} />
         ) : (
