@@ -5,7 +5,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { AgendaList, Code, Picto, weekTile } from "#/components/ui";
-import { FEEDBACK, GAMES, MATCH_AGENDA } from "#/lib/content";
+import { FEEDBACK, MATCH_AGENDA } from "#/lib/content";
 import { useSchedule } from "#/lib/schedule";
 import type { WeekPlan } from "#/lib/schedule";
 import { useJoinCode } from "#/components/officer";
@@ -66,8 +66,22 @@ const Big = ({ children }: { children: ReactNode }) => (
   <ul className="prose-list space-y-4 text-[clamp(1.3rem,1.9vw,2rem)] leading-snug">{children}</ul>
 );
 
+// The Wiki Race rules in content.ts are written to read on a phone; these are the short version for the TV.
+const RACE_STEPS = [
+  "The TV shows a start and a target. Open the start article.",
+  "On “Go,” click only links inside the article. No search bar, no typing URLs.",
+  "The back button and Ctrl+F are fine.",
+  "Land on the target? Tap “We made it!” on a phone and raise a hand.",
+];
+const RACE_POINTS = [
+  ["5", "1st place", "tile-gold"],
+  ["4", "2nd place", "tile-silver"],
+  ["3", "3rd place", "tile-sun"],
+  ["2", "Finished in time", "tile-sky"],
+  ["1", "Played", "tile-meadow"],
+];
+
 function slides(plan: WeekPlan[]): ReactNode[] {
-  const wiki = GAMES.find((g) => g.id === "wiki")!;
   const officers = OFFICERS.filter((o) => o.name);
   const s: ReactNode[] = [
     <div className="grid items-center gap-12 lg:grid-cols-[1.2fr_1fr]">
@@ -259,21 +273,32 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         </p>
       </div>
     </div>,
-    <div className="grid gap-12 lg:grid-cols-2">
+    <div className="grid items-center gap-12 lg:grid-cols-[1.4fr_1fr]">
       <div>
         <H>First match: Wiki Race</H>
-        <ol className="steps space-y-3 text-[clamp(1.2rem,1.8vw,1.9rem)]">
-          {wiki.steps.map((x, k) => (
+        <ol className="steps space-y-4 text-[clamp(1.3rem,2vw,2.1rem)] leading-snug">
+          {RACE_STEPS.map((x, k) => (
             <li key={x} className="m-rise" style={at(3 + k)}>
               {x}
             </li>
           ))}
         </ol>
       </div>
-      <div className="m-rise self-center" style={at(7)}>
-        <h3 className="text-3xl">Scoring</h3>
-        <p className="mt-3 text-2xl">{wiki.scoring}</p>
-        <p className="mt-6 text-xl text-dim">Teams of 2–3, one computer per team.</p>
+      <div>
+        <p className="m-rise mb-4 text-xl text-dim" style={at(4)}>
+          Points per race
+        </p>
+        <ul className="space-y-3">
+          {RACE_POINTS.map(([pts, what, tile], k) => (
+            <li key={what} className="m-rise flex items-center gap-5" style={at(5 + k)}>
+              <span className={`tile ${tile} narrow grid size-16 shrink-0 place-items-center text-4xl font-extrabold`}>{pts}</span>
+              <span className="text-[clamp(1.2rem,1.8vw,1.9rem)] font-bold">{what}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="m-rise mt-8 text-xl text-dim" style={at(10)}>
+          Teams of 2–3, one computer per team.
+        </p>
       </div>
     </div>,
     <div className="text-center">
