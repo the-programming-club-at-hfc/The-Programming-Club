@@ -235,7 +235,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
     </div>,
     <div className="grid items-center gap-12 lg:grid-cols-[1.3fr_1fr]">
       <div>
-        <H>Win the Golden Keycap</H>
+        <H>The Golden Keycap</H>
         <dl className="space-y-6">
           {[plan[3], plan[5]].map((w, n) => (
             <div key={w.week} className="m-rise border-l-[6px] border-gold pl-6" style={at(3 + n)}>
@@ -248,6 +248,9 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         </dl>
         <p className="m-rise mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(6)}>
           Everyone starts at zero, so anyone can win. The winners sign the trophy.
+        </p>
+        <p className="m-rise mt-3 text-[clamp(1.2rem,1.7vw,1.8rem)] text-dim" style={at(7)}>
+          The take-home prize isn’t decided yet.
         </p>
       </div>
       <div className="m-pop" style={at(5)}>
