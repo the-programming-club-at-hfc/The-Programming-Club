@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
 import { OfficerGate, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
@@ -155,7 +156,8 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
 
   return (
     <>
-      <div className="flex-1 overflow-hidden p-[3.5vw]">
+      <div className={s.mode === "slides" ? "flex min-h-0 flex-1" : "flex-1 overflow-hidden p-[3.5vw]"}>
+        {s.mode === "slides" && <Slides index={s.index ?? 0} />}
         {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
         {s.mode === "scoreboard" && <Scoreboard live={live} />}
         {s.mode === "timer" && (
@@ -254,6 +256,16 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
       )}
     </>
   );
+}
+
+// Kickoff slides: /host moves them, and so do the arrow keys or a clicker on the TV computer.
+function Slides({ index }: { index: number }) {
+  const all = kickoffSlides(useSchedule());
+  const setScreen = useMutation(api.sessions.setScreen);
+  const go = useCallback((to: number) => void setScreen({ screen: { mode: "slides", index: to } }), [setScreen]);
+  const i = Math.min(index, all.length - 1);
+  useSlideKeys(i, all.length, go);
+  return <SlideStage slides={all} i={i} />;
 }
 
 /** A pop each time another team locks in (or fixes it, in Fix it for real, or earns a puzzle star). */

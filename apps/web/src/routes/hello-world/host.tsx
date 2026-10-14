@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
 import { NextPanel, WordPeek, nextWord } from "#/components/next";
 import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
@@ -66,7 +67,8 @@ function Running({
   shown: string[];
   keys: Record<string, string | null>;
 }) {
-  const lineup = useSchedule()[live.week - 1].lineup;
+  const week = useSchedule()[live.week - 1];
+  const lineup = week.lineup;
   // The lineup round being played (from the session, so it survives a reload) opens its deck with its filter,
   // e.g. spooky cards for "Fix it for real, spooky".
   const playing = live.round !== null && live.round < lineup.length ? live.round : null;
@@ -98,6 +100,7 @@ function Running({
       />
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1fr_1.25fr]">
         <div className="space-y-6">
+          {week.kind === "kickoff" && <SlidesPanel live={live} />}
           <ScreenPanel live={live} />
           <TimerPanel live={live} />
           <TeamsPanel live={live} keys={keys} />
@@ -237,6 +240,36 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   );
 }
 
+const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", message: "Message", slides: "Kickoff slides" };
+
+// Week 1 runs the kickoff deck on the TV. Arrow keys or a clicker on the TV computer move it too.
+function SlidesPanel({ live }: { live: Live }) {
+  const setScreen = useMutation(api.sessions.setScreen);
+  const count = kickoffSlides(useSchedule()).length;
+  const on = live.screen.mode === "slides";
+  // Where the deck was, so it picks up there after the TV shows something else.
+  const last = useRef(0);
+  if (on) last.current = live.screen.index ?? 0;
+  const i = last.current;
+  const show = (to: number) => run(setScreen({ screen: { mode: "slides", index: Math.min(Math.max(to, 0), count - 1) } }));
+  return (
+    <Panel title="Kickoff slides">
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="btn btn-sm" disabled={!on || i === 0} onClick={() => show(i - 1)}>
+          ‹ Back
+        </button>
+        <button className={`btn btn-sm ${on ? "btn-on" : ""}`} onClick={() => show(i)}>
+          {on ? `Slide ${i + 1} of ${count}` : i ? `Back to slide ${i + 1}` : "Put the slides on the TV"}
+        </button>
+        <button className="btn btn-sm" disabled={on && i === count - 1} onClick={() => show(on ? i + 1 : i)}>
+          Next ›
+        </button>
+      </div>
+      <p className="mt-3 text-sm text-dim">The arrow keys or a clicker on the TV computer move the slides too.</p>
+    </Panel>
+  );
+}
+
 function ScreenPanel({ live }: { live: Live }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const setSound = useMutation(api.sessions.setSound);
@@ -259,10 +292,8 @@ function ScreenPanel({ live }: { live: Live }) {
             {label}
           </button>
         ))}
-        {(live.screen.mode === "card" || live.screen.mode === "wiki" || live.screen.mode === "message") && (
-          <span className="btn btn-sm btn-on pointer-events-none">
-            {live.screen.mode === "card" ? "Challenge card" : live.screen.mode === "wiki" ? "Wiki Race" : "Message"}
-          </span>
+        {live.screen.mode in ON_AIR && (
+          <span className="btn btn-sm btn-on pointer-events-none">{ON_AIR[live.screen.mode as keyof typeof ON_AIR]}</span>
         )}
       </div>
       <form

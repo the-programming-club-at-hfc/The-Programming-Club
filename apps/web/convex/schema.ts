@@ -19,6 +19,8 @@ export const screenV = v.object({
     v.literal("card"),
     v.literal("wiki"),
     v.literal("message"),
+    // Week 1: the kickoff deck, at slide `index` (from 0).
+    v.literal("slides"),
   ),
   game: v.optional(gameV),
   index: v.optional(v.number()),

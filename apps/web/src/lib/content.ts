@@ -124,7 +124,8 @@ export const KICKOFF_AGENDA: Agenda[] = [
     t: "5:00",
     len: 5,
     what: "Lobby",
-    detail: "Scan the QR code to join, grab a seat. The title slide shows a warm-up question.",
+    detail:
+      "Start Week 1 in /host and put the kickoff slides on the TV. Everyone scans the QR code to join and grabs a seat. The title slide shows a warm-up question.",
   },
   {
     t: "5:05",
