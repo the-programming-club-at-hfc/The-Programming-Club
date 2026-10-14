@@ -243,14 +243,16 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
       <div>
         <H>The Golden Keycap</H>
         <dl className="space-y-6">
-          {[plan[3], plan[5]].map((w, n) => (
-            <div key={w.week} className="m-rise border-l-[6px] border-gold pl-6" style={at(3 + n)}>
-              <dt className="text-xl text-dim">
-                Week {w.week} · {fmtDate(w.start, { month: "long", day: "numeric" })}
-              </dt>
-              <dd className="text-5xl font-extrabold tracking-[-0.03em]">{w.title}</dd>
-            </div>
-          ))}
+          {plan
+            .filter((w) => w.kind === "cup")
+            .map((w, n) => (
+              <div key={w.week} className="m-rise border-l-[6px] border-gold pl-6" style={at(3 + n)}>
+                <dt className="text-xl text-dim">
+                  Week {w.week} · {fmtDate(w.start, { month: "long", day: "numeric" })}
+                </dt>
+                <dd className="text-5xl font-extrabold tracking-[-0.03em]">{w.title}</dd>
+              </div>
+            ))}
         </dl>
         <p className="m-rise mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(6)}>
           Everyone starts at zero, so anyone can win. The winners sign the trophy.

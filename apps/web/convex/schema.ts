@@ -19,7 +19,7 @@ export const screenV = v.object({
     v.literal("card"),
     v.literal("wiki"),
     v.literal("message"),
-    // Week 1: the kickoff deck, at slide `index` (from 0).
+    // The kickoff deck, at `slide`.
     v.literal("slides"),
   ),
   game: v.optional(gameV),
@@ -32,6 +32,8 @@ export const screenV = v.object({
   // Wiki Race, Fewest Clicks: teams send their click count instead of racing the clock.
   wikiClicks: v.optional(v.boolean()),
   message: v.optional(v.string()),
+  // Kickoff deck position (from 0), kept apart from `index` so the challenge on the go survives the slides going up.
+  slide: v.optional(v.number()),
 });
 
 // Running when startedAt is set: remaining = remainingMs - (now - startedAt).

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
-import { OfficerGate, useJoinCode } from "#/components/officer";
+import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
@@ -157,7 +157,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   return (
     <>
       <div className={s.mode === "slides" ? "flex min-h-0 flex-1" : "flex-1 overflow-hidden p-[3.5vw]"}>
-        {s.mode === "slides" && <Slides index={s.index ?? 0} />}
+        {s.mode === "slides" && <Slides screen={s} />}
         {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
         {s.mode === "scoreboard" && <Scoreboard live={live} />}
         {s.mode === "timer" && (
@@ -259,11 +259,11 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
 }
 
 // Kickoff slides: /host moves them, and so do the arrow keys or a clicker on the TV computer.
-function Slides({ index }: { index: number }) {
+function Slides({ screen }: { screen: Live["screen"] }) {
   const all = kickoffSlides(useSchedule());
   const setScreen = useMutation(api.sessions.setScreen);
-  const go = useCallback((to: number) => void setScreen({ screen: { mode: "slides", index: to } }), [setScreen]);
-  const i = Math.min(index, all.length - 1);
+  const go = useCallback((to: number) => void run(setScreen({ screen: { ...screen, slide: to } })), [setScreen, screen]);
+  const i = Math.min(screen.slide ?? 0, all.length - 1);
   useSlideKeys(i, all.length, go);
   return <SlideStage slides={all} i={i} />;
 }

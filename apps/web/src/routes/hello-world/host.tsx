@@ -249,9 +249,10 @@ function SlidesPanel({ live }: { live: Live }) {
   const on = live.screen.mode === "slides";
   // Where the deck was, so it picks up there after the TV shows something else.
   const last = useRef(0);
-  if (on) last.current = live.screen.index ?? 0;
+  if (on) last.current = live.screen.slide ?? 0;
   const i = last.current;
-  const show = (to: number) => run(setScreen({ screen: { mode: "slides", index: Math.min(Math.max(to, 0), count - 1) } }));
+  // The rest of the screen stays, so the challenge on the go picks up again after the slides.
+  const show = (to: number) => run(setScreen({ screen: { ...live.screen, mode: "slides", slide: Math.min(Math.max(to, 0), count - 1) } }));
   return (
     <Panel title="Kickoff slides">
       <div className="flex flex-wrap items-center gap-2">
@@ -294,7 +295,7 @@ function ScreenPanel({ live }: { live: Live }) {
         ))}
         <button
           className={`btn btn-sm ${live.screen.mode === "slides" ? "btn-on" : ""}`}
-          onClick={() => live.screen.mode !== "slides" && show({ mode: "slides", index: 0 })}
+          onClick={() => live.screen.mode !== "slides" && show({ ...live.screen, mode: "slides", slide: live.screen.slide ?? 0 })}
         >
           Kickoff slides
         </button>
