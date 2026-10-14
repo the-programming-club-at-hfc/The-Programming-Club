@@ -68,8 +68,10 @@ export function useReadyRace() {
 export function useStartRace() {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
-  // The clock first, so finish times always count from it, then the race goes up and team computers jump to it.
+  // The get-ready screen back on the TV if the scoreboard or join screen went up meanwhile, so the clock times the
+  // race; then the clock, so finish times always count from it; then the race goes up and team computers jump to it.
   return async (s: Screen) => {
+    if (s.mode !== "wiki") await setScreen({ screen: { ...s, mode: "wiki" } });
     await timer({ action: "set", seconds: wikiSeconds(!!s.wikiClicks), relay: false, autostart: true });
     await setScreen({ screen: { ...s, mode: "wiki", wikiReady: undefined } });
   };

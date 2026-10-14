@@ -483,6 +483,25 @@ describe("points", () => {
     expect(await score(a._id)).toBe(5);
   });
 
+  test("Wiki Race Start after the scoreboard went up mid get-ready: the clock still times the race", async () => {
+    const { t, officer, nightWithTeams, show } = setup();
+    const { teams } = await nightWithTeams(4);
+    const race = { mode: "wiki", wikiFrom: "Pizza", wikiTo: "Moon", wikiReady: true } as const;
+    const card = "wiki:Pizza>Moon";
+    await show(race);
+    later(60);
+    await show({ ...race, mode: "scoreboard" });
+    // What Start does (useStartRace in src/components/next.tsx): get-ready back up, the clock, then the race.
+    await show(race);
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 300, relay: false, autostart: true });
+    await show({ ...race, wikiReady: undefined });
+    later(30);
+    await t.mutation(api.wiki.finish, { token: teams[0].tokens[0], card });
+    expect((await t.query(api.wiki.board, {}))!.finished[0].ms).toBe(30_000);
+    later(300);
+    await expect(t.mutation(api.wiki.finish, { token: teams[1].tokens[0], card })).rejects.toThrow("Time’s up");
+  });
+
   test("the officer score buttons: only gains double on double points", async () => {
     const { officer, signedInStudent, nightWithTeams, score } = setup();
     const { teams } = await nightWithTeams(4);
