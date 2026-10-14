@@ -268,7 +268,9 @@ export function NextPanel({
         <p className="mt-2 font-bold text-pine">{allIn ? (allStars ? "Every team has both stars." : "Every team is in.") : "Time’s up."}</p>
       )}
       {teams === 0 && (step === "start" || step === "show") && (
-        <p className="mt-2 font-semibold text-signal">No teams yet. Make teams under Teams & scores so phones can play.</p>
+        <p className="mt-2 font-semibold text-signal">
+          No teams yet. Make teams (or turn on Auto teams) under Teams & scores so phones can play.
+        </p>
       )}
       {r?.kind === "pictionary" && word && step !== "show" && (
         <>

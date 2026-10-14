@@ -4,6 +4,7 @@ import { requireOfficer } from "./officers";
 import {
   addToSession,
   inTeamPool,
+  newTeam,
   newTeamKey,
   openSession,
   requireOpenSession,
@@ -11,10 +12,9 @@ import {
   sessionTeams,
   shuffle,
   teamByKey,
+  teamFor,
 } from "./lib";
 import { TEAM_NAMES } from "./teamNames";
-
-const unusedName = (taken: string[]) => shuffle(TEAM_NAMES).find((n) => !taken.includes(n)) ?? `Team ${taken.length + 1}`;
 
 /** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo). Resets tonight's teams.
  *  Officers running the night stay off the teams. */
@@ -55,13 +55,21 @@ export const add = mutation({
   handler: async (ctx) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
-    const teams = await sessionTeams(ctx, s._id);
-    await ctx.db.insert("teams", {
-      sessionId: s._id,
-      name: unusedName(teams.map((t) => t.name)),
-      score: 0,
-      key: newTeamKey(teams.map((t) => t.key)),
-    });
+    await newTeam(ctx, s._id);
+  },
+});
+
+/** Auto teams on or off for tonight. Turning it on puts everyone still without a team onto one. */
+export const setAuto = mutation({
+  args: { on: v.boolean() },
+  handler: async (ctx, { on }) => {
+    await requireOfficer(ctx);
+    const s = await requireOpenSession(ctx);
+    await ctx.db.patch(s._id, { autoTeams: on ? undefined : false });
+    if (!on) return;
+    const session = { ...s, autoTeams: undefined };
+    for (const a of await sessionAttendance(ctx, s._id))
+      if (inTeamPool(a) && !a.teamId) await ctx.db.patch(a._id, { teamId: await teamFor(ctx, session) });
   },
 });
 

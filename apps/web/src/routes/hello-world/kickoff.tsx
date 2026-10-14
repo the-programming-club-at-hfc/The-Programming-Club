@@ -38,14 +38,14 @@ function JoinBox() {
   );
 }
 
-// Tonight's teams, live: they pop in when an officer makes teams in /host, and late joiners show up on theirs.
+// Tonight's teams, live: they fill in as people join (or when an officer makes teams in /host).
 function Teams() {
   const live = useQuery(api.sessions.live);
   if (!live) return null;
   if (!live.teams.length)
     return (
       <p className="m-rise mt-10 text-xl text-dim" style={at(4)}>
-        {live.roster.length} here. Officers: make teams in /host.
+        {live.autoTeams ? "Join on your phone and you’ll land on a team." : `${live.roster.length} here. Officers: make teams in /host.`}
       </p>
     );
   return (

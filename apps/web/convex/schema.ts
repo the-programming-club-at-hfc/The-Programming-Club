@@ -86,6 +86,8 @@ export default defineSchema({
     practice: v.optional(v.boolean()),
     // The lineup round being played (0-based), so /host's Next button picks up where it left off.
     round: v.optional(v.number()),
+    // false when officers turned auto teams off for tonight. Missing means on: joiners land on a team of up to 3.
+    autoTeams: v.optional(v.boolean()),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),

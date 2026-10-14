@@ -85,7 +85,7 @@ export const MATCH_AGENDA: Agenda[] = [
     len: 10,
     what: "Lobby",
     detail:
-      "Scan the QR to join, squad up into teams of 2–3, warm-up game on screen, then a one-minute rules recap. Late joiners land on the smallest team automatically.",
+      "Scan the QR to join and you land on a team of up to 3, warm-up game on screen, then a one-minute rules recap. Late joiners get a team automatically too.",
   },
   {
     t: "5:10",
@@ -175,7 +175,7 @@ export const CUP_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone, then make teams in /host.",
+    detail: "Join on your phone. Auto teams fill teams of up to 3; Make teams in /host reshuffles if you want new ones.",
   },
   {
     t: "5:06",
@@ -233,7 +233,7 @@ export const FINAL_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone, then make teams in /host.",
+    detail: "Join on your phone. Auto teams fill teams of up to 3; Make teams in /host reshuffles if you want new ones.",
   },
   {
     t: "5:06",
@@ -480,7 +480,7 @@ export const PREP: string[] = [
 ];
 export const NEWCOMERS: string[] = [
   "Point them at the QR code on the TV. Joining takes about 20 seconds.",
-  "If teams already exist, the app puts them on the smallest team automatically. Move them in /host if needed.",
+  "The app puts them on a team automatically. Move them in /host if needed.",
   "One-sentence pitch: “Tonight’s game is ___. Your team scores points together. No experience needed.”",
   "If they arrive mid-round, they watch with their team and play from the next round.",
   "Before they leave, make sure they’re in the club’s Teams group.",

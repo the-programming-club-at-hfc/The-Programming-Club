@@ -351,6 +351,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
   const remove = useMutation(api.teams.remove);
   const setDouble = useMutation(api.sessions.setDouble);
   const resetScores = useMutation(api.teams.resetScores);
+  const setAuto = useMutation(api.teams.setAuto);
   const shuffleTeams = (size: 2 | 3) =>
     (!live.teams.length || confirm("Reshuffle everyone into new teams? Tonight’s team scores reset.")) && run(make({ size }));
 
@@ -369,9 +370,21 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         <button className={`btn btn-sm ${live.double ? "btn-on" : ""}`} onClick={() => run(setDouble({ on: !live.double }))}>
           {live.double ? "Double points: on" : "Double points"}
         </button>
+        <button className={`btn btn-sm ${live.autoTeams ? "btn-on" : ""}`} onClick={() => run(setAuto({ on: !live.autoTeams }))}>
+          {live.autoTeams ? "Auto teams: on" : "Auto teams: off"}
+        </button>
       </div>
+      <p className="mt-2 text-sm text-dim">
+        {live.autoTeams
+          ? "Everyone who joins lands on a team of up to 3. Make teams reshuffles everyone."
+          : "Joiners wait without a team until you make teams. Late joiners then go on the smallest team."}
+      </p>
       {live.teams.length === 0 ? (
-        <p className="mt-4 text-dim">No teams yet. Once people have joined, make teams and they’ll see theirs on their phones.</p>
+        <p className="mt-4 text-dim">
+          {live.autoTeams
+            ? "No teams yet. They fill in as people join."
+            : "No teams yet. Once people have joined, make teams and they’ll see theirs on their phones."}
+        </p>
       ) : (
         <ol className="mt-3 divide-y-2 divide-grid/60">
           {live.teams.map((t) => (
