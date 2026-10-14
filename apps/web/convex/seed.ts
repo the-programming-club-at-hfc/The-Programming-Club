@@ -43,8 +43,12 @@ export const run = internalMutation({
     for (const name of NAMES) await addToSession(ctx, session, name, `${name.split(" ")[0].toLowerCase()}@example.com`);
 
     const teams = await Promise.all(teamIds.map((id) => ctx.db.get(id)));
-    const xp = placeXpFor(teams.filter((t) => t !== null));
-    for (const a of await sessionAttendance(ctx, sessionId)) await ctx.db.patch(a._id, { placeXp: a.teamId ? (xp.get(a.teamId) ?? 0) : 0 });
+    const att = (await sessionAttendance(ctx, sessionId)).map((a) => ({
+      ...a,
+      points: teams.find((t) => t?._id === a.teamId)?.score ?? 0,
+    }));
+    const xp = placeXpFor(att);
+    for (const a of att) await ctx.db.patch(a._id, { points: a.points, placeXp: xp.get(a._id) ?? 0 });
     await ctx.db.patch(sessionId, { status: "ended", endedAt: now });
   },
 });

@@ -635,13 +635,13 @@ describe("points", () => {
 });
 
 describe("ending the night", () => {
-  test("place XP: 3, 2, 1 by rank, ties share the higher place", () => {
-    const xp = (...scores: number[]) => {
-      const teams = scores.map((score, i) => ({ _id: `t${i}`, score }) as unknown as Doc<"teams">);
-      return teams.map((tm) => placeXpFor(teams).get(tm._id));
+  test("place XP: 3, 2, 1 by each player's own points; ties share a place and don't skip the next", () => {
+    const xp = (...points: number[]) => {
+      const att = points.map((p, i) => ({ _id: `a${i}`, teamId: `t${i}`, points: p }) as unknown as Doc<"attendance">);
+      return att.map((a) => placeXpFor(att).get(a._id));
     };
     expect(xp(9, 5, 2, 1)).toEqual([3, 2, 1, 0]);
-    expect(xp(5, 5, 2)).toEqual([3, 3, 1]);
+    expect(xp(13, 13, 11, 9, 4)).toEqual([3, 3, 2, 1, 0]);
     expect(xp(4, 0, 0)).toEqual([3, 0, 0]);
   });
 
@@ -705,7 +705,7 @@ describe("ending the night", () => {
     expect(sheet.rows.filter((r) => r.status === "HFC student")).toHaveLength(8);
   });
 
-  test("place XP on a solo night: each player's own rank, ties share", async () => {
+  test("place XP on a solo night: each player's own rank, ties share without skipping", async () => {
     const { t, officer, startNight, join, attendance } = setup();
     const code = await startNight();
     const tokens = [];
@@ -721,8 +721,34 @@ describe("ending the night", () => {
       await officer.mutation(api.teams.score, { teamId: team(i), delta: pts });
     await officer.mutation(api.sessions.end, {});
     const att = await attendance();
-    expect(tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp)).toEqual([3, 3, 1, 0, 0]);
-    expect((await t.query(api.stats.leaderboard, {})).map((r) => r.xp)).toEqual([6, 6, 4, 3, 3]);
+    expect(tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp)).toEqual([3, 3, 2, 1, 0]);
+    expect((await t.query(api.stats.leaderboard, {})).map((r) => r.xp)).toEqual([6, 6, 5, 4, 3]);
+  });
+
+  test("a night that switched solo to teams: place XP still goes by each player's own points", async () => {
+    const { t, officer, startNight, join, attendance } = setup();
+    const code = await startNight();
+    const tokens = [];
+    for (let i = 1; i <= 4; i++) tokens.push(await join(code, student(i)));
+    const solo = (await t.query(api.sessions.live, {}))!.teams;
+    for (const [i, pts] of [
+      [1, 8],
+      [2, 4],
+      [3, 3],
+      [4, 1],
+    ])
+      await officer.mutation(api.teams.score, { teamId: solo.find((tm) => tm.name === student(i).name)!._id, delta: pts });
+    await officer.mutation(api.teams.make, { size: 2 });
+    await officer.mutation(api.sessions.end, {});
+
+    const att = await attendance();
+    expect(tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp)).toEqual([3, 2, 1, 0]);
+    // Teammates with different place XP show it by their names on the TV.
+    const final = (await t.query(api.sessions.final, {}))!;
+    for (const tm of final.teams) {
+      expect(tm.xp).toBe(undefined);
+      expect(tm.members.every((m) => /\+\d$/.test(m))).toBe(true);
+    }
   });
 
   test("practice nights stay out of XP, the leaderboard, and the attendance sheet", async () => {

@@ -73,9 +73,11 @@ export const final = query({
       .first();
     if (!s) return null;
     const [teams, att] = await Promise.all([sessionTeams(ctx, s._id), sessionAttendance(ctx, s._id)]);
-    const xp = placeXpFor(teams);
+    const xp = placeXpFor(att);
     const roster = await Promise.all(
-      att.filter((a) => a.teamId).map(async (a) => ({ name: (await ctx.db.get(a.playerId))?.name ?? "?", teamId: a.teamId })),
+      att
+        .filter((a) => a.teamId)
+        .map(async (a) => ({ name: (await ctx.db.get(a.playerId))?.name ?? "?", teamId: a.teamId, xp: xp.get(a._id) ?? 0 })),
     );
     return {
       _id: s._id,
@@ -84,13 +86,18 @@ export const final = query({
       practice: !!s.practice,
       solo: (s.teamSize ?? 1) === 1,
       teams: teams
-        .map((t) => ({
-          _id: t._id,
-          name: t.name,
-          score: t.score,
-          xp: s.practice ? undefined : (xp.get(t._id) ?? 0),
-          members: roster.filter((r) => r.teamId === t._id).map((r) => r.name),
-        }))
+        .map((t) => {
+          const members = roster.filter((r) => r.teamId === t._id);
+          // Teammates share their place XP unless teams were remade mid-night; then each player's shows by their name.
+          const same = members.every((m) => m.xp === members[0].xp);
+          return {
+            _id: t._id,
+            name: t.name,
+            score: t.score,
+            xp: s.practice ? undefined : same ? (members[0]?.xp ?? 0) : undefined,
+            members: members.map((m) => (s.practice || same ? m.name : `${m.name} +${m.xp}`)),
+          };
+        })
         .sort((a, b) => b.score - a.score),
     };
   },
@@ -140,11 +147,9 @@ export const end = mutation({
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     await scoreUnrevealedPuzzles(ctx, s);
-    const teams = await sessionTeams(ctx, s._id);
-    const xp = placeXpFor(teams);
-    for (const a of await sessionAttendance(ctx, s._id)) {
-      await ctx.db.patch(a._id, { placeXp: a.teamId ? (xp.get(a.teamId) ?? 0) : 0 });
-    }
+    const att = await sessionAttendance(ctx, s._id);
+    const xp = placeXpFor(att);
+    for (const a of att) await ctx.db.patch(a._id, { placeXp: xp.get(a._id) ?? 0 });
     await ctx.db.patch(s._id, { status: "ended", endedAt: Date.now() });
   },
 });

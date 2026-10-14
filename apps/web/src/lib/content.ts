@@ -414,7 +414,7 @@ export const XP: Xp[] = [
   {
     pts: "+3 / +2 / +1",
     what: "You (or your team) finish 1st / 2nd / 3rd that night",
-    note: "The biggest gap between places in one night is 3 XP.",
+    note: "Place goes by the points you earned that night. Ties share a place, and the next score is still the next place.",
   },
   {
     pts: "+2",

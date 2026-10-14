@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { WEEKS } from "../src/lib/content";
 import { isOfficerEmail } from "./officers";
 import { TEAM_NAMES } from "./teamNames";
+import { placeOf } from "../src/lib/grading";
 
 export const openSession = (ctx: QueryCtx) =>
   ctx.db
@@ -194,12 +195,13 @@ export async function award(ctx: MutationCtx, teamId: Id<"teams">, points: numbe
     if (a.teamId === team._id) await ctx.db.patch(a._id, { points: (a.points ?? 0) + points });
 }
 
-/** Place XP by team rank; ties share the higher place. Teams with 0 points earn nothing. */
-export function placeXpFor(teams: Doc<"teams">[]) {
-  const xp = new Map<Id<"teams">, number>();
-  for (const t of teams) {
-    const rank = 1 + teams.filter((o) => o.score > t.score).length;
-    xp.set(t._id, t.score > 0 ? ([0, 3, 2, 1][rank] ?? 0) : 0);
+/** Place XP from each player's own points tonight: +3, +2, +1 for 1st to 3rd. 0 points, or no team, earns nothing. */
+export function placeXpFor(att: Doc<"attendance">[]) {
+  const all = att.filter((a) => a.teamId).map((a) => a.points ?? 0);
+  const xp = new Map<Id<"attendance">, number>();
+  for (const a of att) {
+    const pts = a.points ?? 0;
+    xp.set(a._id, a.teamId && pts > 0 ? ([0, 3, 2, 1][placeOf(pts, all)] ?? 0) : 0);
   }
   return xp;
 }

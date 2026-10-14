@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { addToSession, inTeamPool, requireOpenSession, teamFor } from "./lib";
+import { placeOf } from "../src/lib/grading";
 import { isOfficerEmail, requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
 import { isHfcEmail } from "../src/lib/season";
@@ -175,7 +176,10 @@ export const me = query({
           name: mine.name,
           key: mine.key ?? null,
           score: mine.score,
-          rank: 1 + teams.filter((t) => t.score > mine.score).length,
+          rank: placeOf(
+            mine.score,
+            teams.map((t) => t.score),
+          ),
           of: teams.length,
           members: names,
         };

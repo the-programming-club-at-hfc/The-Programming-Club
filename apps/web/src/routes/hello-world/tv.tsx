@@ -9,7 +9,7 @@ import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRema
 import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
-import { cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
+import { cardKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
 import { nextMeeting, useJustEnded, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
@@ -570,7 +570,10 @@ function Scoreboard({ teams, solo, final = false }: { teams: Standing[]; solo: b
       ) : (
         <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
           {teams.map((t) => {
-            const rank = 1 + teams.filter((o) => o.score > t.score).length;
+            const rank = placeOf(
+              t.score,
+              teams.map((o) => o.score),
+            );
             return (
               <li key={t._id} className="grid grid-cols-[3vw_6vw_1fr_10vw] items-center gap-[1.5vw]">
                 <span className="size-[2.6vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
