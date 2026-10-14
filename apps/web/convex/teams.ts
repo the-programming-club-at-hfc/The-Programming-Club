@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -17,6 +17,7 @@ import {
   soloName,
   teamByKey,
   teamFor,
+  unscoredCards,
 } from "./lib";
 import { TEAM_NAMES } from "./teamNames";
 
@@ -28,6 +29,7 @@ export const make = mutation({
   handler: async (ctx, { size }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
+    if ((await unscoredCards(ctx, s)).length) throw new ConvexError("Finish the round first: reveal its answers, then switch.");
     await ctx.db.patch(s._id, { teamSize: size });
     for (const t of await sessionTeams(ctx, s._id)) await ctx.db.delete(t._id);
     const all = await sessionAttendance(ctx, s._id);

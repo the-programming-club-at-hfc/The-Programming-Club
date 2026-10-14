@@ -164,6 +164,27 @@ export async function addToSession(
   return token;
 }
 
+/** Tonight's cards that teams have answered, raced, fixed, or starred but that haven't been scored yet. Their rows
+ *  belong to tonight's teams, so teams can't be remade until these are revealed. */
+export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
+  const keys = [...new Set([...(s.played ?? []), ...(s.card ? [s.card] : [])].map((w) => w.key))].filter(
+    (k) => !(s.scored ?? []).includes(k),
+  );
+  const open = [];
+  for (const card of keys)
+    for (const table of ["answers", "fixes", "stars", "races"] as const)
+      if (
+        await ctx.db
+          .query(table)
+          .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", card))
+          .first()
+      ) {
+        open.push(card);
+        break;
+      }
+  return open;
+}
+
 /** Add points to a team and to each player on it now, so a player's points survive teams being remade. */
 export async function award(ctx: MutationCtx, teamId: Id<"teams">, points: number) {
   const team = await ctx.db.get(teamId);

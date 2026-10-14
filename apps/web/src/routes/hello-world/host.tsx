@@ -431,6 +431,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
             key={size}
             className={`btn btn-sm ${live.teamSize === size ? "btn-on" : ""}`}
             onClick={() => setMode(size)}
+            disabled={live.roundOpen}
             aria-pressed={live.teamSize === size}
           >
             {label}
@@ -454,6 +455,9 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         <strong className="text-ink">Tonight: {MODES[live.teamSize - 1][1].toLowerCase()}.</strong>{" "}
         {live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff} Pressing a mode, even tonight’s, remakes every team. Nobody loses points.
       </p>
+      {live.roundOpen && (
+        <p className="mt-1 text-sm font-semibold">Finish the round first: reveal its answers, then you can switch modes.</p>
+      )}
       {live.teams.length === 0 ? (
         <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>
       ) : (

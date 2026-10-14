@@ -2,7 +2,16 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { CODE_LETTERS, inTeamPool, openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
+import {
+  CODE_LETTERS,
+  inTeamPool,
+  unscoredCards,
+  openSession,
+  placeXpFor,
+  requireOpenSession,
+  sessionAttendance,
+  sessionTeams,
+} from "./lib";
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
@@ -42,6 +51,8 @@ export const live = query({
       round: s.round ?? null,
       autoTeams: s.autoTeams !== false,
       teamSize: s.teamSize ?? 1,
+      // A round with answers in that hasn't been revealed yet: teams stay put until it is.
+      roundOpen: (await unscoredCards(ctx, s)).length > 0,
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),

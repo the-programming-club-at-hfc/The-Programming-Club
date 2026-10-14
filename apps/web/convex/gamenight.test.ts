@@ -279,6 +279,22 @@ describe("teams", () => {
     expect((await attendance()).every((a) => !a.points)).toBe(true);
   });
 
+  test("teams can't be remade mid-round: answers in but not revealed lock the mode until the reveal", async () => {
+    const { t, officer, nightWithTeams, show } = setup();
+    const { teams } = await nightWithTeams(4);
+    await show({ mode: "card", game: "output", index: 0 });
+    expect((await t.query(api.sessions.live, {}))!.roundOpen).toBe(false);
+    await t.mutation(api.answers.pick, { token: teams[0].tokens[0], card: "output:0", choice: OUTPUTS[0].answer });
+    // Still locked after the card leaves the TV unrevealed.
+    await show({ mode: "scoreboard" });
+    expect((await t.query(api.sessions.live, {}))!.roundOpen).toBe(true);
+    await expect(officer.mutation(api.teams.make, { size: 1 })).rejects.toThrow("Finish the round first");
+
+    await show({ mode: "card", game: "output", index: 0, revealed: true });
+    expect((await t.query(api.sessions.live, {}))!.roundOpen).toBe(false);
+    await officer.mutation(api.teams.make, { size: 1 });
+  });
+
   test("auto teams fill teams up to the last Make teams size", async () => {
     const { t, officer, startNight, join, attendance, teams } = setup();
     const code = await startNight();
