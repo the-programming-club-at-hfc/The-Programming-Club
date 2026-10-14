@@ -267,11 +267,12 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           ))}
         </ol>
       </div>
-      <div className="m-pop tile tile-sky self-center p-10" style={at(5)}>
+      <div className="m-rise space-y-8 self-center" style={at(5)}>
         <p className="text-[clamp(1.6rem,2.6vw,2.8rem)] leading-tight font-extrabold tracking-[-0.02em] text-balance">
-          The join form asked you this too.
+          Not joined yet? The join form has a box for your ideas.
         </p>
-        <p className="mt-4 text-[clamp(1.2rem,1.7vw,1.8rem)]">
+        <JoinBox />
+        <p className="text-[clamp(1.2rem,1.7vw,1.8rem)] text-dim">
           Every answer goes straight to the officers. Think of something later? Tell any of us.
         </p>
       </div>
