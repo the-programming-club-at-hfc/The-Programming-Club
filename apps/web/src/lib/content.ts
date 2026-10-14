@@ -13,7 +13,7 @@ export const WEEKS: Week[] = [
   },
   {
     kind: "match",
-    title: "Tech Pictionary Night",
+    title: "Tech Pictionary",
     pitch:
       "Draw a tech word on the whiteboard while your team guesses: no letters, numbers, or symbols. Miss it, and the other teams get a shot to steal.",
     games: [
@@ -40,7 +40,7 @@ export const WEEKS: Week[] = [
   },
   {
     kind: "match",
-    title: "Code Relay Night",
+    title: "Code Relay",
     pitch:
       "One keyboard per team. Only the driver types, and you swap every two minutes. A dress rehearsal for the Final’s Advent of Code–style puzzles.",
     games: [
@@ -346,7 +346,7 @@ export const GAMES: Game[] = [
     variants: [
       "Whiteboard Relay (no laptops): each person writes one line, then passes the marker.",
       "Silent Relay: nobody talks. Comments in the code are the only way to communicate.",
-      "Advent-style puzzle (Code Relay Night’s final round and the Final): a story, a worked example, and a two-part puzzle. Each team gets its own input on its team computer at /hello-world/fix, solves it in any language, and types in the answer. Part 2 unlocks once part 1 is right, and a wrong answer locks the team out for 30 seconds. +3 for part 1, +5 for part 2, +2 more for the first team to each.",
+      "Advent-style puzzle (Code Relay’s final round and the Final): a story, a worked example, and a two-part puzzle. Each team gets its own input on its team computer at /hello-world/fix, solves it in any language, and types in the answer. Part 2 unlocks once part 1 is right, and a wrong answer locks the team out for 30 seconds. +3 for part 1, +5 for part 2, +2 more for the first team to each.",
     ],
     tip: "Any language works: Python, Java, C++, JavaScript, whatever your team knows. If the lab computers don’t have an editor set up, onecompiler.com runs most languages in the browser with no account.",
   },
@@ -477,7 +477,7 @@ export const PREP: string[] = [
   "Open programmingclub.dev/host on an officer laptop or phone and start tonight’s week.",
   "Put out markers, paper, and the prize stash.",
   "Code Relay or Cup nights: make sure every team computer has an editor or onecompiler.com open.",
-  "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay Night, the Final): open programmingclub.dev/hello-world/fix on every team computer. Once teams are made, each team types the team key from their phones (also on /host). Python loads by itself.",
+  "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay, the Final): open programmingclub.dev/hello-world/fix on every team computer. Once teams are made, each team types the team key from their phones (also on /host). Python loads by itself.",
   "Puzzle nights: try the puzzle at /hello-world/test first, so you know the example and how part 2 twists part 1.",
 ];
 export const NEWCOMERS: string[] = [

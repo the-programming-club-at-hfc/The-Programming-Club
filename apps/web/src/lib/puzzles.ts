@@ -1,4 +1,4 @@
-// Advent of Code–style puzzles: the double-points final on Code Relay Night and both rounds of the Final.
+// Advent of Code–style puzzles: the double-points final on Code Relay and both rounds of the Final.
 // Each team gets its own input from a seed, solves it on its team computer in any language, and types the answers in.
 // Two parts per puzzle; part 2 twists part 1 and shows up once part 1 is right. Original puzzles: nothing here comes
 // from Advent of Code. Convex imports this file too (to check answers), so keep it plain TypeScript with relative imports.
@@ -86,7 +86,7 @@ function until<T>(make: () => T, ok: (x: T) => boolean): T {
   throw new Error("Couldn’t generate a puzzle input.");
 }
 
-// ---- Sticker Swap (Code Relay Night) ---------------------------------------
+// ---- Sticker Swap (Code Relay) ---------------------------------------
 
 const stickerPacks = (input: string) => lines(input).map((l) => l.split(/\s+/).map(Number));
 

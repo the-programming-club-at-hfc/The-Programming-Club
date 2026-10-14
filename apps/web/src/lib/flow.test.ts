@@ -34,9 +34,9 @@ describe("puzzle rounds", () => {
     expect(revealable(preview)).toBe(true);
   });
 
-  test("Code Relay Night's last round and both rounds of the Final are puzzles, with their own clocks", () => {
+  test("Code Relay's last round and both rounds of the Final are puzzles, with their own clocks", () => {
     const plan = (title: string) => DEFAULT_PLAN.find((w) => w.title === title)!.lineup.map((g, i) => roundOf(g, i));
-    const relay = plan("Code Relay Night");
+    const relay = plan("Code Relay");
     expect(relay.filter((r) => r.kind === "puzzle").map((r) => [r.index, r.puzzle])).toEqual([[relay.length - 1, 0]]);
     const final = plan("The Final");
     expect(final.map((r) => [r.kind, r.puzzle, r.double])).toEqual([

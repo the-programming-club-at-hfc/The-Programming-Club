@@ -53,7 +53,7 @@ const DECK_GAMES: GameId[] = ["bug", "output", "relay", "lang", "fix"];
 export function roundOf(item: LineupItem, index: number): Round {
   const id = gamesIn(item.label)[0];
   const game = DECK_GAMES.find((g) => g === id);
-  // A puzzle round plays the puzzle its label names (Code Relay Night's preview, or the Final's Puzzle 1 or 2).
+  // A puzzle round plays the puzzle its label names (Code Relay's preview, or the Final's Puzzle 1 or 2).
   const puzzle = id === "puzzle" ? puzzleForLabel(item.label) : undefined;
   const kind: Kind = game
     ? "deck"
