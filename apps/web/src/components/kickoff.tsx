@@ -193,6 +193,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
           <li key={o.name} className="m-rise border-t-[3px] border-ink pt-4" style={at(3 + k)}>
             <p className="text-dim">{o.role}</p>
             <p className="mt-1 text-3xl leading-tight font-extrabold tracking-[-0.02em]">{o.name}</p>
+            {o.fullName && <p className="text-xl text-dim">{o.fullName}</p>}
             {o.fact && <p className="mt-3">{o.fact}</p>}
           </li>
         ))}

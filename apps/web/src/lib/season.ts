@@ -19,11 +19,11 @@ export const CLUB = {
 export const isHfcEmail = (email: string) => /@(hawkmail\.)?hfcc\.edu$/i.test(email.trim());
 
 // Shown on the kickoff slides. Sign-in permissions come from OFFICER_EMAILS on the Convex deployment (see convex/officers.ts).
-export const OFFICERS = [
+export const OFFICERS: { role: string; name: string; fullName?: string; fact: string }[] = [
   { role: "President", name: "Gregory Thomas", fact: "" },
   { role: "Vice President", name: "Juan Quenga", fact: "" },
   { role: "Treasurer", name: "Muhammad Bilal Aziz", fact: "" },
-  { role: "Secretary", name: "Virginia Daniel", fact: "" },
+  { role: "Secretary", name: "Jennie", fullName: "Virginia Daniel", fact: "" },
   { role: "Faculty advisor", name: "Sri Sai Sreya Sadasivapetkar", fact: "" },
 ];
 
