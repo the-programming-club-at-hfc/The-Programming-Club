@@ -158,8 +158,8 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         Because programmers start counting at zero.
       </p>
       <p className="m-rise mx-auto mt-6 max-w-[48ch] text-[clamp(1.2rem,1.7vw,1.8rem)] text-dim" style={at(6)}>
-        We’re starting halfway through the semester, so the rest of it is for getting to know each other. Tell us the projects, events,
-        and trips you want, and we’ll build Season 1 around them.
+        We’re starting halfway through the semester, so the rest of it is for getting the club up and running. Tell us the projects,
+        events, and trips you want, and we’ll do our best to plan them into Season 1 next semester.
       </p>
     </div>,
     <div>
