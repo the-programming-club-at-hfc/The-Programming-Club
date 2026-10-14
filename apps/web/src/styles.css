@@ -205,6 +205,9 @@
     border-color: var(--color-ink);
     box-shadow: 0 0 0 3px var(--color-sky);
   }
+  .field[aria-invalid="true"] {
+    border-color: var(--color-signal);
+  }
 
   .chip {
     display: inline-block;

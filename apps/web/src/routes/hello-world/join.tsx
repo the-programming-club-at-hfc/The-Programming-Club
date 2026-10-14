@@ -14,7 +14,7 @@ import { PUZZLES } from "#/lib/puzzles";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
 import { useSchedule } from "#/lib/schedule";
-import { CLUB } from "#/lib/season";
+import { CLUB, isHfcEmail } from "#/lib/season";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/hello-world/join")({
@@ -25,6 +25,14 @@ export const Route = createFileRoute("/hello-world/join")({
 
 const tokenKey = (sessionId: string) => `hwc.token.${sessionId}`;
 type Profile = { name: string; email: string };
+
+// Flags a non-HFC email as soon as what's after the @ can't become one, and any non-HFC email once the field is left.
+const notHfc = (email: string, left: boolean) => {
+  if (left) return email.trim() !== "" && !isHfcEmail(email);
+  if (!email.includes("@")) return false;
+  const domain = email.toLowerCase().split("@")[1].trim();
+  return !["hawkmail.hfcc.edu", "hfcc.edu"].some((d) => d.startsWith(domain));
+};
 
 function Join() {
   const { code: codeFromQr } = Route.useSearch();
@@ -79,7 +87,7 @@ function Join() {
       />
     );
   }
-  return <JoinForm initialCode={codeFromQr ?? ""} sessionId={live._id} week={live.week} onJoined={setToken} />;
+  return <JoinForm initialCode={codeFromQr ?? ""} sessionId={live._id} onJoined={setToken} />;
 }
 
 function Center({ children }: { children: React.ReactNode }) {
@@ -90,17 +98,7 @@ function Center({ children }: { children: React.ReactNode }) {
   );
 }
 
-function JoinForm({
-  initialCode,
-  sessionId,
-  week,
-  onJoined,
-}: {
-  initialCode: string;
-  sessionId: string;
-  week: number;
-  onJoined: (t: string) => void;
-}) {
+function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; sessionId: string; onJoined: (t: string) => void }) {
   const join = useMutation(api.players.join);
   const joinSignedIn = useMutation(api.players.joinSignedIn);
   const checkInOfficer = useMutation(api.players.checkInOfficer);
@@ -128,6 +126,8 @@ function JoinForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [emailLeft, setEmailLeft] = useState(false);
+  const emailBad = notHfc(profile.email, emailLeft);
 
   useEffect(() => {
     const saved = localStorage.getItem("hwc.profile");
@@ -154,14 +154,15 @@ function JoinForm({
       localStorage.setItem(tokenKey(sessionId), token);
       onJoined(token);
     } catch (err) {
-      setError(err instanceof ConvexError ? String(err.data) : "Couldn’t join. Check your connection and try again.");
+      const msg = err instanceof ConvexError ? String(err.data) : "Couldn’t join. Check your connection and try again.";
+      // The server's HawkMail check shows on the email field instead.
+      if (msg.startsWith("Use your HawkMail")) setEmailLeft(true);
+      else setError(msg);
     } finally {
       setBusy(false);
     }
   }
 
-  const wk = useSchedule()[week - 1];
-  const t = weekTile(wk);
   if ((isLoading && !waited) || (isAuthenticated && account === undefined))
     return (
       <Center>
@@ -175,27 +176,15 @@ function JoinForm({
   return (
     <Wrap className="flex min-h-dvh max-w-xl flex-col py-5">
       <form onSubmit={submit} className="flex flex-1 flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <div className={`tile ${t.tile} size-12 shrink-0 rounded-[3px]`}>
-            <Picto id={t.picto} className="absolute inset-[14%]" />
-          </div>
-          <p className="leading-tight">
-            <span className="text-sm text-dim">Week {week}</span>
-            <br />
-            <span className="font-bold">{wk.title}</span>
-          </p>
-        </div>
         <div>
           <h1 className="text-[clamp(2.2rem,10vw,3.2rem)] leading-[0.9] lowercase">{officer ? "officer check-in" : "join the game"}</h1>
-          <p className="mt-2 text-dim">
-            {officer
-              ? "You’re signed in as an officer. You’ll be counted here and kept off the teams so you can run the night."
-              : member
-                ? `Signed in as ${account.email}.`
-                : wrongAccount
-                  ? `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`
-                  : `No account or password. Welcome to ${CLUB.name}!`}
-          </p>
+          {(officer || wrongAccount) && (
+            <p className="mt-2 text-dim">
+              {officer
+                ? "You’re signed in as an officer. You’ll be counted here and kept off the teams so you can run the night."
+                : `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`}
+            </p>
+          )}
         </div>
 
         {!officer && (
@@ -249,17 +238,18 @@ function JoinForm({
               type="email"
               value={profile.email}
               onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+              onBlur={() => setEmailLeft(true)}
               autoComplete="email"
               required
               placeholder="jsmith@hawkmail.hfcc.edu"
+              aria-invalid={emailBad}
+              aria-describedby={emailBad ? "email-error" : undefined}
             />
-          </label>
-        )}
-        {/* Signed-in members skip it after their first night, to keep joining one tap. */}
-        {!officer && (!member || firstPhone) && (
-          <label className="block">
-            <span className="font-bold">Who brought you?</span> <span className="text-sm text-dim">Optional. You both get +2 XP.</span>
-            <input className="field mt-1.5" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
+            {emailBad && (
+              <span id="email-error" className="mt-1 block text-sm font-semibold text-signal">
+                Use your HawkMail (@hawkmail.hfcc.edu). The club is for HFC students.
+              </span>
+            )}
           </label>
         )}
         {!officer && firstPhone && (
@@ -281,6 +271,13 @@ function JoinForm({
                 {idea.length}/{IDEA_MAX}
               </span>
             )}
+          </label>
+        )}
+        {/* Signed-in members skip it after their first night, to keep joining one tap. */}
+        {!officer && (!member || firstPhone) && (
+          <label className="block">
+            <span className="font-bold">Who brought you?</span> <span className="text-sm text-dim">Optional. You both get +2 XP.</span>
+            <input className="field mt-1.5" value={broughtBy} onChange={(e) => setBroughtBy(e.target.value)} maxLength={40} />
           </label>
         )}
         {error && (
