@@ -318,9 +318,16 @@ function ResultBanner({ game, pick, result }: { game: AnswerGame; pick: TeamPick
             )}
           </>
         ) : (
-          <p>
-            Your team picked <span className="font-code whitespace-pre-wrap">{pick.choice}</span> {mark(result?.correct)}
-          </p>
+          <>
+            <p>Your team picked</p>
+            {/* The mark sits beside the whole block, so it reads as the verdict on every line of a multiline answer. */}
+            <div className="mt-2 flex items-center gap-3">
+              <pre className="min-w-0 flex-1 overflow-x-auto rounded-[6px] border-2 border-current/25 px-4 py-2 font-code text-3xl font-bold">
+                {pick.choice}
+              </pre>
+              <span className="shrink-0 text-3xl leading-none font-extrabold">{mark(result?.correct)}</span>
+            </div>
+          </>
         )}
         {result?.early && <p className="mt-1 font-normal">Includes the bonus for locking in early.</p>}
       </div>
