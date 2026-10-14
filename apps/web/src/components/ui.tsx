@@ -69,12 +69,14 @@ const PICTOS = {
   ),
   pictionary: (
     <>
-      <rect x="50" y="12" width="40" height="44" rx="2" {...S} strokeWidth="6" />
-      <path {...S} strokeWidth="5" d="M58 42c4-10 8-10 10-2s6 8 12-6" pathLength={1} className="pa pa-draw" />
-      <path {...S} strokeWidth="6" d="M60 56l-4 30M80 56l4 30" />
-      <circle cx="25" cy="20" r="8" {...F} />
-      <path {...S} strokeWidth="10" d="M27 33l3 25M28 41l-8 13M30 58l-8 28M30 58l8 28" />
-      <path {...S} strokeWidth="10" d="M28 38l13-4 11-5" className="pa pa-sketch" style={at(28, 38)} />
+      {/* A marker sketching while the team guesses. */}
+      <path {...S} strokeWidth="6" d="M16 22c0-7 5-11 11-11s11 4 11 10c0 7-10 8-10 15" />
+      <circle cx="28" cy="45" r="4" {...F} />
+      <path {...S} strokeWidth="6" d="M8 78c8-14 15-14 19-4s12 10 18-4 12-12 16 0" pathLength={1} className="pa pa-draw" />
+      <g className="pa pa-sketch" style={at(74, 44)}>
+        <path {...S} strokeWidth="14" d="M66 54l20-28" />
+        <path {...F} d="M57 70l2-14 11 8Z" />
+      </g>
     </>
   ),
   lang: (
