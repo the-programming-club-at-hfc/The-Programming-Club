@@ -100,7 +100,7 @@ function Running({
       />
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1fr_1.25fr]">
         <div className="space-y-6">
-          {week.kind === "kickoff" && <SlidesPanel live={live} />}
+          {(week.kind === "kickoff" || live.screen.mode === "slides") && <SlidesPanel live={live} />}
           <ScreenPanel live={live} />
           <TimerPanel live={live} />
           <TeamsPanel live={live} keys={keys} />
@@ -240,9 +240,9 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   );
 }
 
-const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", message: "Message", slides: "Kickoff slides" };
+const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", message: "Message" };
 
-// Week 1 runs the kickoff deck on the TV. Arrow keys or a clicker on the TV computer move it too.
+// The kickoff deck on the TV: always here on Week 1, and on any other night once the slides go up from "On the TV".
 function SlidesPanel({ live }: { live: Live }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const count = kickoffSlides(useSchedule()).length;
@@ -292,6 +292,12 @@ function ScreenPanel({ live }: { live: Live }) {
             {label}
           </button>
         ))}
+        <button
+          className={`btn btn-sm ${live.screen.mode === "slides" ? "btn-on" : ""}`}
+          onClick={() => live.screen.mode !== "slides" && show({ mode: "slides", index: 0 })}
+        >
+          Kickoff slides
+        </button>
         {live.screen.mode in ON_AIR && (
           <span className="btn btn-sm btn-on pointer-events-none">{ON_AIR[live.screen.mode as keyof typeof ON_AIR]}</span>
         )}
