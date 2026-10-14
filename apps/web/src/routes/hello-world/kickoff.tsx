@@ -4,8 +4,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
-import { AgendaList, Code, Picto, weekTile } from "#/components/ui";
-import { FEEDBACK, MATCH_AGENDA } from "#/lib/content";
+import { Code, Picto, weekTile } from "#/components/ui";
+import { FEEDBACK } from "#/lib/content";
 import { useSchedule } from "#/lib/schedule";
 import type { WeekPlan } from "#/lib/schedule";
 import { useJoinCode } from "#/components/officer";
@@ -223,25 +223,6 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <p className="m-rise mt-10 text-lg text-dim" style={at(12)}>
         Lineup subject to change.
       </p>
-    </div>,
-    <div className="grid gap-12 lg:grid-cols-2">
-      <div>
-        <H>How a game night works</H>
-        <div className="m-rise text-2xl" style={at(3)}>
-          <AgendaList rows={MATCH_AGENDA.slice(0, 5)} compact />
-        </div>
-      </div>
-      <ul className="space-y-6 self-center text-[clamp(1.3rem,1.8vw,1.9rem)]">
-        <li className="m-rise border-l-[6px] border-meadow pl-6" style={at(5)}>
-          <strong>No homework.</strong> Everything happens in the room.
-        </li>
-        <li className="m-rise border-l-[6px] border-meadow pl-6" style={at(6)}>
-          <strong>Join any week.</strong> Scan the QR code and you’re on a team.
-        </li>
-        <li className="m-rise border-l-[6px] border-meadow pl-6" style={at(7)}>
-          <strong>Any language for Code Relay.</strong> Bug Hunt and Output? use short Python snippets, and we explain every answer.
-        </li>
-      </ul>
     </div>,
     <div>
       <H>How you score</H>
