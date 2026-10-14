@@ -129,7 +129,8 @@ export const setPlaying = mutation({
       .unique();
     const session = a && (await ctx.db.get(a.sessionId));
     if (!a?.officer || session?.status !== "open") throw new ConvexError("Only officers can switch that, during the night.");
-    await ctx.db.patch(a._id, { playing, teamId: playing ? (a.teamId ?? (await teamFor(ctx, session))) : undefined });
+    const name = (await ctx.db.get(a.playerId))?.name ?? "Player";
+    await ctx.db.patch(a._id, { playing, teamId: playing ? (a.teamId ?? (await teamFor(ctx, session, name))) : undefined });
   },
 });
 

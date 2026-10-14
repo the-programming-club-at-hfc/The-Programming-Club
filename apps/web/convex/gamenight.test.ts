@@ -189,9 +189,55 @@ describe("teams", () => {
     expect(att.find((a) => a.officer)!.teamId).toBe(undefined);
   });
 
-  test("auto teams, on by default: joiners fill teams of up to 2, then up to the last Make teams size", async () => {
+  test("solo by default: each joiner gets a team of their own, named after them", async () => {
     const { t, officer, startNight, join, attendance, teams } = setup();
     const code = await startNight();
+    for (let i = 1; i <= 3; i++) await join(code, student(i));
+    // Same name, different person: numbered so the TV can tell them apart.
+    await join(code, { name: "Student 1", email: "other1@hawkmail.hfcc.edu" });
+    await join(code, { name: "Grace", email: GRACE });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const live = (await t.query(api.sessions.live, {}))!;
+    expect([live.autoTeams, live.teamSize]).toEqual([true, 1]);
+    expect(live.teams.map((tm) => [tm.name, tm.members]).sort(([a], [b]) => (a < b ? -1 : 1))).toEqual([
+      ["Student 1", ["Student 1"]],
+      ["Student 1 2", ["Student 1"]],
+      ["Student 2", ["Student 2"]],
+      ["Student 3", ["Student 3"]],
+    ]);
+    expect((await attendance()).filter((a) => a.officer).map((a) => a.teamId)).toEqual([undefined, undefined]);
+    expect(new Set((await teams()).map((tm) => tm.key)).size).toBe(4);
+    // Play tonight puts an officer on a team of their own too.
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    const team = (await t.query(api.players.me, { token: ada }))!.team!;
+    expect([team.name, team.members]).toEqual(["Ada", ["Ada"]]);
+  });
+
+  test("Make teams with size 1: everyone solo, scores reset, and late joiners get their own", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    for (let i = 1; i <= 5; i++) await join(code, student(i));
+    await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await officer.mutation(api.teams.make, { size: 2 });
+    expect(await teams()).toHaveLength(2);
+    await officer.mutation(api.teams.score, { teamId: (await teams())[0]._id, delta: 3 });
+
+    await officer.mutation(api.teams.make, { size: 1 });
+    const live = (await t.query(api.sessions.live, {}))!;
+    expect(live.teamSize).toBe(1);
+    expect(live.teams.map((tm) => [tm.name, tm.members, tm.score]).sort()).toEqual(
+      [1, 2, 3, 4, 5].map((i) => [`Student ${i}`, [`Student ${i}`], 0]),
+    );
+    expect((await attendance()).find((a) => a.officer)!.teamId).toBe(undefined);
+    await join(code, student(6));
+    expect((await t.query(api.sessions.live, {}))!.teams.find((tm) => tm.name === "Student 6")!.members).toEqual(["Student 6"]);
+  });
+
+  test("auto teams fill teams up to the last Make teams size", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    // Picking teams of 2 before anyone joins sets the night's size.
+    await officer.mutation(api.teams.make, { size: 2 });
     for (let i = 1; i <= 7; i++) await join(code, student(i));
     await join(code, { name: "Grace", email: GRACE });
     const att = await attendance();
@@ -210,16 +256,27 @@ describe("teams", () => {
   });
 
   test("with auto teams off, joiners wait for Make teams; turning it back on places them", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
-    const code = await startNight();
-    await officer.mutation(api.teams.setAuto, { on: false });
-    for (let i = 1; i <= 4; i++) await join(code, student(i));
-    expect(await teams()).toHaveLength(0);
-    expect((await t.query(api.sessions.live, {}))!.autoTeams).toBe(false);
-    await expect(t.mutation(api.teams.setAuto, { on: true })).rejects.toThrow("Only club officers");
-    await officer.mutation(api.teams.setAuto, { on: true });
-    expect((await attendance()).every((a) => a.teamId)).toBe(true);
-    expect(await teams()).toHaveLength(2);
+    // [size, teams for 4 players, teams once a 5th joins with auto off again: smallest team, or their own when solo]
+    for (const [size, count, late] of [
+      [2, 2, 2],
+      [1, 4, 5],
+    ] as const) {
+      const { t, officer, startNight, join, attendance, teams } = setup();
+      const code = await startNight();
+      await officer.mutation(api.teams.make, { size });
+      await officer.mutation(api.teams.setAuto, { on: false });
+      for (let i = 1; i <= 4; i++) await join(code, student(i));
+      expect(await teams()).toHaveLength(0);
+      expect((await t.query(api.sessions.live, {}))!.autoTeams).toBe(false);
+      await expect(t.mutation(api.teams.setAuto, { on: true })).rejects.toThrow("Only club officers");
+      await officer.mutation(api.teams.setAuto, { on: true });
+      expect((await attendance()).every((a) => a.teamId)).toBe(true);
+      expect(await teams()).toHaveLength(count);
+      await officer.mutation(api.teams.setAuto, { on: false });
+      await join(code, student(5));
+      expect((await attendance()).every((a) => a.teamId)).toBe(true);
+      expect(await teams()).toHaveLength(late);
+    }
   });
 
   test("Play tonight puts an officer on a team, and off again", async () => {
@@ -566,6 +623,26 @@ describe("ending the night", () => {
     const sheet = await officer.query(api.sessions.attendanceExport, { sessionId });
     expect(sheet.rows).toHaveLength(10);
     expect(sheet.rows.filter((r) => r.status === "HFC student")).toHaveLength(8);
+  });
+
+  test("place XP on a solo night: each player's own rank, ties share", async () => {
+    const { t, officer, startNight, join, attendance } = setup();
+    const code = await startNight();
+    const tokens = [];
+    for (let i = 1; i <= 5; i++) tokens.push(await join(code, student(i)));
+    const live = (await t.query(api.sessions.live, {}))!;
+    const team = (i: number) => live.teams.find((tm) => tm.name === student(i).name)!._id;
+    for (const [i, pts] of [
+      [1, 5],
+      [2, 5],
+      [3, 2],
+      [4, 1],
+    ])
+      await officer.mutation(api.teams.score, { teamId: team(i), delta: pts });
+    await officer.mutation(api.sessions.end, {});
+    const att = await attendance();
+    expect(tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp)).toEqual([3, 3, 1, 0, 0]);
+    expect((await t.query(api.stats.leaderboard, {})).map((r) => r.xp)).toEqual([6, 6, 4, 3, 3]);
   });
 
   test("practice nights stay out of XP, the leaderboard, and the attendance sheet", async () => {

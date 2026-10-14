@@ -95,8 +95,9 @@ export default defineSchema({
     round: v.optional(v.number()),
     // false when officers turned auto teams off for tonight. Missing means on: joiners land on a team of up to teamSize.
     autoTeams: v.optional(v.boolean()),
-    // The size of tonight's last Make teams, which auto teams fill up to. Missing means 2.
-    teamSize: v.optional(v.union(v.literal(2), v.literal(3))),
+    // Solo (1) or teams of 2 or 3, from tonight's last Make teams; auto teams fill up to it. Missing means 1: a solo
+    // night, where every player is a team of one named after them.
+    teamSize: v.optional(v.union(v.literal(1), v.literal(2), v.literal(3))),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),
