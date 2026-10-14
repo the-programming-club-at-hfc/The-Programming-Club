@@ -13,13 +13,14 @@ export const WEEKS: Week[] = [
   },
   {
     kind: "match",
-    title: "Wiki Race Night",
-    pitch: "Get from Pizza to the Moon using only Wikipedia links. Fastest team wins.",
+    title: "Tech Pictionary Night",
+    pitch:
+      "Draw a tech word on the whiteboard while your team guesses: no letters, numbers, or symbols. Miss it, and the other teams get a shot to steal.",
     games: [
-      "Tech Pictionary (warm-up)",
-      "Wiki Race: Classic",
-      "Wiki Race: Fewest Clicks",
-      "Final round, double points: Wiki Race, CS edition",
+      "Guess the Language (warm-up)",
+      "Tech Pictionary: round 1",
+      "Tech Pictionary: speed round",
+      "Final round, double points: Tech Pictionary",
     ],
     showXp: 3,
   },
@@ -524,7 +525,7 @@ export const ANNOUNCEMENT =
   "Hi everyone, quick announcement from the Programming Club. We meet Wednesdays from 5 to 6 in Room E-178, and this semester we’re running a team game league called the Hello, World Cup: Wikipedia races, bug hunts, code relays. You don’t need any experience and there’s no homework. It’s free, and you can join any week. Come play. Details are at programmingclub.dev.";
 export const CAPTIONS: string[] = [
   "Week {n} high scores are up 🕹️ Come knock them off the board Wednesday, 5–6, Room E-178.",
-  "Pizza → Moon in 4 clicks. Think you can beat it? Wiki Race Night, Wednesday 5–6.",
+  "Pizza → Moon in 4 clicks. Think you can beat it? Wednesdays 5–6, Room E-178.",
   "Never coded before? Most of us hadn’t either. Wednesdays 5–6, Room E-178, no experience needed.",
 ];
 export const FEEDBACK: string[] = [
