@@ -153,6 +153,12 @@
     min-height: 2.2rem;
     border-radius: 5px;
   }
+  /* Big enough for a thumb on phones and tablets. */
+  @media (pointer: coarse) {
+    .btn-sm {
+      min-height: 2.75rem;
+    }
+  }
 
   /* A plain container. (px is the old name, kept for the officer console.) */
   .card,

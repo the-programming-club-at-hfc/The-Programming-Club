@@ -29,9 +29,22 @@ type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type HostData = FunctionReturnType<typeof api.sessions.host>;
 type Row = NonNullable<HostData["rows"]>[number];
 
-const Panel = ({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) => (
+const Panel = ({
+  title,
+  action,
+  children,
+  className = "",
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) => (
   <section className={`card p-5 ${className}`}>
-    <h2 className="mb-3 text-2xl">{title}</h2>
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <h2 className="text-2xl">{title}</h2>
+      {action}
+    </div>
     {children}
   </section>
 );
@@ -98,7 +111,7 @@ function Running({
         }}
         className="mt-6"
       />
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1fr_1.25fr]">
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
         <div className="space-y-6">
           {(week.kind === "kickoff" || live.screen.mode === "slides") && <SlidesPanel live={live} />}
           <ScreenPanel live={live} />
@@ -129,7 +142,7 @@ function Header({ live }: { live: Live }) {
   const code = useJoinCode();
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
-      <div>
+      <div className="min-w-0">
         <p className="font-bold text-pine">
           Week {live.week}
           {isCupWeek(live.week) ? " · Cup night" : ""}
@@ -137,10 +150,11 @@ function Header({ live }: { live: Live }) {
         </p>
         <h1 className="text-3xl">{plan[live.week - 1]?.title}</h1>
       </div>
-      <p className="narrow font-extrabold text-5xl tracking-[0.2em] text-ink" title="Join code">
+      <p className="narrow ml-auto font-extrabold text-4xl tracking-[0.2em] text-ink sm:ml-0 sm:text-5xl" title="Join code">
         {code}
       </p>
-      <nav className="ml-auto flex flex-wrap items-center gap-1">
+      {/* One row that scrolls sideways on phones, so the controls start right under the header. */}
+      <nav className="-mx-1 flex w-full items-center gap-1 overflow-x-auto px-1 *:shrink-0 sm:ml-auto sm:w-auto sm:flex-wrap sm:overflow-visible">
         <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="btn btn-sm">
           Open TV view
         </a>
@@ -311,7 +325,7 @@ function ScreenPanel({ live }: { live: Live }) {
         }}
       >
         <input
-          className="field"
+          className="field min-w-0"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Big message, e.g. “5 minute break”"
@@ -503,6 +517,9 @@ function LineupPanel({
   const save = useMutation(api.schedule.save);
   const w = useSchedule()[week - 1];
   const lineup = w.lineup;
+  // While a night runs, the editing buttons stay out of the way until Edit.
+  const [editing, setEditing] = useState(!onPlay);
+  const edit = editing || lineup.length === 0;
   const update = (next: LineupItem[]) =>
     run(
       save({
@@ -536,7 +553,18 @@ function LineupPanel({
   );
 
   return (
-    <Panel title={onPlay ? "Tonight’s lineup" : `Week ${week} lineup`} className={className}>
+    <Panel
+      title={onPlay ? "Tonight’s lineup" : `Week ${week} lineup`}
+      action={
+        onPlay &&
+        lineup.length > 0 && (
+          <button className={`btn btn-sm ${editing ? "btn-on" : ""}`} onClick={() => setEditing(!editing)} aria-pressed={editing}>
+            {editing ? "Done" : "Edit"}
+          </button>
+        )
+      }
+      className={className}
+    >
       {lineup.length === 0 ? (
         <p className="text-dim">No games planned. Add one below.</p>
       ) : (
@@ -546,12 +574,15 @@ function LineupPanel({
             const gt = id ? GAME_TILE[id] : null;
             const on = playing === i;
             return (
-              <li key={`${i}-${g.label}`} className={`flex flex-wrap items-center gap-2 p-2 ${on ? "bg-sun/30" : "bg-mist"}`}>
+              <li
+                key={`${i}-${g.label}`}
+                className={`flex items-center gap-2 p-2 ${edit ? "flex-wrap" : ""} ${on ? "bg-sun/30" : "bg-mist"}`}
+              >
                 <span className="narrow w-6 text-center text-lg font-extrabold">{i + 1}</span>
                 <span className={`tile ${gt?.tile ?? ideaTile(g.label) ?? "bg-line"} size-8 shrink-0`}>
                   {gt && <Picto id={gt.picto} className="absolute inset-[10%]" />}
                 </span>
-                <span className="min-w-32 flex-1 font-bold">
+                <span className={`flex-1 font-bold ${edit ? "min-w-32" : "min-w-0"}`}>
                   {g.label}
                   {g.double && <span className="chip ml-2">Double points</span>}
                 </span>
@@ -560,50 +591,56 @@ function LineupPanel({
                     {on ? "Playing" : "Play"}
                   </button>
                 )}
-                <select
-                  className="field w-28 py-1 text-sm"
-                  value=""
-                  onChange={(e) => e.target.value && setLine(i, { label: e.target.value })}
-                  aria-label={`Swap game ${i + 1}`}
-                >
-                  <option value="">Swap…</option>
-                  {options}
-                </select>
-                <button
-                  className={`btn btn-sm ${g.double ? "btn-on" : ""}`}
-                  onClick={() => setLine(i, { double: !g.double })}
-                  aria-pressed={g.double}
-                  title="Double points"
-                >
-                  Double
-                </button>
-                <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
-                  ↑
-                </button>
-                <button className="btn btn-sm" onClick={() => move(i, 1)} disabled={i === lineup.length - 1} aria-label="Move down">
-                  ↓
-                </button>
-                <button
-                  className="btn btn-sm text-dim"
-                  onClick={() => update(lineup.filter((_, j) => j !== i))}
-                  aria-label={`Remove ${g.label}`}
-                >
-                  ✕
-                </button>
+                {edit && (
+                  <>
+                    <select
+                      className="field w-28 py-1 text-sm"
+                      value=""
+                      onChange={(e) => e.target.value && setLine(i, { label: e.target.value })}
+                      aria-label={`Swap game ${i + 1}`}
+                    >
+                      <option value="">Swap…</option>
+                      {options}
+                    </select>
+                    <button
+                      className={`btn btn-sm ${g.double ? "btn-on" : ""}`}
+                      onClick={() => setLine(i, { double: !g.double })}
+                      aria-pressed={g.double}
+                      title="Double points"
+                    >
+                      Double
+                    </button>
+                    <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
+                      ↑
+                    </button>
+                    <button className="btn btn-sm" onClick={() => move(i, 1)} disabled={i === lineup.length - 1} aria-label="Move down">
+                      ↓
+                    </button>
+                    <button
+                      className="btn btn-sm text-dim"
+                      onClick={() => update(lineup.filter((_, j) => j !== i))}
+                      aria-label={`Remove ${g.label}`}
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
               </li>
             );
           })}
         </ol>
       )}
-      <select
-        className="field mt-3 text-sm"
-        value=""
-        onChange={(e) => e.target.value && update([...lineup, { label: e.target.value, double: false }])}
-        aria-label="Add a game"
-      >
-        <option value="">+ Add a game…</option>
-        {options}
-      </select>
+      {edit && (
+        <select
+          className="field mt-3 text-sm"
+          value=""
+          onChange={(e) => e.target.value && update([...lineup, { label: e.target.value, double: false }])}
+          aria-label="Add a game"
+        >
+          <option value="">+ Add a game…</option>
+          {options}
+        </select>
+      )}
     </Panel>
   );
 }
