@@ -74,8 +74,8 @@ const PICTOS = {
       <circle cx="28" cy="45" r="4" {...F} />
       <path {...S} strokeWidth="6" d="M8 78c8-14 15-14 19-4s12 10 18-4 12-12 16 0" pathLength={1} className="pa pa-draw" />
       <g className="pa pa-sketch" style={at(74, 44)}>
-        <path {...S} strokeWidth="14" d="M66 54l20-28" />
-        <path {...F} d="M57 70l2-14 11 8Z" />
+        <path {...F} d="M80.3 21.9l11.4 8.2-20 28-11.4-8.2Z" />
+        <path {...F} d="M70.5 59.7l-11.4-8.2-1.8 14.7Z" />
       </g>
     </>
   ),
