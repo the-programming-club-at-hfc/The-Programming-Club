@@ -145,15 +145,15 @@ export const KICKOFF_AGENDA: Agenda[] = [
   },
   {
     t: "5:26",
-    len: 10,
+    len: 6,
     what: "Your turn: feedback",
     detail: "Talk through the questions on the slide. Ideas from the join form land on the officer dashboard.",
   },
   {
-    t: "5:36",
-    len: 16,
+    t: "5:32",
+    len: 20,
     what: "First match: Wiki Race",
-    detail: "One practice race, then two scored races.",
+    detail: "Teams open programmingclub.dev/wiki. One practice race, then two scored races.",
   },
   {
     t: "5:52",
