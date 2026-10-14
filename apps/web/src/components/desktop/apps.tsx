@@ -119,7 +119,7 @@ function Meetings() {
         </div>
       )}
       {isHalloweenMonth() && costume && (
-        <p className="mb-4 text-sm font-semibold text-[#c2410c]">Come to {costume.title} in costume for +1 XP.</p>
+        <p className="mb-4 text-sm font-semibold text-[#c2410c]">Come to {costume.title} in costume for +3 XP.</p>
       )}
       <ol className="divide-y divide-line">
         {plan.map((w, i) => {
