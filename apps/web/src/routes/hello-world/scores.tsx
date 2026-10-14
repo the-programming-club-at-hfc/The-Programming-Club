@@ -15,7 +15,10 @@ function Scores() {
   const board = useQuery(api.stats.leaderboard);
   return (
     <>
-      <PageHead title="scores">Season XP so far. Showing up every week is the fastest way up the board.</PageHead>
+      <PageHead title="scores">
+        Season XP so far. Showing up every week is the fastest way up the board.
+        <span className="mt-2 block">Each night: 3 XP for coming, +3/2/1 for your place, plus any bonus XP.</span>
+      </PageHead>
       <Wrap>
         {board === undefined ? (
           <p className="text-dim">Loading scores…</p>
