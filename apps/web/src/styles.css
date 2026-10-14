@@ -312,6 +312,172 @@
   animation: tile-in 520ms cubic-bezier(0.65, 0, 0.35, 1) both;
 }
 
+/* Kickoff deck motion: entrances stagger by --i (90ms beats) after --base (260ms); the wipe covers slide changes. */
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-line-rise {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes m-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes m-drop {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes m-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-slam {
+  from {
+    opacity: 0;
+    transform: scale(1.5);
+    letter-spacing: 0.04em;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-0.35rem);
+  }
+}
+@keyframes m-shine {
+  0% {
+    transform: translateX(-100%) skewX(-20deg);
+  }
+  15%,
+  100% {
+    transform: translateX(400%) skewX(-20deg);
+  }
+}
+@keyframes deck-wipe {
+  0% {
+    clip-path: inset(0 0 0 100%);
+  }
+  45% {
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+
+.m-rise {
+  animation: m-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--base, 260ms) + var(--i, 0) * 90ms);
+}
+.m-line {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-block: 0.06em 0.12em;
+  margin-block: -0.06em -0.12em;
+}
+.m-line > span {
+  display: inline-block;
+  animation: m-line-rise 760ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--base, 260ms) + var(--i, 0) * 90ms);
+}
+.m-wipe {
+  animation: m-wipe 640ms cubic-bezier(0.65, 0, 0.35, 1) backwards;
+  animation-delay: calc(var(--base, 260ms) + var(--i, 0) * 90ms);
+}
+.m-drop {
+  animation: m-drop 560ms cubic-bezier(0.65, 0, 0.35, 1) backwards;
+  animation-delay: calc(var(--base, 260ms) + var(--i, 0) * 90ms);
+}
+.m-pop {
+  animation: m-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(var(--base, 260ms) + var(--i, 0) * 90ms);
+}
+.m-slam {
+  animation: m-slam 520ms cubic-bezier(0.2, 0.9, 0.1, 1) backwards;
+  animation-delay: calc(var(--base, 260ms) + var(--i, 0) * 90ms);
+}
+.m-float {
+  animation: m-float 4s ease-in-out 1.2s infinite alternate;
+}
+.m-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: #fff;
+  opacity: 0.2;
+  animation: m-shine 6s cubic-bezier(0.65, 0, 0.35, 1) 1.2s infinite backwards;
+}
+
+.deck-wipe {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+}
+.deck-wipe > span {
+  animation: deck-wipe 620ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.deck-wipe > span:nth-child(1) {
+  background: var(--color-sky);
+  animation-delay: 0ms;
+}
+.deck-wipe > span:nth-child(2) {
+  background: var(--color-meadow);
+  animation-delay: 40ms;
+}
+.deck-wipe > span:nth-child(3) {
+  background: var(--color-sun);
+  animation-delay: 80ms;
+}
+.deck-wipe > span:nth-child(4) {
+  background: var(--color-gold);
+  animation-delay: 120ms;
+}
+.deck-wipe[data-dir="back"] {
+  transform: scaleX(-1);
+}
+.deck-progress {
+  transition: width 600ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
 /* Club desktop (components/desktop). White sheets with layered depth on deep school blue; frosted glass for the system chrome. */
 .desk-wallpaper {
   background: #0a2a5e;
@@ -889,10 +1055,20 @@ html:has(.desk-wallpaper) {
   .boot-wallpaper,
   .boot-taskbar,
   .boot-icon,
-  .heart-pop {
+  .heart-pop,
+  .m-rise,
+  .m-line > span,
+  .m-wipe,
+  .m-drop,
+  .m-pop,
+  .m-slam,
+  .m-float,
+  .m-shine::after,
+  .deck-wipe > span {
     animation: none;
   }
-  .scene {
+  .scene,
+  .deck-wipe {
     display: none;
   }
   .press:active {
