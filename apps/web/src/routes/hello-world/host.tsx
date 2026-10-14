@@ -8,7 +8,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
-import { NextPanel, WordPeek, nextWord, useStartRace } from "#/components/next";
+import { NextPanel, WordPeek, nextWord, useReadyRace, useStartRace } from "#/components/next";
 import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { WIKI_RACES, wikiUrl } from "#/lib/content";
@@ -1121,6 +1121,7 @@ function WikiStatus({ live }: { live: Live }) {
 function WikiTool({ live, used }: { live: Live; used: string[] }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
+  const readyRace = useReadyRace();
   const startRace = useStartRace();
   const s = live.screen;
   const [cs, setCs] = useState(false);
@@ -1205,13 +1206,7 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
               <button
                 className="btn btn-sm btn-neon"
                 // The get-ready screen first, so every team is on /wiki before the race shows.
-                onClick={() =>
-                  run(
-                    setScreen({
-                      screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: clicks || undefined, wikiReady: true },
-                    }),
-                  )
-                }
+                onClick={() => run(readyRace({ ...race, clicks }))}
               >
                 Show on TV
               </button>
@@ -1219,7 +1214,8 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
             <button className="btn btn-sm" onClick={() => setRace({ from: race.to, to: race.from })}>
               Reverse
             </button>
-            {!(onTv && s.wikiReady) && (
+            {/* While any race waits on its get-ready screen, only Start the race starts the clock. */}
+            {!(s.mode === "wiki" && s.wikiReady) && (
               <button
                 className="btn btn-sm"
                 onClick={() => run(timer({ action: "set", seconds: wikiSeconds(clicks), relay: false, autostart: true }))}

@@ -52,6 +52,18 @@ export function WordPeek({ word }: { word: string }) {
 const level = (game: GameId, i: number) =>
   game === "bug" ? BUGS[i].level : game === "fix" ? FIXES[i].level : game === "relay" ? RELAYS[i].level : null;
 
+/** Put a Wiki Race's get-ready screen on the TV, with its clock set but stopped so no old countdown or chime runs on. */
+export function useReadyRace() {
+  const setScreen = useMutation(api.sessions.setScreen);
+  const timer = useMutation(api.sessions.timer);
+  return async (race: { from: string; to: string; clicks: boolean }) => {
+    await setScreen({
+      screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: race.clicks || undefined, wikiReady: true },
+    });
+    await timer({ action: "set", seconds: wikiSeconds(race.clicks), relay: false });
+  };
+}
+
 /** Start a Wiki Race from its get-ready screen: the race goes up and its clock starts, for every team at once. */
 export function useStartRace() {
   const setScreen = useMutation(api.sessions.setScreen);
@@ -80,6 +92,7 @@ export function NextPanel({
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const end = useMutation(api.sessions.end);
+  const readyRace = useReadyRace();
   const startRace = useStartRace();
   const remaining = useRemaining(live.timer);
   const [busy, setBusy] = useState(false);
@@ -144,9 +157,7 @@ export function NextPanel({
       await timer({ action: "set", seconds: cardSeconds("puzzle", r.puzzle), relay: !!PUZZLES[r.puzzle].relay, autostart: true });
     } else if (race) {
       // The get-ready screen: Start (the "go" step) shows the race and starts the clock.
-      await setScreen({
-        screen: { mode: "wiki", wikiFrom: race.from, wikiTo: race.to, wikiClicks: race.clicks || undefined, wikiReady: true },
-      });
+      await readyRace(race);
     } else if (r?.kind === "pictionary") {
       setWord(nextWord());
       await setScreen({ screen: { mode: "timer" } });
