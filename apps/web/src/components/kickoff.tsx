@@ -21,12 +21,12 @@ function JoinBox() {
   return (
     <div className="flex gap-6 text-left">
       <div className="shrink-0 bg-white p-3">
-        <QRCodeSVG value={`${origin}/join${open ? `?code=${code}` : ""}`} size={200} marginSize={0} className="size-50" />
+        <QRCodeSVG value={`${origin}/join${open ? `?code=${code}` : ""}`} size={216} marginSize={0} className="size-54" />
       </div>
-      <div className="flex h-56 flex-col justify-between">
+      <div className="flex h-60 flex-col justify-between text-xl">
         <div>
-          <p className="opacity-70">Scan, or go to</p>
-          <p className="text-2xl leading-tight font-extrabold">
+          <p className="opacity-80">Scan, or go to</p>
+          <p className="text-[clamp(1.25rem,1.6vw,1.5rem)] leading-tight font-extrabold">
             {CLUB.url}
             <wbr />
             /join
@@ -34,12 +34,12 @@ function JoinBox() {
         </div>
         {open ? (
           <div>
-            <p className="opacity-70">and enter code</p>
+            <p className="opacity-80">and enter code</p>
             <p className="narrow text-7xl leading-none font-extrabold tracking-[0.12em]">{code}</p>
-            <p className="mt-1 opacity-70">{live.roster.length} joined</p>
+            <p className="mt-1 opacity-80">{live.roster.length} joined</p>
           </div>
         ) : (
-          <p className="max-w-[30ch] text-sm opacity-70">Officers: start Week 1 in /host and sign in here, and the join code appears.</p>
+          <p className="max-w-[30ch] text-base opacity-80">Officers: start Week 1 in /host and sign in here, and the join code appears.</p>
         )}
       </div>
     </div>
@@ -148,9 +148,9 @@ const RACE_POINTS = [
 export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
   const officers = OFFICERS.filter((o) => o.name);
   const s: ReactNode[] = [
-    <div className="grid items-center gap-12 lg:grid-cols-[1.2fr_1fr]">
+    <div className="grid items-center gap-12 lg:grid-cols-2">
       <div>
-        <p className="m-rise text-xl text-dim" style={at(0)}>
+        <p className="m-rise text-2xl text-dim" style={at(0)}>
           Welcome to {CLUB.name}!
         </p>
         <h1 className="mt-3 text-[clamp(3.5rem,8vw,8rem)] leading-[0.9] tracking-[-0.045em] lowercase">
@@ -284,7 +284,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
         </div>
       </div>
     </div>,
-    <div className="grid gap-12 lg:grid-cols-2">
+    <div className="grid gap-12 lg:grid-cols-[1fr_1.15fr]">
       <div>
         <H>Your turn: what should this club be?</H>
         <ol className="steps space-y-3 text-[clamp(1.2rem,1.7vw,1.8rem)]">
@@ -295,7 +295,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
           ))}
         </ol>
       </div>
-      <div className="m-pop tile tile-sky self-center p-10" style={at(5)}>
+      <div className="m-pop tile tile-sky self-center p-8" style={at(5)}>
         <p className="text-[clamp(1.6rem,2.6vw,2.8rem)] leading-tight font-extrabold tracking-[-0.02em] text-balance">
           Not joined yet? Join now and add your ideas.
         </p>
