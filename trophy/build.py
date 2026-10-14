@@ -3,7 +3,8 @@
   /Applications/Blender.app/Contents/MacOS/Blender -b -P trophy/build.py            # STLs
   /Applications/Blender.app/Contents/MacOS/Blender -b -P trophy/build.py -- render  # STLs + preview images
 
-Units are millimetres. Every part is modelled in its print orientation (flat side on the bed, no supports).
+Every part is modelled at 1x in its print orientation (flat side on the bed, no supports), then scaled by SCALE on
+export so the base, the biggest part, fills the P1S bed. Dimensions below are in millimetres at 1x.
 """
 
 import math
@@ -27,8 +28,6 @@ PLAQUE_LINES = [  # (text, font, cap height mm, centre y mm)
 ]
 BACK_TEXT = "programmingclub.dev"
 
-FIT = 0.25  # clearance per side on every joint
-
 # Plinth
 BASE_W, BASE_D, BASE_H = 150, 124, 8
 BODY_W, BODY_D, BODY_H = 130, 104, 44
@@ -38,6 +37,10 @@ TOP_FRONT_Y = -BODY_D / 2 + BODY_H * math.tan(SLOPE)
 SWITCH_Y = (TOP_FRONT_Y + BODY_D / 2) / 2
 PEG_D, PEG_H = 20, 10
 PEG_Y = 0  # the printed base has its peg at the centre of the footprint, SWITCH_Y in front of the switch's centre
+
+# Print scale: the base's long side spans the P1S's 256 mm bed, less a 2 mm margin each side.
+SCALE = (256 - 2 * 2) / BASE_W
+FIT = 0.25 / SCALE  # 0.25 mm clearance per side on every joint once scaled
 
 # Plaque
 PLAQUE_W, PLAQUE_H, PLAQUE_T, RELIEF = 118, 40, 2.4, 0.8
@@ -245,15 +248,14 @@ def make_keycap():
     dish = cylinder("dish", DISH_R, -100, 100, segs=512)
     transform(dish, to_axis)
     boolean(cap, dish, "DIFFERENCE")
-    # The rounded >_ mark is engraved into the dish. The keycap itself supplies
-    # the logo's rounded-square silhouette; its colour comes from gold paint.
-    chevron = rounded_stroke("chevron", (-17, 11), (-5, 0), 2.8, CAP_H - 20, CAP_H + 5)
-    boolean(chevron, rounded_stroke("chevron_lower", (-5, 0), (-17, -11), 2.8, CAP_H - 20, CAP_H + 5), "UNION")
-    underline = rounded_stroke("underline", (5, -11), (17, -11), 2.8, CAP_H - 20, CAP_H + 5)
-    for mark in (chevron, underline):
-        depth = cylinder("depth", DISH_R + ENGRAVE, -100, 100, segs=512)
-        transform(depth, to_axis)
-        boolean(cap, boolean(mark, depth, "INTERSECT"), "DIFFERENCE")
+    # An enter-key arrow (↵) is engraved into the dish, in the same rounded strokes as the club's >_ logo.
+    strokes = [((15, 13), (15, -5)), ((15, -5), (-15, -5)), ((-15, -5), (-7, 3)), ((-15, -5), (-7, -13))]
+    arrow = rounded_stroke("arrow", *strokes[0], 2.8, CAP_H - 20, CAP_H + 5)
+    for start, end in strokes[1:]:
+        boolean(arrow, rounded_stroke("stroke", start, end, 2.8, CAP_H - 20, CAP_H + 5), "UNION")
+    depth = cylinder("depth", DISH_R + ENGRAVE, -100, 100, segs=512)
+    transform(depth, to_axis)
+    boolean(cap, boolean(arrow, depth, "INTERSECT"), "DIFFERENCE")
     # Cross socket for the switch stem, with 45° peaked roofs so nothing bridges.
     w, d, z = CROSS_L + 2 * FIT, CROSS_T + 2 * FIT, CROSS_H + 0.5
     for a, b in ((w, d), (d, w)):
@@ -303,28 +305,6 @@ def export(obs, name):
     bpy.ops.wm.stl_export(filepath=os.path.join(OUT, f"{name}.stl"), export_selected_objects=True, ascii_format=False)
 
 
-# The base, switch and keycap on one 256 x 256 P1S plate: (bed x, bed y, turn) for each part's centre.
-# The layout is clear of the P1S's 18 x 28 mm exclusion zone. The plaque prints separately.
-PLATE = {
-    "base": (78, 154, 90),
-    "keycap": (195, 200, 0),
-    "switch": (195, 55, 0),
-}
-
-
-def export_plate(parts):
-    """plate.stl: the black parts laid out together on the bed."""
-    copies = []
-    for name, (x, y, turn) in PLATE.items():
-        c = parts[name].copy()
-        c.matrix_world = Matrix.Translation((x, y, 0)) @ Matrix.Rotation(math.radians(turn), 4, "Z")
-        bpy.context.scene.collection.objects.link(c)
-        copies.append(c)
-    export(copies, "plate")
-    for c in copies:
-        bpy.data.objects.remove(c)
-
-
 def material(name, rgb, metallic=0.0, rough=0.5):
     m = bpy.data.materials.new(name)
     bsdf = m.node_tree.nodes["Principled BSDF"]
@@ -347,7 +327,7 @@ def render(parts):
     }
     for name, ob in parts.items():
         mat, m = placed[name]
-        ob.matrix_world = mat
+        ob.matrix_world = mat @ Matrix.Scale(1 / SCALE, 4)  # previews stay at 1x
         ob.data.materials.clear()  # booleans leave empty slots behind
         ob.data.materials.append(m)
         for p in ob.data.polygons:
@@ -397,9 +377,9 @@ def main():
     print("Golden Keycap trophy:")
     for name, ob in parts.items():
         ob.name = name
+        transform(ob, Matrix.Scale(SCALE, 4))
         check(ob)
         export([ob], name)
-    export_plate(parts)
     if "render" in sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []:
         render(parts)
 
