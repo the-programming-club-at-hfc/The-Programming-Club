@@ -220,6 +220,9 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           );
         })}
       </ol>
+      <p className="m-rise mt-10 text-lg text-dim" style={at(12)}>
+        Lineup subject to change.
+      </p>
     </div>,
     <div className="grid gap-12 lg:grid-cols-2">
       <div>
