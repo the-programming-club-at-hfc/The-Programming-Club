@@ -179,12 +179,12 @@ export const GAME_TILE: Record<string, { picto: PictoId; tile: string }> = {
   puzzle: { picto: "puzzle", tile: "tile-sun" },
 };
 
-/** The pictogram and color that stand for a week: its final-round game, or the keycap on Cup nights. */
+/** The pictogram and color that stand for a week: its main game (the first one that isn't a warm-up), or the keycap on Cup nights. */
 export function weekTile(w: Pick<Week, "kind" | "games">): { picto: PictoId; tile: string } {
   if (w.kind === "cup") return { picto: "keycap", tile: "tile-gold" };
   if (w.kind === "kickoff") return { picto: "people", tile: "tile-pine" };
   if (w.kind === "wrap") return { picto: "people", tile: "tile-sky" };
-  const id = [...w.games].reverse().flatMap(gamesIn)[0];
+  const id = w.games.filter((g) => !g.includes("(warm-up)")).flatMap(gamesIn)[0];
   return id ? GAME_TILE[id] : { picto: "people", tile: "tile-silver" };
 }
 
