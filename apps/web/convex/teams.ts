@@ -17,7 +17,9 @@ import {
   soloName,
   teamByKey,
   teamFor,
+  leaveTeam,
   unscoredCards,
+  upgradeOldNight,
 } from "./lib";
 import { TEAM_NAMES } from "./teamNames";
 
@@ -28,7 +30,7 @@ export const make = mutation({
   args: { size: v.union(v.literal(1), v.literal(2), v.literal(3)) },
   handler: async (ctx, { size }) => {
     await requireOfficer(ctx);
-    const s = await requireOpenSession(ctx);
+    const s = await upgradeOldNight(ctx, await requireOpenSession(ctx));
     if ((await unscoredCards(ctx, s)).length) throw new ConvexError("Finish the round first: reveal its answers, then switch.");
     await ctx.db.patch(s._id, { teamSize: size });
     for (const t of await sessionTeams(ctx, s._id)) await ctx.db.delete(t._id);
@@ -172,6 +174,8 @@ export const removePlayer = mutation({
   args: { attendanceId: v.id("attendance") },
   handler: async (ctx, { attendanceId }) => {
     await requireOfficer(ctx);
+    const a = await ctx.db.get(attendanceId);
+    if (a) await leaveTeam(ctx, a);
     await ctx.db.delete(attendanceId);
   },
 });

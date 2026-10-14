@@ -283,16 +283,32 @@ describe("teams", () => {
     const { t, officer, nightWithTeams, show } = setup();
     const { teams } = await nightWithTeams(4);
     await show({ mode: "card", game: "output", index: 0 });
-    expect((await t.query(api.sessions.live, {}))!.roundOpen).toBe(false);
+    expect((await t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
     await t.mutation(api.answers.pick, { token: teams[0].tokens[0], card: "output:0", choice: OUTPUTS[0].answer });
     // Still locked after the card leaves the TV unrevealed.
     await show({ mode: "scoreboard" });
-    expect((await t.query(api.sessions.live, {}))!.roundOpen).toBe(true);
+    expect((await t.query(api.sessions.live, {}))!.unrevealed).toEqual(["output:0"]);
     await expect(officer.mutation(api.teams.make, { size: 1 })).rejects.toThrow("Finish the round first");
 
     await show({ mode: "card", game: "output", index: 0, revealed: true });
-    expect((await t.query(api.sessions.live, {}))!.roundOpen).toBe(false);
+    expect((await t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
     await officer.mutation(api.teams.make, { size: 1 });
+  });
+
+  test("Play tonight off and back on, solo: the officer's own points come back, and no empty team is left behind", async () => {
+    const { t, officer, startNight, join, teams } = setup();
+    const code = await startNight();
+    await join(code, student(1));
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    const mine = async () => (await t.query(api.players.me, { token: ada }))!.team;
+    await officer.mutation(api.teams.score, { teamId: (await mine())!._id, delta: 4 });
+
+    await t.mutation(api.players.setPlaying, { token: ada, playing: false });
+    expect((await teams()).map((tm) => tm.name)).toEqual(["Student 1"]);
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    expect([(await mine())!.name, (await mine())!.score]).toEqual(["Ada", 4]);
+    expect(await teams()).toHaveLength(2);
   });
 
   test("auto teams fill teams up to the last Make teams size", async () => {
@@ -751,6 +767,30 @@ describe("ending the night", () => {
       expect(tm.xp).toBe(undefined);
       expect(tm.members.every((m) => /\+\d$/.test(m))).toBe(true);
     }
+  });
+
+  test("a night from before solo mode: reopening and ending it again keeps its place XP, and it stays a team night", async () => {
+    const { t, officer, nightWithTeams, attendance, join } = setup();
+    const { code, teams } = await nightWithTeams(4);
+    await officer.mutation(api.teams.score, { teamId: teams[0]._id, delta: 5 });
+    await officer.mutation(api.teams.score, { teamId: teams[1]._id, delta: 2 });
+    await officer.mutation(api.sessions.end, {});
+    const before = (await attendance()).map((a) => [a.token, a.placeXp]);
+    // What the old code left behind: no teamSize, no player points.
+    await t.run(async (ctx) => {
+      for (const a of await ctx.db.query("attendance").collect()) await ctx.db.patch(a._id, { points: undefined });
+      for (const s of await ctx.db.query("sessions").collect()) await ctx.db.patch(s._id, { teamSize: undefined });
+    });
+    // The TV shows what End night stored.
+    expect((await t.query(api.sessions.final, {}))!.teams.map((tm) => tm.xp)).toEqual([3, 2]);
+
+    await officer.mutation(api.sessions.reopen, { sessionId: (await attendance())[0].sessionId });
+    expect((await t.query(api.sessions.live, {}))!.teamSize).toBe(2);
+    await join(code, student(5)); // teams of 2 are full: a new team, not one named after them
+    expect((await t.query(api.sessions.live, {}))!.teams.map((tm) => tm.name)).not.toContain("Student 5");
+    await officer.mutation(api.sessions.end, {});
+    const after = new Map((await attendance()).map((a) => [a.token, a.placeXp]));
+    for (const [token, xp] of before) expect(after.get(token as string)).toBe(xp);
   });
 
   test("practice nights stay out of XP, the leaderboard, and the attendance sheet", async () => {

@@ -381,7 +381,11 @@ function TimerPanel({ live }: { live: Live }) {
       </div>
       <div className="mt-2 flex flex-wrap justify-center gap-2">
         {[30, 45, 60, 90, 120, 300, 720].map((s) => (
-          <button key={s} className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: s, relay: s === 720 }))}>
+          <button
+            key={s}
+            className="btn btn-sm"
+            onClick={() => run(timer({ action: "set", seconds: s, relay: live.teamSize > 1 && s === 720 }))}
+          >
             {fmtClock(s * 1000)}
           </button>
         ))}
@@ -431,7 +435,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
             key={size}
             className={`btn btn-sm ${live.teamSize === size ? "btn-on" : ""}`}
             onClick={() => setMode(size)}
-            disabled={live.roundOpen}
+            disabled={live.unrevealed.length > 0}
             aria-pressed={live.teamSize === size}
           >
             {label}
@@ -455,8 +459,10 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         <strong className="text-ink">Tonight: {MODES[live.teamSize - 1][1].toLowerCase()}.</strong>{" "}
         {live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff} Pressing a mode, even tonight’s, remakes every team. Nobody loses points.
       </p>
-      {live.roundOpen && (
-        <p className="mt-1 text-sm font-semibold">Finish the round first: reveal its answers, then you can switch modes.</p>
+      {live.unrevealed.length > 0 && (
+        <p className="mt-1 text-sm font-semibold">
+          Finish the round first: put {live.unrevealed.map(cardName).join(", ")} back up and reveal it, then you can switch modes.
+        </p>
       )}
       {live.teams.length === 0 ? (
         <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>
@@ -668,6 +674,14 @@ function LineupPanel({
   );
 }
 
+/** "output:2" as "Output? #3", and a race key as "Wiki Race: From → To", for officers. */
+const cardName = (key: string) => {
+  const [game, rest] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+  return game === "wiki"
+    ? `Wiki Race: ${rest.replace(">", " → ")}`
+    : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
+};
+
 type Tab = GameId | "wiki" | "pictionary";
 const TABS: [Tab, string][] = [
   ["bug", "Bug Hunt"],
@@ -837,7 +851,7 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
               timer({
                 action: "set",
                 seconds: secs,
-                relay: game === "relay" || (game === "puzzle" && !!PUZZLES[index].relay),
+                relay: live.teamSize > 1 && (game === "relay" || (game === "puzzle" && !!PUZZLES[index].relay)),
                 autostart: true,
               }),
             )

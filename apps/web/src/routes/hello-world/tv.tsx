@@ -91,7 +91,7 @@ function AfterNight() {
   if (last === undefined) return null;
   return last ? (
     <div className="flex-1 overflow-hidden p-[3.5vw]">
-      <Scoreboard teams={last.teams} solo={last.solo} final />
+      <Scoreboard teams={last.teams} solo={last.solo} practice={last.practice} final />
     </div>
   ) : (
     <Attract />
@@ -177,7 +177,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
       <div className={s.mode === "slides" ? "flex min-h-0 flex-1" : "flex-1 overflow-hidden p-[3.5vw]"}>
         {s.mode === "slides" && <Slides screen={s} />}
         {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
-        {s.mode === "scoreboard" && <Scoreboard teams={live.teams} solo={live.teamSize === 1} />}
+        {s.mode === "scoreboard" && <Scoreboard teams={live.teams} solo={live.teamSize === 1} practice={live.practice} />}
         {s.mode === "timer" && (
           <div className="grid h-full place-items-center">
             <BigTimer remaining={remaining} running={running} swap={isSwapMoment(live.timer, remaining)} size="text-[34vw]" />
@@ -548,11 +548,18 @@ const MEDAL = ["var(--color-gold)", "var(--color-silver)", "#d79a5b"];
 
 type Standing = { _id: string; name: string; score: number; members: string[]; xp?: number };
 
-/** Standings in points. Once the night is over (`final`), with the place XP each team's players earned. */
-function Scoreboard({ teams, solo, final = false }: { teams: Standing[]; solo: boolean; final?: boolean }) {
+// Rows per column once there are too many for one: a 16:9 TV fits this many compact rows under the heading.
+const PER_COLUMN = 7;
+
+/** Standings in points. Once the night is over (`final`), with the place XP each team's players earned (a team whose
+ *  players earned different XP has none of its own; theirs shows by their names). More than six rows go compact, down
+ *  up to three columns, and the rest are on /scores. */
+function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[]; solo: boolean; practice: boolean; final?: boolean }) {
   const top = Math.max(1, ...teams.map((t) => t.score));
   const first = teams.filter((t) => t.score > 0 && t.score === teams[0].score);
-  const xp = teams.some((t) => t.xp !== undefined);
+  const compact = teams.length > 6;
+  const shown = teams.slice(0, PER_COLUMN * 3);
+  const columns = Math.ceil(shown.length / PER_COLUMN);
   return (
     <div className="mx-auto grid h-full max-w-[86vw] grid-cols-[minmax(0,1fr)_auto] gap-[3vw]">
       <div className="flex min-h-0 flex-col">
@@ -560,7 +567,7 @@ function Scoreboard({ teams, solo, final = false }: { teams: Standing[]; solo: b
         {final && first.length > 0 && (
           <p className="mt-[1.2vw] text-[2.4vw] font-bold">
             {first.map((t) => t.name).join(" and ")} {first.length === 1 ? "wins" : "tie for 1st"}
-            {xp && (
+            {first[0].xp !== undefined && (
               <span className="text-meadow">
                 {" "}
                 · +{first[0].xp} XP{solo ? "" : " each"}
@@ -570,7 +577,7 @@ function Scoreboard({ teams, solo, final = false }: { teams: Standing[]; solo: b
         )}
         {teams.length === 0 ? (
           <p className="mt-[6vw] text-[2.2vw] text-dim">{teamWords(solo).scoreboardEmpty}</p>
-        ) : (
+        ) : !compact ? (
           <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
             {teams.map((t) => {
               const rank = placeOf(
@@ -598,14 +605,46 @@ function Scoreboard({ teams, solo, final = false }: { teams: Standing[]; solo: b
               );
             })}
           </ol>
+        ) : (
+          // Down each column, then across, so the order reads like standings.
+          <ol
+            className="mt-[2vw] grid grid-flow-col gap-x-[2.5vw] gap-y-[0.7vw]"
+            style={{ gridTemplateRows: `repeat(${Math.min(PER_COLUMN, shown.length)}, auto)`, gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+          >
+            {shown.map((t) => {
+              const rank = placeOf(
+                t.score,
+                teams.map((o) => o.score),
+              );
+              return (
+                <li key={t._id} className="grid grid-cols-[1.4vw_3.4vw_1fr_auto] items-center gap-[0.8vw]">
+                  <span className="size-[1.2vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
+                  <span className="narrow text-[1.8vw] leading-none font-extrabold">{ordinal(rank)}</span>
+                  <p className="truncate text-[1.6vw] leading-tight font-extrabold">
+                    {t.name}{" "}
+                    {t.members.join(", ") !== t.name && <span className="text-[1.1vw] font-normal text-dim">{t.members.join(", ")}</span>}
+                  </p>
+                  <span className="text-right whitespace-nowrap">
+                    <span className="narrow text-[2.4vw] leading-none font-extrabold">{t.score}</span>
+                    {t.xp !== undefined && <span className="ml-[0.5vw] text-[1.1vw] font-bold text-meadow">+{t.xp}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {teams.length > shown.length && (
+          <p className="mt-[0.8vw] text-[1.4vw] font-bold">
+            + {teams.length - shown.length} more at {CLUB.url}/hello-world/scores
+          </p>
         )}
         {/* Points are tonight's game; XP is the season board. */}
         <p className="mt-auto pt-[2vw] text-[1.5vw] text-dim">
-          {!final
-            ? "Points are for tonight. When the night ends, 1st, 2nd, and 3rd place earn +3, +2, and +1 XP each."
-            : xp
-              ? `Points were for tonight. Season XP is 3 for coming, +3/2/1 for your place: ${CLUB.url}/hello-world/scores`
-              : "Practice night: nothing tonight counts toward XP."}
+          {practice
+            ? "Practice night: nothing tonight counts toward XP."
+            : !final
+              ? "Points are for tonight. When the night ends, 1st, 2nd, and 3rd place earn +3, +2, and +1 XP each."
+              : `Points were for tonight. Season XP is 3 for coming, +3/2/1 for your place: ${CLUB.url}/hello-world/scores`}
         </p>
       </div>
       {/* A break in the game, or the night's over: the one time the TV shows a second QR. */}

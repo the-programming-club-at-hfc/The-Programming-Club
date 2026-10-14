@@ -156,10 +156,15 @@ export function NextPanel({
     if (r?.kind === "deck" && r.game) {
       if (card === null) return alert("This deck is out of cards for tonight. Pick one by hand under Games.");
       await setScreen({ screen: { mode: "card", game: r.game, index: card, revealed: false } });
-      await timer({ action: "set", seconds: cardSeconds(r.game, card), relay: r.game === "relay", autostart: true });
+      await timer({ action: "set", seconds: cardSeconds(r.game, card), relay: live.teamSize > 1 && r.game === "relay", autostart: true });
     } else if (r?.kind === "puzzle" && r.puzzle !== undefined) {
       await setScreen({ screen: { mode: "card", game: "puzzle", index: r.puzzle, revealed: false } });
-      await timer({ action: "set", seconds: cardSeconds("puzzle", r.puzzle), relay: !!PUZZLES[r.puzzle].relay, autostart: true });
+      await timer({
+        action: "set",
+        seconds: cardSeconds("puzzle", r.puzzle),
+        relay: live.teamSize > 1 && !!PUZZLES[r.puzzle].relay,
+        autostart: true,
+      });
     } else if (race) {
       // The get-ready screen: Start (the "go" step) shows the race and starts the clock.
       await readyRace(race);

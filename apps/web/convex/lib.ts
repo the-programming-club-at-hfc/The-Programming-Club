@@ -100,7 +100,7 @@ export async function newTeam(ctx: MutationCtx, sessionId: Id<"sessions">, playe
 export async function teamFor(ctx: MutationCtx, session: Doc<"sessions">, name: string) {
   const teams = await sessionTeams(ctx, session._id);
   const auto = session.autoTeams !== false;
-  const full = session.teamSize ?? 1;
+  const full = session.teamSize ?? 2;
   if (full === 1) return auto || teams.length ? newTeam(ctx, session._id, name) : undefined;
   const att = await sessionAttendance(ctx, session._id);
   const size = (t: Id<"teams">) => att.filter((a) => a.teamId === t).length;
@@ -184,6 +184,25 @@ export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
         break;
       }
   return open;
+}
+
+/** Nights from before solo mode have no teamSize and no player points: they were team nights, and each player's
+ *  points were their team's. Fill both in before anything (Make teams, End night) relies on them. */
+export async function upgradeOldNight(ctx: MutationCtx, s: Doc<"sessions">) {
+  if (s.teamSize !== undefined) return s;
+  const teams = new Map((await sessionTeams(ctx, s._id)).map((t) => [t._id, t.score]));
+  for (const a of await sessionAttendance(ctx, s._id))
+    if (a.teamId && a.points === undefined) await ctx.db.patch(a._id, { points: teams.get(a.teamId) ?? 0 });
+  await ctx.db.patch(s._id, { teamSize: 2 });
+  return { ...s, teamSize: 2 as const };
+}
+
+/** Take a player off their team, keeping their own points. A team left empty goes too, so a solo player's old team
+ *  never sits on the board (with their points) without them. */
+export async function leaveTeam(ctx: MutationCtx, a: Doc<"attendance">) {
+  if (!a.teamId) return;
+  await ctx.db.patch(a._id, { teamId: undefined });
+  if (!(await sessionAttendance(ctx, a.sessionId)).some((o) => o.teamId === a.teamId)) await ctx.db.delete(a.teamId);
 }
 
 /** Add points to a team and to each player on it now, so a player's points survive teams being remade. */

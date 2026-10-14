@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { addToSession, inTeamPool, requireOpenSession, teamFor } from "./lib";
+import { addToSession, inTeamPool, leaveTeam, requireOpenSession, sessionAttendance, teamFor } from "./lib";
 import { placeOf } from "../src/lib/grading";
 import { isOfficerEmail, requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
@@ -130,8 +130,16 @@ export const setPlaying = mutation({
       .unique();
     const session = a && (await ctx.db.get(a.sessionId));
     if (!a?.officer || session?.status !== "open") throw new ConvexError("Only officers can switch that, during the night.");
-    const name = (await ctx.db.get(a.playerId))?.name ?? "Player";
-    await ctx.db.patch(a._id, { playing, teamId: playing ? (a.teamId ?? (await teamFor(ctx, session, name))) : undefined });
+    if (!playing) {
+      await leaveTeam(ctx, a);
+      return await ctx.db.patch(a._id, { playing });
+    }
+    if (a.teamId) return await ctx.db.patch(a._id, { playing });
+    const teamId = await teamFor(ctx, session, (await ctx.db.get(a.playerId))?.name ?? "Player");
+    await ctx.db.patch(a._id, { playing, teamId });
+    // Back on a team of their own (a solo night, or a new team): it starts from the points they already earned.
+    if (teamId && (await sessionAttendance(ctx, session._id)).filter((o) => o.teamId === teamId).length === 1)
+      await ctx.db.patch(teamId, { score: a.points ?? 0 });
   },
 });
 

@@ -11,6 +11,7 @@ import {
   requireOpenSession,
   sessionAttendance,
   sessionTeams,
+  upgradeOldNight,
 } from "./lib";
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
@@ -50,9 +51,9 @@ export const live = query({
       practice: !!s.practice,
       round: s.round ?? null,
       autoTeams: s.autoTeams !== false,
-      teamSize: s.teamSize ?? 1,
-      // A round with answers in that hasn't been revealed yet: teams stay put until it is.
-      roundOpen: (await unscoredCards(ctx, s)).length > 0,
+      teamSize: s.teamSize ?? 2,
+      // Cards with answers in that haven't been revealed yet ("game:index" or a race): teams stay put until they are.
+      unrevealed: await unscoredCards(ctx, s),
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
@@ -73,18 +74,18 @@ export const final = query({
       .first();
     if (!s) return null;
     const [teams, att] = await Promise.all([sessionTeams(ctx, s._id), sessionAttendance(ctx, s._id)]);
-    const xp = placeXpFor(att);
+    // What End night stored, the same numbers phones and /scores show.
     const roster = await Promise.all(
       att
         .filter((a) => a.teamId)
-        .map(async (a) => ({ name: (await ctx.db.get(a.playerId))?.name ?? "?", teamId: a.teamId, xp: xp.get(a._id) ?? 0 })),
+        .map(async (a) => ({ name: (await ctx.db.get(a.playerId))?.name ?? "?", teamId: a.teamId, xp: a.placeXp ?? 0 })),
     );
     return {
       _id: s._id,
       week: s.week,
       endedAt: s.endedAt ?? s.startedAt,
       practice: !!s.practice,
-      solo: (s.teamSize ?? 1) === 1,
+      solo: s.teamSize === 1,
       teams: teams
         .map((t) => {
           const members = roster.filter((r) => r.teamId === t._id);
@@ -136,6 +137,7 @@ export const start = mutation({
       screen: { mode: "lobby" },
       timer: { durationMs: 90_000, remainingMs: 90_000, relay: false },
       practice: practice || undefined,
+      teamSize: 1,
     });
   },
 });
@@ -145,7 +147,7 @@ export const end = mutation({
   args: {},
   handler: async (ctx) => {
     await requireOfficer(ctx);
-    const s = await requireOpenSession(ctx);
+    const s = await upgradeOldNight(ctx, await requireOpenSession(ctx));
     await scoreUnrevealedPuzzles(ctx, s);
     const att = await sessionAttendance(ctx, s._id);
     const xp = placeXpFor(att);
@@ -160,6 +162,8 @@ export const reopen = mutation({
   handler: async (ctx, { sessionId }) => {
     await requireOfficer(ctx);
     if (await openSession(ctx)) throw new ConvexError("Another night is already running.");
+    const s = await ctx.db.get(sessionId);
+    if (s) await upgradeOldNight(ctx, s);
     await ctx.db.patch(sessionId, { status: "open", endedAt: undefined });
   },
 });
