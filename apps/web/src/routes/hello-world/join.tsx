@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
 import { CardView, Hint, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { InstagramLink } from "#/components/instagram";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { WikiPair, WikiRound } from "#/components/wiki";
 import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
@@ -76,6 +77,9 @@ function Join() {
         <Link to="/hello-world/season" className="btn mt-8">
           See this week’s game
         </Link>
+        <p className="mt-8">
+          <InstagramLink className="link" />
+        </p>
       </Center>
     );
 
@@ -118,6 +122,8 @@ function NightOver({ me }: { me: Me }) {
       <Link to="/hello-world/scores" className="btn btn-primary mt-8">
         See the scores
       </Link>
+      <p className="mt-8 text-dim">Got photos from tonight? Tag us.</p>
+      <InstagramLink className="link mt-1" />
     </Center>
   );
 }
@@ -466,6 +472,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         <button onClick={onSwitch} className="link">
           Not {me.name}? Switch player
         </button>
+        <InstagramLink className="w-full justify-center border-t border-line pt-3" />
       </div>
     </Wrap>
   );

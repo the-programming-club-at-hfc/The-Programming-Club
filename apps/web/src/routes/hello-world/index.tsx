@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { InstagramLink } from "#/components/instagram";
 import { AgendaList, GAME_TILE, HourDial, Picto, Wrap, weekTile } from "#/components/ui";
 import { GAMES, MATCH_AGENDA } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
@@ -59,6 +60,7 @@ function Home() {
               See the six games
             </Link>
           </div>
+          <InstagramLink className="link mt-6 self-start" />
         </div>
 
         {/* The pictogram wall: one tile per game, then the trophy, the season, and the way in. */}

@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { InstagramLink } from "#/components/instagram";
 import { Disclaimer } from "#/components/site";
 import { GAME_TILE, Picto, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
@@ -69,6 +70,7 @@ function About() {
           </div>
         ))}
       </dl>
+      <InstagramLink className="link" />
     </div>
   );
 }
@@ -168,6 +170,9 @@ function WorldCup() {
           See the six games
         </Link>
       </div>
+      <p className="mt-4 border-t border-line pt-4 text-sm text-dim">
+        Game-night photos and results go up on Instagram. <InstagramLink className="link text-ink" />
+      </p>
     </div>
   );
 }

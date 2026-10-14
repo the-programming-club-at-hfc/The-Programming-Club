@@ -5,10 +5,11 @@ import { Show, SignInButton, UserButton } from "@clerk/tanstack-react-start";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { InstagramGlyph, InstagramLink } from "#/components/instagram";
 import { useLikelyOfficer } from "#/components/officer";
 import { ClubLogo } from "#/components/site";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
-import { CLUB, isHalloweenMonth } from "#/lib/season";
+import { CLUB, INSTAGRAM_URL, isHalloweenMonth } from "#/lib/season";
 import { APPS, appFor, countdown } from "./apps";
 import { Scene } from "./scene";
 import type { App, AppId } from "./apps";
@@ -377,6 +378,19 @@ function Taskbar({
                 <span className="font-semibold">{a.label}</span>
               </button>
             ))}
+            <a
+              role="menuitem"
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="press flex w-full items-center gap-3 rounded-[8px] px-2 py-1.5 hover:bg-mist focus-visible:bg-mist"
+            >
+              <span className="grid size-8 place-items-center rounded-[8px] bg-[linear-gradient(135deg,#d62976,#962fbf_55%,#4f5bd5)] p-1.5 text-white">
+                <InstagramGlyph className="size-full" />
+              </span>
+              <span className="font-semibold">Instagram</span>
+              <span className="ml-auto text-sm text-dim">@{CLUB.instagram}</span>
+            </a>
             <div className="mt-2 border-t border-line pt-2">
               <Link to="/hello-world/host" className="block rounded-[8px] px-2 py-1.5 text-sm text-dim hover:bg-mist">
                 Officer sign-in
@@ -558,6 +572,9 @@ function Phone({ routeApp, onOpen, bootIn }: { routeApp: App | null; onOpen: (a:
             <span className="text-[0.8rem] leading-tight font-semibold text-white">{a.label}</span>
           </button>
         ))}
+      </div>
+      <div {...bootIn(3 + iconApps.length)}>
+        <InstagramLink className="mt-10 rounded-full bg-white/12 px-4 py-2.5 text-sm text-white hover:bg-white/20" />
       </div>
     </div>
   );

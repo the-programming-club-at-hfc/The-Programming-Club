@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { InstagramQr } from "#/components/instagram";
 import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
@@ -124,6 +125,7 @@ function Attract() {
           </p>
         )}
         <p className="mt-[0.8vw] text-[1.5vw] text-dim">Grab a seat. The game starts soon.</p>
+        <InstagramQr compact className="mt-[2.5vw]" />
       </div>
     </div>
   );
@@ -552,58 +554,62 @@ function Scoreboard({ teams, solo, final = false }: { teams: Standing[]; solo: b
   const first = teams.filter((t) => t.score > 0 && t.score === teams[0].score);
   const xp = teams.some((t) => t.xp !== undefined);
   return (
-    <div className="mx-auto flex h-full max-w-[86vw] flex-col">
-      <h2 className="text-[4vw] leading-none tracking-[-0.04em]">{final ? "final standings" : "tonight’s standings"}</h2>
-      {final && first.length > 0 && (
-        <p className="mt-[1.2vw] text-[2.4vw] font-bold">
-          {first.map((t) => t.name).join(" and ")} {first.length === 1 ? "wins" : "tie for 1st"}
-          {xp && (
-            <span className="text-meadow">
-              {" "}
-              · +{first[0].xp} XP{solo ? "" : " each"}
-            </span>
-          )}
-        </p>
-      )}
-      {teams.length === 0 ? (
-        <p className="mt-[6vw] text-[2.2vw] text-dim">{teamWords(solo).scoreboardEmpty}</p>
-      ) : (
-        <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
-          {teams.map((t) => {
-            const rank = placeOf(
-              t.score,
-              teams.map((o) => o.score),
-            );
-            return (
-              <li key={t._id} className="grid grid-cols-[3vw_6vw_1fr_10vw] items-center gap-[1.5vw]">
-                <span className="size-[2.6vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
-                <span className="narrow text-[3.2vw] leading-none font-extrabold">{ordinal(rank)}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-[2.5vw] leading-tight font-extrabold">
-                    {t.name}{" "}
-                    {t.members.join(", ") !== t.name && <span className="text-[1.3vw] font-normal text-dim">{t.members.join(", ")}</span>}
-                  </p>
-                  <div className="mt-[0.6vw] h-[0.9vw] bg-mist">
-                    <div className="h-full bg-sky" style={{ width: `${Math.max(2, (t.score / top) * 100)}%` }} />
+    <div className="mx-auto grid h-full max-w-[86vw] grid-cols-[minmax(0,1fr)_auto] gap-[3vw]">
+      <div className="flex min-h-0 flex-col">
+        <h2 className="text-[4vw] leading-none tracking-[-0.04em]">{final ? "final standings" : "tonight’s standings"}</h2>
+        {final && first.length > 0 && (
+          <p className="mt-[1.2vw] text-[2.4vw] font-bold">
+            {first.map((t) => t.name).join(" and ")} {first.length === 1 ? "wins" : "tie for 1st"}
+            {xp && (
+              <span className="text-meadow">
+                {" "}
+                · +{first[0].xp} XP{solo ? "" : " each"}
+              </span>
+            )}
+          </p>
+        )}
+        {teams.length === 0 ? (
+          <p className="mt-[6vw] text-[2.2vw] text-dim">{teamWords(solo).scoreboardEmpty}</p>
+        ) : (
+          <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
+            {teams.map((t) => {
+              const rank = placeOf(
+                t.score,
+                teams.map((o) => o.score),
+              );
+              return (
+                <li key={t._id} className="grid grid-cols-[3vw_6vw_1fr_10vw] items-center gap-[1.5vw]">
+                  <span className="size-[2.6vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
+                  <span className="narrow text-[3.2vw] leading-none font-extrabold">{ordinal(rank)}</span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[2.5vw] leading-tight font-extrabold">
+                      {t.name}{" "}
+                      {t.members.join(", ") !== t.name && <span className="text-[1.3vw] font-normal text-dim">{t.members.join(", ")}</span>}
+                    </p>
+                    <div className="mt-[0.6vw] h-[0.9vw] bg-mist">
+                      <div className="h-full bg-sky" style={{ width: `${Math.max(2, (t.score / top) * 100)}%` }} />
+                    </div>
                   </div>
-                </div>
-                <span className="text-right">
-                  <span className="narrow block text-[5vw] leading-none font-extrabold">{t.score}</span>
-                  {t.xp !== undefined && <span className="block text-[1.5vw] font-bold text-meadow">+{t.xp} XP</span>}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-      {/* Points are tonight's game; XP is the season board. */}
-      <p className="mt-auto pt-[2vw] text-[1.5vw] text-dim">
-        {!final
-          ? "Points are for tonight. When the night ends, 1st, 2nd, and 3rd place earn +3, +2, and +1 XP each."
-          : xp
-            ? `Points were for tonight. Season XP is 3 for coming, +3/2/1 for your place: ${CLUB.url}/hello-world/scores`
-            : "Practice night: nothing tonight counts toward XP."}
-      </p>
+                  <span className="text-right">
+                    <span className="narrow block text-[5vw] leading-none font-extrabold">{t.score}</span>
+                    {t.xp !== undefined && <span className="block text-[1.5vw] font-bold text-meadow">+{t.xp} XP</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {/* Points are tonight's game; XP is the season board. */}
+        <p className="mt-auto pt-[2vw] text-[1.5vw] text-dim">
+          {!final
+            ? "Points are for tonight. When the night ends, 1st, 2nd, and 3rd place earn +3, +2, and +1 XP each."
+            : xp
+              ? `Points were for tonight. Season XP is 3 for coming, +3/2/1 for your place: ${CLUB.url}/hello-world/scores`
+              : "Practice night: nothing tonight counts toward XP."}
+        </p>
+      </div>
+      {/* A break in the game, or the night's over: the one time the TV shows a second QR. */}
+      <InstagramQr className="self-end" />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { Link, Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
+import { InstagramLink } from "#/components/instagram";
 import { Disclaimer } from "#/components/site";
 import { CLUB } from "#/lib/season";
 
@@ -90,6 +91,7 @@ function Footer() {
             </Link>
             . {CLUB.day}, {CLUB.time}, in {CLUB.room}. {CLUB.eligibility}.
           </p>
+          <InstagramLink className="mt-5 hover:text-sky" />
         </div>
         <nav className="grid content-start gap-2">
           {NAV.map((n) => (
