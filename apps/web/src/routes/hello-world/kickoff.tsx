@@ -18,21 +18,32 @@ export const Route = createFileRoute("/hello-world/kickoff")({
   component: Kickoff,
 });
 
+// The QR always opens the join page; once an officer starts the night, it carries the join code too.
 function JoinBox() {
   const live = useQuery(api.sessions.live);
   const code = useJoinCode();
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
   useEffect(() => setOrigin(window.location.origin), []);
-  if (!live || !code) return <p className="text-dim">Officers: start Week 1 in /host, sign in here, and the join code appears.</p>;
+  const open = live && code;
   return (
     <div className="flex items-center gap-6">
-      <div className="bg-white p-3">
-        <QRCodeSVG value={`${origin}/join?code=${code}`} size={180} marginSize={0} />
+      <div className="shrink-0 bg-white p-3">
+        <QRCodeSVG value={`${origin}/join${open ? `?code=${code}` : ""}`} size={180} marginSize={0} />
       </div>
       <div>
-        <p className="text-dim">Scan to join, or enter code</p>
-        <p className="narrow text-8xl leading-none font-extrabold tracking-[0.12em]">{code}</p>
-        <p className="text-dim">{live.roster.length} joined</p>
+        <p className="opacity-70">Scan, or go to</p>
+        <p className="text-2xl font-extrabold">{CLUB.url}/join</p>
+        {open ? (
+          <>
+            <p className="mt-2 opacity-70">and enter code</p>
+            <p className="narrow text-8xl leading-none font-extrabold tracking-[0.12em]">{code}</p>
+            <p className="opacity-70">{live.roster.length} joined</p>
+          </>
+        ) : (
+          <p className="mt-2 max-w-[30ch] text-sm opacity-70">
+            Officers: start Week 1 in /host and sign in here, and the join code appears.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -270,12 +281,14 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           ))}
         </ol>
       </div>
-      <div className="m-rise space-y-8 self-center" style={at(5)}>
+      <div className="m-pop tile tile-sky self-center p-10" style={at(5)}>
         <p className="text-[clamp(1.6rem,2.6vw,2.8rem)] leading-tight font-extrabold tracking-[-0.02em] text-balance">
-          Not joined yet? The join form has a box for your ideas.
+          Not joined yet? Join now and add your ideas.
         </p>
-        <JoinBox />
-        <p className="text-[clamp(1.2rem,1.7vw,1.8rem)] text-dim">
+        <div className="mt-8">
+          <JoinBox />
+        </div>
+        <p className="mt-8 text-[clamp(1.1rem,1.5vw,1.6rem)]">
           Every answer goes straight to the officers. Think of something later? Tell any of us.
         </p>
       </div>
