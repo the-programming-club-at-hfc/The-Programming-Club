@@ -17,24 +17,29 @@ function JoinBox() {
   const [origin, setOrigin] = useState(`https://${CLUB.url}`);
   useEffect(() => setOrigin(window.location.origin), []);
   const open = live && code;
+  // The text column is exactly as tall as the QR, so its first and last lines square up with the QR's edges.
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex gap-6 text-left">
       <div className="shrink-0 bg-white p-3">
-        <QRCodeSVG value={`${origin}/join${open ? `?code=${code}` : ""}`} size={180} marginSize={0} />
+        <QRCodeSVG value={`${origin}/join${open ? `?code=${code}` : ""}`} size={200} marginSize={0} className="size-50" />
       </div>
-      <div>
-        <p className="opacity-70">Scan, or go to</p>
-        <p className="text-2xl font-extrabold">{CLUB.url}/join</p>
-        {open ? (
-          <>
-            <p className="mt-2 opacity-70">and enter code</p>
-            <p className="narrow text-8xl leading-none font-extrabold tracking-[0.12em]">{code}</p>
-            <p className="opacity-70">{live.roster.length} joined</p>
-          </>
-        ) : (
-          <p className="mt-2 max-w-[30ch] text-sm opacity-70">
-            Officers: start Week 1 in /host and sign in here, and the join code appears.
+      <div className="flex h-56 flex-col justify-between">
+        <div>
+          <p className="opacity-70">Scan, or go to</p>
+          <p className="text-2xl leading-tight font-extrabold">
+            {CLUB.url}
+            <wbr />
+            /join
           </p>
+        </div>
+        {open ? (
+          <div>
+            <p className="opacity-70">and enter code</p>
+            <p className="narrow text-7xl leading-none font-extrabold tracking-[0.12em]">{code}</p>
+            <p className="mt-1 opacity-70">{live.roster.length} joined</p>
+          </div>
+        ) : (
+          <p className="max-w-[30ch] text-sm opacity-70">Officers: start Week 1 in /host and sign in here, and the join code appears.</p>
         )}
       </div>
     </div>
@@ -65,6 +70,36 @@ function Teams() {
   );
 }
 const TEAM_TILES = ["tile-sky", "tile-meadow", "tile-sun", "tile-silver"];
+
+// The weeks, with a spotlight that plays each week's pictogram for a few seconds before moving to the next.
+function WeekTiles({ plan }: { plan: WeekPlan[] }) {
+  const [on, setOn] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setOn((n) => (n + 1) % plan.length), 3000);
+    return () => clearInterval(id);
+  }, [plan.length]);
+  return (
+    <ol className="grid grid-cols-4 gap-x-[3px] gap-y-6 lg:grid-cols-8">
+      {plan.map((w, i) => {
+        const t = weekTile(w);
+        return (
+          <li key={w.week}>
+            <span className={`tile ${t.tile} m-pop block aspect-square`} style={at(1 + i)}>
+              <Picto id={t.picto} className="absolute inset-[15%]" animate={i === on ? "loop" : undefined} />
+              <span className="narrow absolute top-2 left-3 text-3xl font-extrabold">{i + 1}</span>
+            </span>
+            <span className="narrow m-rise mt-3 block text-xl font-bold text-dim" style={at(2 + i)}>
+              {fmtDate(w.start, { month: "short", day: "numeric" }).toLowerCase()}
+            </span>
+            <span className="m-rise block text-[clamp(1rem,1.4vw,1.5rem)] leading-tight font-bold" style={at(2 + i)}>
+              {w.title}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 const at = (i: number) => ({ "--i": i }) as CSSProperties;
 
@@ -116,7 +151,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
     <div className="grid items-center gap-12 lg:grid-cols-[1.2fr_1fr]">
       <div>
         <p className="m-rise text-xl text-dim" style={at(0)}>
-          {CLUB.name} at {CLUB.school}
+          Welcome to {CLUB.name}!
         </p>
         <h1 className="mt-3 text-[clamp(3.5rem,8vw,8rem)] leading-[0.9] tracking-[-0.045em] lowercase">
           <Words text={"Hello,\nWorld Cup"} i={1} />
@@ -202,30 +237,12 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
       </p>
       <p className="m-rise mx-auto mt-6 max-w-[48ch] text-[clamp(1.2rem,1.7vw,1.8rem)] text-balance text-dim" style={at(6)}>
         We’re starting mid-semester, so the rest of it is for getting the club up and running. Tell us the projects, events, and trips you
-        want, and we’ll do our best to plan them into Season 1.
+        want, and we’ll do our best to plan them into next semester.
       </p>
     </div>,
     <div>
-      <H>The next eight Wednesdays</H>
-      <ol className="grid grid-cols-4 gap-x-[3px] gap-y-6 lg:grid-cols-8">
-        {plan.map((w, i) => {
-          const t = weekTile(w);
-          return (
-            <li key={w.week}>
-              <span className={`tile ${t.tile} m-pop block aspect-square`} style={at(1 + i)}>
-                <Picto id={t.picto} className="absolute inset-[15%]" />
-                <span className="narrow absolute top-2 left-3 text-3xl font-extrabold">{i + 1}</span>
-              </span>
-              <span className="narrow m-rise mt-3 block text-xl font-bold text-dim" style={at(2 + i)}>
-                {fmtDate(w.start, { month: "short", day: "numeric" }).toLowerCase()}
-              </span>
-              <span className="m-rise block text-[clamp(1rem,1.4vw,1.5rem)] leading-tight font-bold" style={at(2 + i)}>
-                {w.title}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      <H>This semester’s game plan</H>
+      <WeekTiles plan={plan} />
       <p className="m-rise mt-10 text-lg text-dim" style={at(12)}>
         Lineup subject to change.
       </p>
@@ -328,6 +345,9 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
       <p className="m-rise mt-6 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(3)}>
         Sit together, then open {CLUB.url}/wiki on one computer per team.
       </p>
+      <div className="m-rise mx-auto mt-10 w-fit" style={at(4)}>
+        <JoinBox />
+      </div>
       <Teams />
     </div>,
   );
