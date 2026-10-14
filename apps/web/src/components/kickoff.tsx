@@ -364,7 +364,7 @@ export function SlideStage({ slides, i }: { slides: ReactNode[]; i: number }) {
     prev.current = i;
   }
   return (
-    <div className="relative flex min-h-0 flex-1">
+    <div className="always-move relative flex min-h-0 flex-1">
       <div className="flex flex-1 overflow-auto">
         <div key={i} className="m-auto w-[min(1500px,100%-5rem)] py-10">
           {slides[i]}

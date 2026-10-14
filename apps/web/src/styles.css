@@ -817,72 +817,70 @@ html:has(.desk-wallpaper) {
   background: #0b4fa3;
 }
 
-/* Pictogram motion (components/ui.tsx). Parts rest until the pictogram is looping or hovered, then act out their game. */
+/* Pictogram motion (components/ui.tsx). Parts rest until the pictogram is looping or hovered, then act out their game (reduced motion: see the end). */
 .picto .pa {
   transform-box: view-box;
 }
 .pa-speed {
   opacity: 0;
 }
-@media (prefers-reduced-motion: no-preference) {
-  :is(.picto-loop, .picto:hover, .group:hover .picto, .group:focus-visible .picto) {
-    .pa-run {
-      animation: pa-bob 0.55s ease-in-out infinite;
-    }
-    .pa-swing {
-      animation: pa-swing 0.55s ease-in-out infinite;
-    }
-    .pa-speed {
-      animation: pa-speed 0.55s linear infinite;
-    }
-    .pa-scan {
-      animation: pa-scan 2.4s ease-in-out infinite;
-    }
-    .pa-scuttle {
-      animation: pa-scuttle 2.4s ease-in-out infinite;
-    }
-    .pa-legs {
-      animation: pa-legs 0.16s linear infinite alternate;
-    }
-    .pa-stride {
-      animation: pa-stride 0.7s ease-in-out infinite;
-    }
-    .pa-point {
-      animation: pa-point 1.8s ease-in-out infinite;
-    }
-    .pa-wobble {
-      animation: pa-wobble 1.8s ease-in-out infinite;
-    }
-    .pa-draw {
-      animation: pa-draw 2.8s ease-in-out infinite;
-    }
-    .pa-sketch {
-      animation: pa-sketch 0.35s ease-in-out infinite alternate;
-    }
-    .pa-blink {
-      animation: pa-blink 3s ease-in-out infinite;
-    }
-    .pa-blip {
-      animation: pa-blip 1.5s ease-in-out infinite;
-    }
-    .pa-pump {
-      animation: pa-pump 1.2s ease-in-out infinite;
-    }
-    .pa-press {
-      animation: pa-press 1.4s cubic-bezier(0.3, 0, 0.3, 1) infinite;
-    }
-    .pa-hop {
-      animation: pa-hop 1.5s ease-in-out infinite;
-    }
-    .pa-late {
-      animation-delay: 0.275s;
-    }
-    .pa-stride.pa-late {
-      animation-delay: 0.35s;
-    }
-    .pa-later {
-      animation-delay: 0.55s;
-    }
+:is(.picto-loop, .picto:hover, .group:hover .picto, .group:focus-visible .picto) {
+  .pa-run {
+    animation: pa-bob 0.55s ease-in-out infinite;
+  }
+  .pa-swing {
+    animation: pa-swing 0.55s ease-in-out infinite;
+  }
+  .pa-speed {
+    animation: pa-speed 0.55s linear infinite;
+  }
+  .pa-scan {
+    animation: pa-scan 2.4s ease-in-out infinite;
+  }
+  .pa-scuttle {
+    animation: pa-scuttle 2.4s ease-in-out infinite;
+  }
+  .pa-legs {
+    animation: pa-legs 0.16s linear infinite alternate;
+  }
+  .pa-stride {
+    animation: pa-stride 0.7s ease-in-out infinite;
+  }
+  .pa-point {
+    animation: pa-point 1.8s ease-in-out infinite;
+  }
+  .pa-wobble {
+    animation: pa-wobble 1.8s ease-in-out infinite;
+  }
+  .pa-draw {
+    animation: pa-draw 2.8s ease-in-out infinite;
+  }
+  .pa-sketch {
+    animation: pa-sketch 0.35s ease-in-out infinite alternate;
+  }
+  .pa-blink {
+    animation: pa-blink 3s ease-in-out infinite;
+  }
+  .pa-blip {
+    animation: pa-blip 1.5s ease-in-out infinite;
+  }
+  .pa-pump {
+    animation: pa-pump 1.2s ease-in-out infinite;
+  }
+  .pa-press {
+    animation: pa-press 1.4s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+  }
+  .pa-hop {
+    animation: pa-hop 1.5s ease-in-out infinite;
+  }
+  .pa-late {
+    animation-delay: 0.275s;
+  }
+  .pa-stride.pa-late {
+    animation-delay: 0.35s;
+  }
+  .pa-later {
+    animation-delay: 0.55s;
   }
 }
 @keyframes pa-bob {
@@ -1055,29 +1053,35 @@ html:has(.desk-wallpaper) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .blink,
-  .tile-in,
-  .win-opening,
-  .menu-open,
-  .task-in,
-  .phone-in,
-  .boot-wallpaper,
-  .boot-taskbar,
-  .boot-icon,
-  .heart-pop,
-  .m-rise,
-  .m-line > span,
-  .m-wipe,
-  .m-drop,
-  .m-pop,
-  .m-slam,
-  .m-float,
-  .m-shine::after,
-  .deck-wipe > span {
-    animation: none;
+  /* The kickoff deck (.always-move) keeps its motion: it's presented from shared machines that often have animations off. */
+  :not(.always-move *) {
+    &.blink,
+    &.tile-in,
+    &.win-opening,
+    &.menu-open,
+    &.task-in,
+    &.phone-in,
+    &.boot-wallpaper,
+    &.boot-taskbar,
+    &.boot-icon,
+    &.heart-pop,
+    &.m-rise,
+    &.m-line > span,
+    &.m-wipe,
+    &.m-drop,
+    &.m-pop,
+    &.m-slam,
+    &.m-float,
+    &.m-shine::after,
+    &.deck-wipe > span {
+      animation: none;
+    }
+  }
+  .picto:not(.always-move *) .pa {
+    animation: none !important;
   }
   .scene,
-  .deck-wipe {
+  .deck-wipe:not(.always-move *) {
     display: none;
   }
   .press:active {

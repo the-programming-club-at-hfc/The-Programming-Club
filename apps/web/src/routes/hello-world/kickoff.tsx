@@ -31,7 +31,7 @@ function Kickoff() {
   }, []);
 
   return (
-    <div ref={deck} className="theme-pine flex h-screen flex-col">
+    <div ref={deck} className="always-move theme-pine flex h-screen flex-col">
       <SlideStage slides={all} i={i} />
       <footer className="flex items-center gap-3 bg-mist px-5 py-2 text-sm font-semibold">
         <button className="btn btn-sm" onClick={() => go(i - 1)} aria-label="Previous slide">
