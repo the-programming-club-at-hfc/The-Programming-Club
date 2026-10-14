@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { addToSession, requireOpenSession, teamFor } from "./lib";
+import { addToSession, inTeamPool, requireOpenSession, teamFor } from "./lib";
 import { isOfficerEmail, requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
 import { isHfcEmail } from "../src/lib/season";
@@ -133,7 +133,7 @@ export const setPlaying = mutation({
   },
 });
 
-/** A member's own view: their team, its rank, and their XP so far. */
+/** A member's own view: their team, its rank, their XP so far, and tonight's. */
 export const me = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
@@ -145,13 +145,13 @@ export const me = query({
     const [session, player] = await Promise.all([ctx.db.get(a.sessionId), ctx.db.get(a.playerId)]);
     if (!session || !player) return null;
 
-    // Practice nights and officer check-ins don't count toward season XP (same as the leaderboard).
+    // Practice nights don't count toward season XP, and officer check-ins only when they played (same as the leaderboard).
     const all = await ctx.db
       .query("attendance")
       .withIndex("by_player", (q) => q.eq("playerId", a.playerId))
       .collect();
     const nights = await Promise.all(all.map((h) => ctx.db.get(h.sessionId)));
-    const history = all.filter((h, i) => nights[i] && !nights[i].practice && !h.officer);
+    const history = all.filter((h, i) => nights[i] && !nights[i].practice && inTeamPool(h));
     const seasonXp = history.reduce((n, h) => n + h.showXp + (h.placeXp ?? 0) + h.bonusXp, 0);
 
     let team = null;
@@ -190,6 +190,8 @@ export const me = query({
       team,
       seasonXp,
       weeks: history.length,
+      // This night's XP by the same rules (place XP lands when the night ends); null when it doesn't count.
+      tonight: !session.practice && inTeamPool(a) ? { show: a.showXp, place: a.placeXp ?? 0, bonus: a.bonusXp } : null,
     };
   },
 });

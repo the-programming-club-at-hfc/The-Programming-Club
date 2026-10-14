@@ -526,13 +526,13 @@ describe("ending the night", () => {
     expect(xp(4, 0, 0)).toEqual([3, 0, 0]);
   });
 
-  test("place XP by rank (ties share), nothing for 0 points or for officers, and officers off the leaderboard", async () => {
+  test("place XP by rank (ties share), nothing for 0 points or for officers running the night, who stay off the leaderboard", async () => {
     const { t, officer, nightWithTeams, join, attendance, score } = setup();
     const { code, teams } = await nightWithTeams(8);
     const [a, b, c, d] = teams;
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
     const grace = await join(code, { name: "Grace", email: GRACE });
-    await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // joins the smallest team
+    await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // a new team, with 0 points
     // c and d tie for 3rd with 0 points, which earns nothing.
     await officer.mutation(api.teams.score, { teamId: a._id, delta: 10 });
     await officer.mutation(api.teams.score, { teamId: b._id, delta: 10 });
@@ -551,14 +551,32 @@ describe("ending the night", () => {
     expect(xpOf(ada)).toBe(0);
     expect(await score(d._id)).toBe(0);
 
+    // The TV's final standings: each team's points and place XP, names only.
+    const final = (await t.query(api.sessions.final, {}))!;
+    expect(final.teams.map((tm) => [tm.score, tm.xp])).toEqual([
+      [10, 3],
+      [10, 3],
+      [0, 0],
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(JSON.stringify(final)).not.toContain("@");
+
     const board = await t.query(api.stats.leaderboard, {});
-    expect(board).toHaveLength(8);
-    expect(board.some((r) => r.name === "Ada" || r.name === "Grace")).toBe(false);
+    // Ada ran the night; Grace played, so she counts like everyone else.
+    expect(board).toHaveLength(9);
+    expect(board.some((r) => r.name === "Ada")).toBe(false);
+    expect(board.find((r) => r.name === "Grace")!.xp).toBe(3);
     expect(board[0].xp).toBe(3 + 3);
-    // Teams c and d scored nothing, so their players get show XP plus any bonus.
+    // Teams c, d, and Grace's scored nothing, so their players get show XP plus any bonus.
     expect(board.filter((r) => r.xp === 3 + 2)).toHaveLength(1);
-    expect(board.filter((r) => r.xp === 3)).toHaveLength(3);
+    expect(board.filter((r) => r.xp === 3)).toHaveLength(4);
     expect((await t.query(api.players.me, { token: ada }))!.seasonXp).toBe(0);
+    expect((await t.query(api.players.me, { token: grace }))!.seasonXp).toBe(3);
+    // Phones after End night: what tonight earned, nothing for an officer who ran it.
+    expect((await t.query(api.players.me, { token: a.tokens[0] }))!.tonight).toEqual({ show: 3, place: 3, bonus: 0 });
+    expect((await t.query(api.players.me, { token: d.tokens[0] }))!.tonight).toEqual({ show: 3, place: 0, bonus: 2 });
+    expect((await t.query(api.players.me, { token: ada }))!.tonight).toBe(null);
     expect((await t.query(api.players.me, { token: a.tokens[0] }))!.seasonXp).toBe(6);
 
     // Officers still count for attendance.
@@ -574,6 +592,7 @@ describe("ending the night", () => {
     const token = await join(code, student(1));
     await officer.mutation(api.sessions.end, {});
     expect(await t.query(api.stats.leaderboard, {})).toEqual([]);
+    expect((await t.query(api.sessions.final, {}))!.teams.every((tm) => tm.xp === undefined)).toBe(true);
     expect((await t.query(api.players.me, { token }))!.seasonXp).toBe(0);
     await expect(officer.query(api.sessions.attendanceExport, { sessionId: (await attendance())[0].sessionId })).rejects.toThrow(
       "Practice nights",
@@ -593,5 +612,8 @@ describe("ending the night", () => {
     }
     const [row] = await t.query(api.stats.leaderboard, {});
     expect([row.xp, row.weeks, row.founder]).toEqual([2 * (3 + 3), 2, true]);
+    // Each night's breakdown, for /scores. Names only: no emails on this public query.
+    expect(row.nights).toEqual([1, 2].map((week) => ({ week, show: 3, place: 3, bonus: 0 })));
+    expect(JSON.stringify(await t.query(api.stats.leaderboard, {}))).not.toContain("@");
   });
 });

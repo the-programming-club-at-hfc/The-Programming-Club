@@ -15,7 +15,10 @@ function Scores() {
   const board = useQuery(api.stats.leaderboard);
   return (
     <>
-      <PageHead title="scores">Season XP so far. Showing up every week is the fastest way up the board.</PageHead>
+      <PageHead title="scores">
+        Season XP so far. Showing up every week is the fastest way up the board.
+        <span className="mt-2 block">Each night: 3 XP for coming, +3/2/1 for your place, plus any bonus XP.</span>
+      </PageHead>
       <Wrap>
         {board === undefined ? (
           <p className="text-dim">Loading scores…</p>
@@ -56,9 +59,26 @@ function Scores() {
                       </span>
                     </td>
                     <td className="py-3.5 text-lg font-bold">
-                      {p.name}
-                      {p.founder && <span className="chip ml-2 align-middle font-semibold">Founder</span>}
-                      {p.rookie && <span className="chip ml-2 bg-meadow/25 align-middle font-semibold">Rookie</span>}
+                      {/* Where the XP came from, night by night. */}
+                      <details className="group">
+                        <summary className="flex cursor-pointer flex-wrap items-center gap-2 select-none">
+                          {p.name}
+                          {p.founder && <span className="chip font-semibold">Founder</span>}
+                          {p.rookie && <span className="chip bg-meadow/25 font-semibold">Rookie</span>}
+                          <span className="font-normal text-dim transition-transform group-open:rotate-90" aria-hidden>
+                            ›
+                          </span>
+                        </summary>
+                        <ul className="mt-2 space-y-1 text-sm font-normal text-dim">
+                          {p.nights.map((n, j) => (
+                            <li key={j}>
+                              Week {n.week}: {n.show} for coming
+                              {n.place > 0 && `, +${n.place} for place`}
+                              {n.bonus > 0 && `, +${n.bonus} bonus`} = <strong className="text-ink">{n.show + n.place + n.bonus} XP</strong>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     </td>
                     <td className="narrow py-3.5 text-right text-lg text-dim">{p.weeks}</td>
                     <td className="narrow py-3.5 text-right text-3xl font-extrabold">{p.xp}</td>

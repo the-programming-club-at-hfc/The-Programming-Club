@@ -10,7 +10,7 @@ import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
-import { nextMeeting, useSchedule } from "#/lib/schedule";
+import { nextMeeting, useJustEnded, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
 
@@ -53,7 +53,7 @@ function TvScreen() {
       className="theme-pine relative flex h-screen flex-col overflow-hidden"
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
-      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <Attract /> : null}
+      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <AfterNight /> : null}
       {!sound && (
         <button
           className="absolute top-4 right-4 z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim"
@@ -79,6 +79,19 @@ function CodeSquares({ code, className = "" }: { code: string; className?: strin
         </span>
       ))}
     </span>
+  );
+}
+
+/** After End night: the final standings for a while, then the attract screen. */
+function AfterNight() {
+  const last = useJustEnded();
+  if (last === undefined) return null;
+  return last ? (
+    <div className="flex-1 overflow-hidden p-[3.5vw]">
+      <Scoreboard teams={last.teams} final />
+    </div>
+  ) : (
+    <Attract />
   );
 }
 
@@ -159,7 +172,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
       <div className={s.mode === "slides" ? "flex min-h-0 flex-1" : "flex-1 overflow-hidden p-[3.5vw]"}>
         {s.mode === "slides" && <Slides screen={s} />}
         {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
-        {s.mode === "scoreboard" && <Scoreboard live={live} />}
+        {s.mode === "scoreboard" && <Scoreboard teams={live.teams} />}
         {s.mode === "timer" && (
           <div className="grid h-full place-items-center">
             <BigTimer remaining={remaining} running={running} swap={isSwapMoment(live.timer, remaining)} size="text-[34vw]" />
@@ -526,17 +539,28 @@ function Lobby({ live, code, joinUrl }: { live: Live; code: string; joinUrl: str
 
 const MEDAL = ["var(--color-gold)", "var(--color-silver)", "#d79a5b"];
 
-function Scoreboard({ live }: { live: Live }) {
-  const top = Math.max(1, ...live.teams.map((t) => t.score));
+type Standing = { _id: string; name: string; score: number; members: string[]; xp?: number };
+
+/** Standings in points. Once the night is over (`final`), with the place XP each team's players earned. */
+function Scoreboard({ teams, final = false }: { teams: Standing[]; final?: boolean }) {
+  const top = Math.max(1, ...teams.map((t) => t.score));
+  const first = teams.filter((t) => t.score > 0 && t.score === teams[0].score);
+  const xp = teams.some((t) => t.xp !== undefined);
   return (
     <div className="mx-auto flex h-full max-w-[86vw] flex-col">
-      <h2 className="text-[4vw] leading-none tracking-[-0.04em]">tonight’s standings</h2>
-      {live.teams.length === 0 ? (
+      <h2 className="text-[4vw] leading-none tracking-[-0.04em]">{final ? "final standings" : "tonight’s standings"}</h2>
+      {final && first.length > 0 && (
+        <p className="mt-[1.2vw] text-[2.4vw] font-bold">
+          {first.map((t) => t.name).join(" and ")} {first.length === 1 ? "wins" : "tie for 1st"}
+          {xp && <span className="text-meadow"> · +{first[0].xp} XP each</span>}
+        </p>
+      )}
+      {teams.length === 0 ? (
         <p className="mt-[6vw] text-[2.2vw] text-dim">Teams show up here once officers make them.</p>
       ) : (
         <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
-          {live.teams.map((t) => {
-            const rank = 1 + live.teams.filter((o) => o.score > t.score).length;
+          {teams.map((t) => {
+            const rank = 1 + teams.filter((o) => o.score > t.score).length;
             return (
               <li key={t._id} className="grid grid-cols-[3vw_6vw_1fr_10vw] items-center gap-[1.5vw]">
                 <span className="size-[2.6vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
@@ -549,12 +573,23 @@ function Scoreboard({ live }: { live: Live }) {
                     <div className="h-full bg-sky" style={{ width: `${Math.max(2, (t.score / top) * 100)}%` }} />
                   </div>
                 </div>
-                <span className="narrow text-right text-[5vw] leading-none font-extrabold">{t.score}</span>
+                <span className="text-right">
+                  <span className="narrow block text-[5vw] leading-none font-extrabold">{t.score}</span>
+                  {t.xp !== undefined && <span className="block text-[1.5vw] font-bold text-meadow">+{t.xp} XP</span>}
+                </span>
               </li>
             );
           })}
         </ol>
       )}
+      {/* Points are tonight's game; XP is the season board. */}
+      <p className="mt-auto pt-[2vw] text-[1.5vw] text-dim">
+        {!final
+          ? "Points are for tonight. When the night ends, 1st, 2nd, and 3rd place earn +3, +2, and +1 XP each."
+          : xp
+            ? `Points were for tonight. Season XP is 3 for coming, +3/2/1 for your place: ${CLUB.url}/hello-world/scores`
+            : "Practice night: nothing tonight counts toward XP."}
+      </p>
     </div>
   );
 }

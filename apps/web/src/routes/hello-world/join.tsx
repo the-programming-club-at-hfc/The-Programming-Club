@@ -13,7 +13,7 @@ import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
-import { gamesIn, useSchedule, usesTeamComputer } from "#/lib/schedule";
+import { gamesIn, useJustEnded, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import { CLUB, isHfcEmail } from "#/lib/season";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -37,12 +37,15 @@ const notHfc = (email: string, left: boolean) => {
 function Join() {
   const { code: codeFromQr } = Route.useSearch();
   const live = useQuery(api.sessions.live);
+  // After End night, this phone's token for the night that just ended, to show what it earned.
+  const last = useJustEnded(live !== null);
+  const sessionId = live ? live._id : (last?._id ?? null);
   const [token, setToken] = useState<string | null>(null);
   const me = useQuery(api.players.me, token ? { token } : "skip");
 
   useEffect(() => {
-    setToken(live ? localStorage.getItem(tokenKey(live._id)) : null);
-  }, [live?._id]);
+    setToken(sessionId ? localStorage.getItem(tokenKey(sessionId)) : null);
+  }, [sessionId]);
 
   useEffect(() => {
     // An officer removed this player, or the token is stale.
@@ -52,12 +55,13 @@ function Join() {
     }
   }, [token, me, live]);
 
-  if (live === undefined)
+  if (live === undefined || (live === null && (last === undefined || (token && me === undefined))))
     return (
       <Center>
         <p className="text-dim">Loading…</p>
       </Center>
     );
+  if (live === null && me?.ended) return <NightOver me={me} />;
   if (live === null)
     return (
       <Center>
@@ -88,6 +92,33 @@ function Join() {
     );
   }
   return <JoinForm initialCode={codeFromQr ?? ""} sessionId={live._id} onJoined={setToken} />;
+}
+
+/** After End night: what tonight earned, and the season board. */
+function NightOver({ me }: { me: Me }) {
+  const t = me.tonight;
+  return (
+    <Center>
+      <p className="text-dim">
+        Week {me.week} is over. Thanks, {me.name}!
+      </p>
+      {t ? (
+        <>
+          <h1 className="mt-3 text-[clamp(2.4rem,7vw,3.6rem)]">You earned {t.show + t.place + t.bonus} XP tonight</h1>
+          <p className="mx-auto mt-4 max-w-[40ch] text-lg text-dim">
+            {t.show} for coming{t.place > 0 && `, +${t.place} for your place`}
+            {t.bonus > 0 && `, +${t.bonus} bonus`}. Season XP: {me.seasonXp}.
+          </p>
+        </>
+      ) : (
+        <h1 className="mt-3 text-[clamp(2.4rem,7vw,3.6rem)] lowercase">{me.practice ? "practice night" : "see you next week"}</h1>
+      )}
+      {me.practice && <p className="mx-auto mt-4 max-w-[40ch] text-lg text-dim">Nothing tonight counts toward XP.</p>}
+      <Link to="/hello-world/scores" className="btn btn-primary mt-8">
+        See the scores
+      </Link>
+    </Center>
+  );
 }
 
 function Center({ children }: { children: React.ReactNode }) {
