@@ -272,7 +272,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
             ))}
         </dl>
         <p className="m-rise mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(6)}>
-          Everyone starts at zero, so anyone can win. The winners sign the trophy.
+          Both Cup nights start everyone at zero, so anyone can win. The winning team signs the trophy.
         </p>
         <p className="m-rise mt-3 text-[clamp(1.2rem,1.7vw,1.8rem)] text-dim" style={at(7)}>
           The take-home prize isn’t decided yet.
