@@ -98,6 +98,13 @@ function Overview() {
         ))}
       </dl>
 
+      <Section title="Still to figure out">
+        <p className="text-sm">
+          <strong>Costume XP (+1 at Spooky Bugs):</strong> we need a way to confirm who actually wore a costume. Until then, give it by hand
+          with the bonus XP buttons on /host.
+        </p>
+      </Section>
+
       <Section title="Attendance">
         {nights.length === 0 ? (
           <p className="text-dim">No nights yet. Attendance records itself when members join with the code.</p>
