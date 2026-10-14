@@ -7,7 +7,7 @@ export const WEEKS: Week[] = [
     kind: "kickoff",
     title: "Kickoff: Hello, World",
     pitch: "Meet the officers, find out how Season 0 works, tell us what you want from the club, then play the first Wiki Race.",
-    games: ["Meet the officers", "Feedback wall", "Wiki Race (first match)"],
+    games: ["Meet the officers", "What should the club be?", "Wiki Race (first match)"],
     bonus: "Everyone here tonight is a Founding Member and goes on the Season 0 roster.",
     showXp: 3,
   },
@@ -148,7 +148,7 @@ export const KICKOFF_AGENDA: Agenda[] = [
     t: "5:26",
     len: 10,
     what: "Your turn: feedback",
-    detail: "Sticky-note wall, or the feedback form on phones.",
+    detail: "Talk through the questions on the slide. Ideas from the join form land on the officer dashboard.",
   },
   {
     t: "5:36",
@@ -540,7 +540,6 @@ export const FEEDBACK: string[] = [
   "Does Wednesday 5–6 work for you?",
   "What one thing would make you come back every week?",
 ];
-export const WALL_CATEGORIES: string[] = ["Learn", "Build", "Compete", "Hang out"];
 export const REMIX_MENU: string[] = [
   "Guess the Language",
   "Output? Showdown",

@@ -5,7 +5,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { AgendaList, Code, Picto, weekTile } from "#/components/ui";
-import { FEEDBACK, GAMES, MATCH_AGENDA, WALL_CATEGORIES } from "#/lib/content";
+import { FEEDBACK, GAMES, MATCH_AGENDA } from "#/lib/content";
 import { useSchedule } from "#/lib/schedule";
 import type { WeekPlan } from "#/lib/schedule";
 import { useJoinCode } from "#/components/officer";
@@ -250,29 +250,13 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           ))}
         </ol>
       </div>
-      <div className="self-center text-center">
-        {CLUB.links.feedbackForm && (
-          <div className="m-pop mb-8" style={at(5)}>
-            <div className="inline-block bg-white p-3">
-              <QRCodeSVG value={CLUB.links.feedbackForm} size={220} marginSize={0} />
-            </div>
-            <p className="mt-2 text-xl">Scan to answer on your phone</p>
-          </div>
-        )}
-        <p className="m-rise text-xl text-dim" style={at(4)}>
-          Or grab sticky notes and post ideas under:
+      <div className="m-pop tile tile-sky self-center p-10" style={at(5)}>
+        <p className="text-[clamp(1.6rem,2.6vw,2.8rem)] leading-tight font-extrabold tracking-[-0.02em] text-balance">
+          The join form asked you this too.
         </p>
-        <ul className="mt-4 grid grid-cols-2 gap-4">
-          {WALL_CATEGORIES.map((c, i) => (
-            <li
-              key={c}
-              className={`tile m-pop ${["tile-sky", "tile-meadow", "tile-sun", "tile-silver"][i % 4]} py-8 text-3xl font-extrabold`}
-              style={at(5 + i)}
-            >
-              {c}
-            </li>
-          ))}
-        </ul>
+        <p className="mt-4 text-[clamp(1.2rem,1.7vw,1.8rem)]">
+          Every answer goes straight to the officers. Think of something later? Tell any of us.
+        </p>
       </div>
     </div>,
     <div className="grid gap-12 lg:grid-cols-2">

@@ -14,7 +14,6 @@ export const CLUB = {
   advisor: { name: "Sreya Sadasivapetkar", email: "ssadasivapetkar@hfcc.edu", office: "E-162I" },
   timeZone: "America/Detroit",
   links: {
-    feedbackForm: "", // Microsoft Form for kickoff feedback (shown as a QR code on the slides)
     teams: "", // Invite link to the club's Microsoft Teams group (QR code on the last kickoff slide)
   },
 };
