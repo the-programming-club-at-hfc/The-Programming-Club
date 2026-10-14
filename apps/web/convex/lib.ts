@@ -164,6 +164,15 @@ export async function addToSession(
   return token;
 }
 
+/** Add points to a team and to each player on it now, so a player's points survive teams being remade. */
+export async function award(ctx: MutationCtx, teamId: Id<"teams">, points: number) {
+  const team = await ctx.db.get(teamId);
+  if (!team || !points) return;
+  await ctx.db.patch(team._id, { score: team.score + points });
+  for (const a of await sessionAttendance(ctx, team.sessionId))
+    if (a.teamId === team._id) await ctx.db.patch(a._id, { points: (a.points ?? 0) + points });
+}
+
 /** Place XP by team rank; ties share the higher place. Teams with 0 points earn nothing. */
 export function placeXpFor(teams: Doc<"teams">[]) {
   const xp = new Map<Id<"teams">, number>();

@@ -413,13 +413,13 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
   const resetScores = useMutation(api.teams.resetScores);
   const setAuto = useMutation(api.teams.setAuto);
   const w = teamWords(live.teamSize === 1);
-  // Like Make teams always has, picking a mode (even tonight's) remakes tonight's teams and resets the scores.
+  // Picking a mode (even tonight's) remakes tonight's teams. Points carry over: each new team starts from its players' average.
   const setMode = (size: 1 | 2 | 3) =>
     (!live.teams.length ||
       confirm(
         size === 1
-          ? "Put everyone on a team of their own? Tonight’s scores reset."
-          : `Reshuffle everyone into teams of ${size}? Tonight’s scores reset.`,
+          ? "Put everyone on a team of their own? Everyone keeps their own points."
+          : `Reshuffle everyone into teams of ${size}? Each team starts from its players’ average points.`,
       )) &&
     run(make({ size }));
 
@@ -452,7 +452,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
       </div>
       <p className="mt-2 text-sm text-dim">
         <strong className="text-ink">Tonight: {MODES[live.teamSize - 1][1].toLowerCase()}.</strong>{" "}
-        {live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff} Pressing a mode, even tonight’s, remakes every team and resets the scores.
+        {live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff} Pressing a mode, even tonight’s, remakes every team. Nobody loses points.
       </p>
       {live.teams.length === 0 ? (
         <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>

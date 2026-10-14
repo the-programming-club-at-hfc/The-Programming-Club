@@ -5,6 +5,7 @@ import type { Doc } from "./_generated/dataModel";
 import { requireOfficer } from "./officers";
 import {
   addToSession,
+  award,
   inTeamPool,
   newTeam,
   newTeamKey,
@@ -20,7 +21,7 @@ import {
 import { TEAM_NAMES } from "./teamNames";
 
 /** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo), or with size 1 put everyone on a
- *  team of their own, named after them. Resets tonight's teams. Officers running the night stay off the teams.
+ *  team of their own, named after them. Remakes tonight's teams without losing points. Officers running the night stay off.
  *  Auto teams fill up to `size` from then on. */
 export const make = mutation({
   args: { size: v.union(v.literal(1), v.literal(2), v.literal(3)) },
@@ -42,6 +43,11 @@ export const make = mutation({
       ids.push(await ctx.db.insert("teams", { sessionId: s._id, name: names[i % names.length], score: 0, key: keys[i] }));
     }
     for (let i = 0; i < att.length; i++) await ctx.db.patch(att[i]._id, { teamId: ids[i % n] });
+    // Nobody's points are lost: each new team starts from its players' average, and they keep their own totals.
+    for (let i = 0; i < n; i++) {
+      const pts = att.filter((_, j) => j % n === i).map((a) => a.points ?? 0);
+      await ctx.db.patch(ids[i], { score: Math.round(pts.reduce((x, y) => x + y, 0) / pts.length) });
+    }
   },
 });
 
@@ -115,7 +121,7 @@ export const score = mutation({
     const s = await requireOpenSession(ctx);
     const t = await ctx.db.get(teamId);
     if (!t || t.sessionId !== s._id) return;
-    await ctx.db.patch(teamId, { score: t.score + (delta > 0 && s.double ? delta * 2 : delta) });
+    await award(ctx, teamId, delta > 0 && s.double ? delta * 2 : delta);
   },
 });
 
@@ -125,6 +131,7 @@ export const resetScores = mutation({
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     for (const t of await sessionTeams(ctx, s._id)) await ctx.db.patch(t._id, { score: 0 });
+    for (const a of await sessionAttendance(ctx, s._id)) if (a.points) await ctx.db.patch(a._id, { points: 0 });
     await ctx.db.patch(s._id, { double: false });
   },
 });

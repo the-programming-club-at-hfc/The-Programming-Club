@@ -123,6 +123,8 @@ export default defineSchema({
     showXp: v.number(),
     placeXp: v.optional(v.number()),
     bonusXp: v.number(),
+    // Points this player earned tonight, kept when teams are remade (teams.make starts each team from its members' average).
+    points: v.optional(v.number()),
     // An officer's check-in: counts for attendance but stays out of teams and the leaderboard unless they opt in to play.
     officer: v.optional(v.boolean()),
     playing: v.optional(v.boolean()),

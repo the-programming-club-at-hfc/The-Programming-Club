@@ -3,7 +3,7 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
+import { award, openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
 import { cardStart, isOpen, liveCard } from "./answers";
 import { puzzleCard } from "./puzzles";
 import { FIXES } from "../src/lib/fixes";
@@ -128,7 +128,7 @@ export async function scoreFixReveal(ctx: MutationCtx, s: Doc<"sessions">) {
     const team = await ctx.db.get(row.teamId);
     if (!team) continue;
     await ctx.db.patch(row._id, { result: { points, first } });
-    await ctx.db.patch(team._id, { score: team.score + points });
+    await award(ctx, team._id, points);
   }
   await ctx.db.patch(s._id, { scored: r.scored });
 }
