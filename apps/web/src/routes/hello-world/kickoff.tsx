@@ -138,8 +138,8 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <dl className="space-y-6 self-center">
         {[
           ["Who can join", "All currently enrolled HFC students"],
-          ["Experience needed", "None"],
-          ["Dues", "$0, always"],
+          ["Experience", "All majors and skill levels welcome"],
+          ["Fees", "None, all free!"],
         ].map(([k, v], n) => (
           <div key={k} className="m-rise border-l-[6px] border-sky pl-6" style={at(6 + n)}>
             <dt className="text-xl text-dim">{k}</dt>
