@@ -235,24 +235,20 @@ function slides(plan: WeekPlan[]): ReactNode[] {
     </div>,
     <div className="grid items-center gap-12 lg:grid-cols-[1.3fr_1fr]">
       <div>
-        <H>Cup nights and the Golden Keycap</H>
-        <Big>
-          <li className="m-rise" style={at(3)}>
-            Week 4 is the Midseason Cup. Week 6 is the Final.
-          </li>
-          <li className="m-rise" style={at(4)}>
-            Everyone starts at zero, so a first-timer can win.
-          </li>
-          <li className="m-rise" style={at(5)}>
-            The last round counts double, just like on game nights.
-          </li>
-          <li className="m-rise" style={at(6)}>
-            The Final is two Advent of Code–style puzzles.
-          </li>
-          <li className="m-rise" style={at(7)}>
-            The winners sign the Golden Keycap, then we hand out the season awards.
-          </li>
-        </Big>
+        <H>Win the Golden Keycap</H>
+        <dl className="space-y-6">
+          {[plan[3], plan[5]].map((w, n) => (
+            <div key={w.week} className="m-rise border-l-[6px] border-gold pl-6" style={at(3 + n)}>
+              <dt className="text-xl text-dim">
+                Week {w.week} · {fmtDate(w.start, { month: "long", day: "numeric" })}
+              </dt>
+              <dd className="text-5xl font-extrabold tracking-[-0.03em]">{w.title}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="m-rise mt-8 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(6)}>
+          Everyone starts at zero, so anyone can win. The winners sign the trophy.
+        </p>
       </div>
       <div className="m-pop" style={at(5)}>
         <div className="tile tile-gold m-float m-shine mx-auto aspect-square w-[min(100%,24rem)]">
