@@ -52,11 +52,13 @@ function Teams() {
       </p>
     );
   return (
-    <ul className="mx-auto mt-10 grid max-w-[1300px] grid-cols-2 gap-[3px] text-left lg:grid-cols-4">
+    <ul className="mx-auto mt-10 grid max-w-[1400px] grid-cols-2 gap-[3px] text-left lg:grid-cols-4">
       {live.teams.map((t, k) => (
-        <li key={t._id} className={`tile m-pop ${TEAM_TILES[k % TEAM_TILES.length]} p-5`} style={at(4 + Math.min(k, 7))}>
-          <p className="text-[clamp(1.2rem,1.7vw,1.8rem)] leading-tight font-extrabold">{t.name}</p>
-          <p className="mt-1 text-[clamp(1rem,1.3vw,1.4rem)] leading-snug">{t.members.join(", ") || "Nobody yet"}</p>
+        <li key={t._id} className={`tile m-pop ${TEAM_TILES[k % TEAM_TILES.length]} p-6`} style={at(4 + Math.min(k, 7))}>
+          <p className="text-[clamp(1.5rem,2.2vw,2.4rem)] leading-tight font-extrabold tracking-[-0.02em]">{t.name}</p>
+          <ul className="mt-2 text-[clamp(1.2rem,1.6vw,1.8rem)] leading-snug font-semibold">
+            {t.members.length ? t.members.map((m) => <li key={m}>{m}</li>) : <li>Nobody yet</li>}
+          </ul>
         </li>
       ))}
     </ul>
@@ -319,33 +321,12 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
         className="m-slam text-[clamp(3rem,6vw,6.5rem)] leading-[0.9] tracking-[-0.045em] lowercase"
         style={{ "--base": "200ms" } as CSSProperties}
       >
-        Squad up.
+        Find your team.
       </h2>
       <p className="m-rise mt-6 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(3)}>
-        Teams of 2–3. Open programmingclub.dev/wiki on your team’s computer.
+        Sit together, then open {CLUB.url}/wiki on one computer per team.
       </p>
       <Teams />
-    </div>,
-    <div className="text-center">
-      <h2 className="text-[clamp(3rem,6.5vw,7rem)] leading-[0.9] tracking-[-0.045em] lowercase">
-        <Words text="See you next Wednesday." />
-      </h2>
-      <p className="mt-10 text-[clamp(1.5rem,2.4vw,2.6rem)]">
-        <span className="m-wipe inline-block bg-sun px-[0.4em] py-[0.1em] text-[#12332b]" style={at(4)}>
-          {plan[1].title}: {fmtDate(plan[1].start, { weekday: "long", month: "long", day: "numeric" })}, {CLUB.time}, {CLUB.room}.
-        </span>
-      </p>
-      <p className="m-rise mt-6 text-[clamp(1.2rem,1.8vw,1.9rem)] text-dim" style={at(5)}>
-        Bring an HFC classmate who’s never been: you both get +2 XP.
-      </p>
-      {CLUB.links.teams && (
-        <div className="m-pop mt-10" style={at(7)}>
-          <div className="inline-block bg-white p-3">
-            <QRCodeSVG value={CLUB.links.teams} size={200} marginSize={0} />
-          </div>
-          <p className="mt-2 text-xl">Join our Teams group</p>
-        </div>
-      )}
     </div>,
   );
   return s;
