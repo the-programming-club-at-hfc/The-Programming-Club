@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PUZZLES } from "#/lib/puzzles";
 import { TIMEOUT_MS } from "#/lib/python";
 import type { PyRun, Python } from "#/lib/python";
+import { teamWords } from "#/lib/words";
 import { Editor, PyState, Traceback } from "./fix";
 import { Hint, LevelChip, PuzzleExample, Rich, fmtElapsed } from "./game";
 import { Code } from "./ui";
@@ -33,6 +34,8 @@ interface Props {
   saveKey?: string;
   /** Checks an answer. Throw a ConvexError to show why it didn't count. */
   onSubmit: (part: 1 | 2, answer: string) => Promise<{ right: boolean; waitMs: number }>;
+  /** A solo night: the input is one player's. */
+  solo?: boolean;
 }
 
 const STARTER = `# Your puzzle input is in input.txt (and on stdin).
@@ -41,7 +44,7 @@ print(len(lines), "lines")
 print(lines[0])
 `;
 
-export function PuzzleRound({ index, input, py, revealed, hint, open, stars, lockedUntil, result, saveKey, onSubmit }: Props) {
+export function PuzzleRound({ index, input, py, revealed, hint, open, stars, lockedUntil, result, saveKey, onSubmit, solo }: Props) {
   const p = PUZZLES[index];
   const [code, setCode] = useState(STARTER);
   const [busy, setBusy] = useState<"example" | "input" | null>(null);
@@ -106,7 +109,7 @@ export function PuzzleRound({ index, input, py, revealed, hint, open, stars, loc
             <p className="text-sm text-dim">Any language or tool on this computer works. Only the answer counts.</p>
           </div>
         )}
-        <InputBox input={input} />
+        <InputBox input={input} solo={solo} />
         <Editor value={code} onChange={edit} />
         <div className="flex flex-wrap items-center gap-1">
           <button className="btn" disabled={!can} onClick={() => void go("example")}>
@@ -276,7 +279,7 @@ function AnswerBox({
 }
 
 /** The team's own input, to copy into another tool or download as input.txt. */
-function InputBox({ input }: { input: string }) {
+function InputBox({ input, solo }: { input: string; solo?: boolean }) {
   const [copied, setCopied] = useState(false);
   const download = () => {
     const url = URL.createObjectURL(new Blob([input + "\n"], { type: "text/plain" }));
@@ -288,7 +291,10 @@ function InputBox({ input }: { input: string }) {
     <div className="card p-4">
       <div className="flex flex-wrap items-center gap-1">
         <p className="mr-auto font-extrabold">
-          Your puzzle input <span className="font-normal text-dim">· {input.split("\n").length} lines, just for your team</span>
+          Your puzzle input{" "}
+          <span className="font-normal text-dim">
+            · {input.split("\n").length} lines, just for {teamWords(solo).you}
+          </span>
         </p>
         <button
           className="btn btn-sm"

@@ -13,6 +13,8 @@ import { cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
+import { teamWords } from "#/lib/words";
+import type { TeamWords } from "#/lib/words";
 
 export const Route = createFileRoute("/hello-world/tv")({
   head: () => ({ meta: [{ title: `TV · ${CLUB.season}` }] }),
@@ -125,6 +127,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const plan = useSchedule();
   const wk = plan[live.week - 1];
   const wt = weekTile(wk);
+  const w = teamWords(live.teamSize === 1);
   const deckTile = s.game ? GAME_TILE[s.game] : null;
   const answerable = s.mode === "card" && isAnswerGame(s.game) && s.index !== undefined;
   const boardData = useQuery(api.answers.board, answerable ? {} : "skip");
@@ -176,12 +179,12 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
               {DECKS[s.game].name}
               {board && board.locked !== null && !s.revealed && board.teams > 0 && (
                 <span className="ml-auto">
-                  <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} teams locked in
+                  <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} {w.teams} locked in
                 </span>
               )}
               {fixBoard && !done && fixBoard.teams > 0 && (
                 <span className="ml-auto">
-                  <span className="narrow text-[2.6vw] font-extrabold">{fixBoard.fixed.length}</span> of {fixBoard.teams} teams fixed it
+                  <span className="narrow text-[2.6vw] font-extrabold">{fixBoard.fixed.length}</span> of {fixBoard.teams} {w.teams} fixed it
                 </span>
               )}
               {puzzleBoard && !done && stars !== null && stars > 0 && (
@@ -191,10 +194,10 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
               )}
             </p>
             <div className={board?.results || fixBoard || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
-              <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" />
+              <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" solo={w.solo} />
               {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
-              {fixBoard && <FixList board={fixBoard} done={done} />}
-              {puzzleBoard && <StarBoard board={puzzleBoard} done={done} />}
+              {fixBoard && <FixList board={fixBoard} done={done} w={w} />}
+              {puzzleBoard && <StarBoard board={puzzleBoard} done={done} w={w} />}
             </div>
           </div>
         )}
@@ -202,9 +205,9 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
           <div className="grid h-full place-items-center text-center">
             <div>
               <p className="text-[2vw] font-bold text-dim">Wiki Race{s.wikiClicks ? ": Fewest Clicks" : ""} · get ready</p>
-              <p className="mt-[1.5vw] text-[2.4vw]">Team computers, open</p>
+              <p className="mt-[1.5vw] text-[2.4vw]">{w.openOn}</p>
               <p className="mt-[0.5vw] text-[6vw] leading-[1] font-extrabold tracking-[-0.03em]">{CLUB.url}/wiki</p>
-              <p className="mt-[2vw] text-[1.8vw] text-dim">The start and target go up when the race starts, for every team at once.</p>
+              <p className="mt-[2vw] text-[1.8vw] text-dim">The start and target go up when the race starts, for {w.everyone} at once.</p>
             </div>
           </div>
         )}
@@ -215,7 +218,9 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 <div className="bg-mist p-[3vw]">
                   <p className="text-[1.6vw] text-dim">Start here</p>
                   <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiFrom}</p>
-                  <p className="mt-[1.2vw] text-[1.6vw] font-bold">Team computers: {CLUB.url}/wiki</p>
+                  <p className="mt-[1.2vw] text-[1.6vw] font-bold">
+                    {w.Computers}: {CLUB.url}/wiki
+                  </p>
                 </div>
                 <div className="tile tile-sky p-[3vw]">
                   <p className="text-[1.6vw]">Get to</p>
@@ -224,10 +229,10 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
               </div>
               <p className="text-[1.5vw] text-dim">
                 {s.wikiClicks ? "Fewest clicks wins. Count every link you click. " : ""}
-                Links inside the article only. No search bar. Back button and Ctrl+F are fine. Tap “We made it!” on a phone when you land.
+                Links inside the article only. No search bar. Back button and Ctrl+F are fine. Tap “{w.madeIt}” on a phone when you land.
               </p>
             </div>
-            {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} />}
+            {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} w={w} />}
           </div>
         )}
         {s.mode === "message" && (
@@ -290,10 +295,10 @@ function useCountSound(card: string | undefined, n: number | null) {
 }
 
 /** Fix it for real: the teams that fixed it, in order, with their times. Points join them once it's scored. No code. */
-function FixList({ board, done }: { board: FixBoard; done: boolean }) {
+function FixList({ board, done, w }: { board: FixBoard; done: boolean; w: TeamWords }) {
   return (
     <div>
-      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your team computer</p>}
+      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your {w.computer}</p>}
       {board.fixed.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
       ) : (
@@ -318,7 +323,7 @@ function FixList({ board, done }: { board: FixBoard; done: boolean }) {
 }
 
 /** Puzzles: every team's stars, most first, with times on the puzzle's clock. Points join them once it's scored. Never answers. */
-function StarBoard({ board, done }: { board: PuzzleBoard; done: boolean }) {
+function StarBoard({ board, done, w }: { board: PuzzleBoard; done: boolean; w: TeamWords }) {
   const star = (ms: number | null, first: boolean) => (
     <span className={`block text-[1.2vw] ${ms === null ? "text-dim" : ""}`}>
       <span className={ms === null ? "" : "text-gold"}>{ms === null ? "☆" : "★"}</span>
@@ -327,9 +332,9 @@ function StarBoard({ board, done }: { board: PuzzleBoard; done: boolean }) {
   );
   return (
     <div>
-      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your team computer</p>}
+      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your {w.computer}</p>}
       {board.teams.length === 0 ? (
-        <p className="mt-[1vw] text-[1.6vw] text-dim">No teams yet.</p>
+        <p className="mt-[1vw] text-[1.6vw] text-dim">{w.noTeams}</p>
       ) : (
         <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
           {board.teams.map((t) => (
@@ -349,7 +354,7 @@ function StarBoard({ board, done }: { board: PuzzleBoard; done: boolean }) {
 }
 
 /** Wiki Race: the finish order with places and times (or click counts), then every team's points once it's scored. */
-function RaceList({ board, done }: { board: WikiBoard; done: boolean }) {
+function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: TeamWords }) {
   const rows = board.results
     ? board.results.map((r) => ({
         key: r.teamId,
@@ -377,7 +382,7 @@ function RaceList({ board, done }: { board: WikiBoard; done: boolean }) {
         </p>
       )}
       {rows.length === 0 ? (
-        <p className="mt-[1vw] text-[1.6vw] text-dim">Nobody yet. Tap “We made it!” on a phone when you land.</p>
+        <p className="mt-[1vw] text-[1.6vw] text-dim">Nobody yet. Tap “{w.madeIt}” on a phone when you land.</p>
       ) : (
         <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
           {rows.map((r) => (
@@ -532,7 +537,7 @@ function Scoreboard({ live }: { live: Live }) {
     <div className="mx-auto flex h-full max-w-[86vw] flex-col">
       <h2 className="text-[4vw] leading-none tracking-[-0.04em]">tonight’s standings</h2>
       {live.teams.length === 0 ? (
-        <p className="mt-[6vw] text-[2.2vw] text-dim">Teams show up here once officers make them.</p>
+        <p className="mt-[6vw] text-[2.2vw] text-dim">{teamWords(live.teamSize === 1).scoreboardEmpty}</p>
       ) : (
         <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
           {live.teams.map((t) => {
@@ -543,7 +548,8 @@ function Scoreboard({ live }: { live: Live }) {
                 <span className="narrow text-[3.2vw] leading-none font-extrabold">{ordinal(rank)}</span>
                 <div className="min-w-0">
                   <p className="truncate text-[2.5vw] leading-tight font-extrabold">
-                    {t.name} <span className="text-[1.3vw] font-normal text-dim">{t.members.join(", ")}</span>
+                    {t.name}{" "}
+                    {t.members.join(", ") !== t.name && <span className="text-[1.3vw] font-normal text-dim">{t.members.join(", ")}</span>}
                   </p>
                   <div className="mt-[0.6vw] h-[0.9vw] bg-mist">
                     <div className="h-full bg-sky" style={{ width: `${Math.max(2, (t.score / top) * 100)}%` }} />

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { BUGS } from "#/lib/content";
 import { choices, searchLanguages } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
+import { teamWords } from "#/lib/words";
+import type { TeamWords } from "#/lib/words";
 import { CardView, LevelChip } from "./game";
 import { highlight } from "./ui";
 
@@ -43,14 +45,17 @@ interface RoundProps {
   error?: string;
   onPick: (p: PickArgs) => void;
   onLock: (step: "line" | "answer") => void;
+  /** A solo night: the copy speaks to one player. */
+  solo?: boolean;
 }
 
 /** What a phone shows for an answerable card: the card and the team's answer, then the result after the reveal. */
 export function PhoneRound(p: RoundProps) {
+  const w = teamWords(p.solo);
   if (p.revealed)
     return (
       <div className="space-y-3">
-        <ResultBanner game={p.game} pick={p.pick} result={p.result} />
+        <ResultBanner game={p.game} pick={p.pick} result={p.result} w={w} />
         <div className="card p-5">
           <CardView game={p.game} index={p.index} answer />
         </div>
@@ -70,6 +75,7 @@ export function PhoneRound(p: RoundProps) {
                 pick={p.pick}
                 disabled={!p.open || p.pick.locked}
                 onPick={(choice) => p.onPick({ choice })}
+                w={w}
               />
               <LockStep
                 what={p.pick.choice && short(p.pick.choice)}
@@ -78,6 +84,7 @@ export function PhoneRound(p: RoundProps) {
                 lockedBy={p.pick.lockedBy}
                 open={p.open}
                 onLock={() => p.onLock("answer")}
+                w={w}
               />
             </>
           ) : (
@@ -104,7 +111,8 @@ function LockStep({
   lockedBy,
   open,
   onLock,
-  label = "Lock in for the whole team",
+  label,
+  w,
 }: {
   what?: string;
   by?: string;
@@ -113,28 +121,27 @@ function LockStep({
   open: boolean;
   onLock: () => void;
   label?: string;
+  w: TeamWords;
 }) {
   if (locked)
     return (
       <p className="mt-4 rounded-[6px] bg-pine px-4 py-3 font-semibold text-white">
-        Locked in by {lockedBy ?? "your team"}: {what}. That’s final for your team.
+        {w.lockedBy(lockedBy)}: {what}. {w.final}
       </p>
     );
   if (!open)
     return (
       <p className="mt-4 rounded-[6px] bg-mist px-4 py-3 font-semibold">
-        {what ? `Time’s up. Your team’s pick (${what}) still counts.` : "Time’s up. Answers are closed."}
+        {what ? `Time’s up. ${w.Your} pick (${what}) still counts.` : "Time’s up. Answers are closed."}
       </p>
     );
   return (
     <div className="mt-4">
-      <p className="text-center font-semibold">
-        {what ? `${by ?? "Someone"} picked ${what}.` : "Nobody has picked yet. Anyone on your team can."}
-      </p>
+      <p className="text-center font-semibold">{what ? `${w.who(by)} picked ${what}.` : w.nobodyPicked}</p>
       <button className="btn btn-primary mt-3 w-full text-lg" disabled={!what} onClick={onLock}>
-        {label}
+        {label ?? w.lockAll}
       </button>
-      <p className="mt-2 text-center text-sm text-dim">Anyone on your team can change the pick until someone locks it in.</p>
+      <p className="mt-2 text-center text-sm text-dim">{w.canChange}</p>
     </div>
   );
 }
@@ -146,6 +153,7 @@ function ChoiceList({
   disabled,
   code = false,
   onPick,
+  w,
 }: {
   options: string[];
   pick: TeamPick;
@@ -153,6 +161,7 @@ function ChoiceList({
   /** Highlight the choices as Python (fixes), rather than plain printed output. */
   code?: boolean;
   onPick: (choice: string) => void;
+  w: TeamWords;
 }) {
   return (
     <div className="mt-4 grid gap-2">
@@ -170,7 +179,7 @@ function ChoiceList({
             {code
               ? o.split("\n").map((l, i) => <span key={i} className="block" dangerouslySetInnerHTML={{ __html: highlight(l) || " " }} />)
               : o}
-            {on && <span className="mt-1 block font-sans text-sm font-bold text-sun">{pick.choiceBy ?? "Your team"} picked this</span>}
+            {on && <span className="mt-1 block font-sans text-sm font-bold text-sun">{w.who(pick.choiceBy, w.You)} picked this</span>}
           </button>
         );
       })}
@@ -179,7 +188,8 @@ function ChoiceList({
 }
 
 /** Bug Hunt in two steps: tap the line and lock it, then pick the fix and lock that. */
-function BugAnswer({ index, open, pick, onPick, onLock }: RoundProps) {
+function BugAnswer({ index, open, pick, onPick, onLock, solo }: RoundProps) {
+  const w = teamWords(solo);
   const b = BUGS[index];
   const canTap = open && !pick.lineLocked;
   return (
@@ -216,7 +226,8 @@ function BugAnswer({ index, open, pick, onPick, onLock }: RoundProps) {
         lockedBy={pick.lineLockedBy}
         open={open}
         onLock={() => onLock("line")}
-        label="Lock in this line for the whole team"
+        label={w.lockLine}
+        w={w}
       />
       {pick.lineLocked && (
         <div className="mt-6 border-t-2 border-dashed border-line pt-4">
@@ -227,6 +238,7 @@ function BugAnswer({ index, open, pick, onPick, onLock }: RoundProps) {
             disabled={!open || pick.locked}
             code
             onPick={(choice) => onPick({ choice })}
+            w={w}
           />
           <LockStep
             what={pick.choice && "a fix"}
@@ -235,6 +247,7 @@ function BugAnswer({ index, open, pick, onPick, onLock }: RoundProps) {
             lockedBy={pick.lockedBy}
             open={open}
             onLock={() => onLock("answer")}
+            w={w}
           />
         </div>
       )}
@@ -243,7 +256,8 @@ function BugAnswer({ index, open, pick, onPick, onLock }: RoundProps) {
 }
 
 /** Search or scroll a list of languages, then tap one. */
-function LangAnswer({ open, pick, onPick, onLock }: RoundProps) {
+function LangAnswer({ open, pick, onPick, onLock, solo }: RoundProps) {
+  const w = teamWords(solo);
   const [q, setQ] = useState("");
   const list = searchLanguages(q);
   const disabled = !open || pick.locked;
@@ -284,6 +298,7 @@ function LangAnswer({ open, pick, onPick, onLock }: RoundProps) {
         lockedBy={pick.lockedBy}
         open={open}
         onLock={() => onLock("answer")}
+        w={w}
       />
     </div>
   );
@@ -292,7 +307,7 @@ function LangAnswer({ open, pick, onPick, onLock }: RoundProps) {
 const mark = (ok?: boolean) => (ok ? "✓" : "✗");
 
 /** "Correct! +N" or "Not this time", with what the team picked. */
-function ResultBanner({ game, pick, result }: { game: AnswerGame; pick: TeamPick; result: Result | null }) {
+function ResultBanner({ game, pick, result, w }: { game: AnswerGame; pick: TeamPick; result: Result | null; w: TeamWords }) {
   const pts = result?.points ?? 0;
   const tone = result?.correct ? "bg-meadow text-[#12332b]" : pts > 0 ? "bg-sun text-[#12332b]" : "bg-mist";
   const nothing = pick.line === undefined && pick.choice === undefined;
@@ -303,7 +318,7 @@ function ResultBanner({ game, pick, result }: { game: AnswerGame; pick: TeamPick
       </p>
       <div className="mt-3 font-semibold">
         {nothing ? (
-          <p>Your team didn’t pick an answer.</p>
+          <p>{w.You} didn’t pick an answer.</p>
         ) : game === "bug" ? (
           <>
             <p>
@@ -319,7 +334,7 @@ function ResultBanner({ game, pick, result }: { game: AnswerGame; pick: TeamPick
           </>
         ) : (
           <p>
-            Your team picked <span className="font-code whitespace-pre-wrap">{pick.choice}</span> {mark(result?.correct)}
+            {w.You} picked <span className="font-code whitespace-pre-wrap">{pick.choice}</span> {mark(result?.correct)}
           </p>
         )}
         {result?.early && <p className="mt-1 font-normal">Includes the bonus for locking in early.</p>}

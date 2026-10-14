@@ -8,6 +8,7 @@ import { FEEDBACK } from "#/lib/content";
 import type { WeekPlan } from "#/lib/schedule";
 import { useJoinCode } from "#/components/officer";
 import { CLUB, OFFICERS, fmtDate } from "#/lib/season";
+import { teamWords } from "#/lib/words";
 import { XpTable } from "#/routes/hello-world/rules";
 
 // The QR always opens the join page; once an officer starts the night, it carries the join code too.
@@ -46,14 +47,21 @@ function JoinBox() {
   );
 }
 
+/** Team copy for tonight: solo until a night says otherwise, since new nights start solo. */
+function useWords() {
+  const live = useQuery(api.sessions.live);
+  return teamWords(!live || live.teamSize === 1);
+}
+
 // Tonight's teams, live: they fill in as people join (or when an officer makes teams in /host).
 function Teams() {
   const live = useQuery(api.sessions.live);
+  const w = useWords();
   if (!live) return null;
   if (!live.teams.length)
     return (
       <p className="m-rise mt-10 text-xl text-dim" style={at(4)}>
-        {live.autoTeams ? "Teams show up here as people join." : `${live.roster.length} here. Officers: make teams in /host.`}
+        {live.autoTeams ? w.joinEmpty : `${live.roster.length} here. Officers: ${w.makeTeams} in /host.`}
       </p>
     );
   return (
@@ -61,9 +69,12 @@ function Teams() {
       {live.teams.map((t, k) => (
         <li key={t._id} className={`tile m-pop ${TEAM_TILES[k % TEAM_TILES.length]} p-6`} style={at(4 + Math.min(k, 7))}>
           <p className="text-[clamp(1.5rem,2.2vw,2.4rem)] leading-tight font-extrabold tracking-[-0.02em]">{t.name}</p>
-          <ul className="mt-2 text-[clamp(1.2rem,1.6vw,1.8rem)] leading-snug font-semibold">
-            {t.members.length ? t.members.map((m) => <li key={m}>{m}</li>) : <li>Nobody yet</li>}
-          </ul>
+          {/* A solo player's team is named after them, so their name once is enough. */}
+          {t.members.join(", ") !== t.name && (
+            <ul className="mt-2 text-[clamp(1.2rem,1.6vw,1.8rem)] leading-snug font-semibold">
+              {t.members.length ? t.members.map((m) => <li key={m}>{m}</li>) : <li>Nobody yet</li>}
+            </ul>
+          )}
         </li>
       ))}
     </ul>
@@ -130,12 +141,39 @@ const Big = ({ children }: { children: ReactNode }) => (
 );
 
 // The Wiki Race rules in content.ts are written to read on a phone; these are the short version for the TV.
-const RACE_STEPS = [
-  "On your team’s computer, open programmingclub.dev/wiki. It jumps to the start article.",
-  "On “Go,” click only links inside the article. No search bar, no typing URLs.",
-  "The back button and Ctrl+F are fine.",
-  "Land on the target? Tap “We made it!” on a phone and raise a hand.",
-];
+function RaceSteps() {
+  const w = useWords();
+  return [
+    `On your ${w.computer}, open programmingclub.dev/wiki. It jumps to the start article.`,
+    "On “Go,” click only links inside the article. No search bar, no typing URLs.",
+    "The back button and Ctrl+F are fine.",
+    `Land on the target? Tap “${w.madeIt}” on a phone and raise a hand.`,
+  ].map((x, k) => (
+    <li key={k} className="m-rise" style={at(3 + k)}>
+      {x}
+    </li>
+  ));
+}
+
+/** Where to sit tonight: with your team, or anywhere on a solo night. */
+function Seats() {
+  const w = useWords();
+  return (
+    <>
+      <h2
+        className="m-slam text-[clamp(3rem,6vw,6.5rem)] leading-[0.9] tracking-[-0.045em] lowercase"
+        style={{ "--base": "200ms" } as CSSProperties}
+      >
+        {w.findSeats}
+      </h2>
+      <p className="m-rise mx-auto mt-6 max-w-[44ch] text-[clamp(1.4rem,2.2vw,2.4rem)] text-balance" style={at(3)}>
+        {w.seats}
+      </p>
+    </>
+  );
+}
+
+const PerComputer = () => <>{useWords().perComputer}</>;
 const RACE_POINTS = [
   ["5", "1st place", "tile-gold"],
   ["4", "2nd place", "tile-silver"],
@@ -309,15 +347,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
       </div>
     </div>,
     <div className="text-center">
-      <h2
-        className="m-slam text-[clamp(3rem,6vw,6.5rem)] leading-[0.9] tracking-[-0.045em] lowercase"
-        style={{ "--base": "200ms" } as CSSProperties}
-      >
-        Find your teammates.
-      </h2>
-      <p className="m-rise mx-auto mt-6 max-w-[44ch] text-[clamp(1.4rem,2.2vw,2.4rem)] text-balance" style={at(3)}>
-        Joining puts you on a team. It’s on your phone and listed below. Sit together, one computer per team.
-      </p>
+      <Seats />
       <div className="m-rise mx-auto mt-10 w-fit" style={at(4)}>
         <JoinBox />
       </div>
@@ -327,11 +357,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
       <div>
         <H>First match: Wiki Race</H>
         <ol className="steps space-y-4 text-[clamp(1.3rem,2vw,2.1rem)] leading-snug">
-          {RACE_STEPS.map((x, k) => (
-            <li key={x} className="m-rise" style={at(3 + k)}>
-              {x}
-            </li>
-          ))}
+          <RaceSteps />
         </ol>
       </div>
       <div>
@@ -347,7 +373,7 @@ export function kickoffSlides(plan: WeekPlan[]): ReactNode[] {
           ))}
         </ul>
         <p className="m-rise mt-8 text-xl text-dim" style={at(10)}>
-          Teams of 2–3, one computer per team.
+          <PerComputer />
         </p>
       </div>
     </div>,
