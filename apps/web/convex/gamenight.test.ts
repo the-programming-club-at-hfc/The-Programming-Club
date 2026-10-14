@@ -646,11 +646,11 @@ describe("ending the night", () => {
   });
 
   test("place XP by rank (ties share), nothing for 0 points or for officers running the night, who stay off the leaderboard", async () => {
-    const { t, officer, nightWithTeams, join, attendance, score } = setup();
+    const { t, officer, nightWithTeams, attendance, score } = setup();
     const { code, teams } = await nightWithTeams(8);
     const [a, b, c, d] = teams;
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
-    const grace = await join(code, { name: "Grace", email: GRACE });
+    const grace = await t.mutation(api.players.join, { code, name: "Grace", email: GRACE, broughtBy: "Student 1" });
     await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // a new team, with 0 points
     // c and d tie for 3rd with 0 points, which earns nothing.
     await officer.mutation(api.teams.score, { teamId: a._id, delta: 10 });
@@ -703,6 +703,8 @@ describe("ending the night", () => {
     const sheet = await officer.query(api.sessions.attendanceExport, { sessionId });
     expect(sheet.rows).toHaveLength(10);
     expect(sheet.rows.filter((r) => r.status === "HFC student")).toHaveLength(8);
+    // Who brought whom stays on the sheet after the night, for the +2 friend XP.
+    expect(sheet.rows.find((r) => r.name === "Grace")!.broughtBy).toBe("Student 1");
   });
 
   test("place XP on a solo night: each player's own rank, ties share without skipping", async () => {

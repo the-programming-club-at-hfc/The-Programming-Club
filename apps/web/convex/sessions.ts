@@ -341,6 +341,7 @@ export const attendanceExport = query({
           status: email.endsWith("@hawkmail.hfcc.edu") ? "HFC student" : email.endsWith("@hfcc.edu") ? "HFC staff" : "Guest",
           team: a.teamId ? (teams.get(a.teamId) ?? "") : "",
           firstTime: a.firstTime,
+          broughtBy: a.broughtBy ?? "",
           xp: a.showXp + (a.placeXp ?? 0) + a.bonusXp,
         };
       }),

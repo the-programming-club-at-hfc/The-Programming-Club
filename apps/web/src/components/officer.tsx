@@ -101,8 +101,8 @@ export function ExportButton({ sessionId }: { sessionId: Id<"sessions"> }) {
       ["Event/Activity/Meeting", `${CLUB.season} Week ${d.week}: ${plan[d.week - 1]?.title ?? ""}`],
       ["Sponsor", "HFC Programming Club"],
       [],
-      ["Full Name", "Email Address", "Status/Title", "Team", "First time", "XP"],
-      ...d.rows.map((r) => [r.name, r.email, r.status, r.team, r.firstTime ? "yes" : "", r.xp]),
+      ["Full Name", "Email Address", "Status/Title", "Team", "First time", "Brought by", "XP"],
+      ...d.rows.map((r) => [r.name, r.email, r.status, r.team, r.firstTime ? "yes" : "", r.broughtBy, r.xp]),
     ];
     const blob = new Blob([lines.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv" });
     const a = document.createElement("a");
