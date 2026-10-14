@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { requireOfficer } from "./officers";
 import {
   addToSession,
@@ -11,15 +13,17 @@ import {
   sessionAttendance,
   sessionTeams,
   shuffle,
+  soloName,
   teamByKey,
   teamFor,
 } from "./lib";
 import { TEAM_NAMES } from "./teamNames";
 
-/** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo). Resets tonight's teams.
- *  Officers running the night stay off the teams. Auto teams fill up to `size` from then on. */
+/** Shuffle everyone into teams of `size` (sizes differ by at most one, nobody solo), or with size 1 put everyone on a
+ *  team of their own, named after them. Resets tonight's teams. Officers running the night stay off the teams.
+ *  Auto teams fill up to `size` from then on. */
 export const make = mutation({
-  args: { size: v.union(v.literal(2), v.literal(3)) },
+  args: { size: v.union(v.literal(1), v.literal(2), v.literal(3)) },
   handler: async (ctx, { size }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
@@ -29,8 +33,8 @@ export const make = mutation({
     for (const a of all) if (a.teamId && !inTeamPool(a)) await ctx.db.patch(a._id, { teamId: undefined });
     const att = shuffle(all.filter(inTeamPool));
     if (!att.length) return;
-    const n = Math.max(1, size === 3 ? Math.ceil(att.length / 3) : Math.floor(att.length / 2));
-    const names = shuffle(TEAM_NAMES);
+    const n = size === 1 ? att.length : Math.max(1, size === 3 ? Math.ceil(att.length / 3) : Math.floor(att.length / 2));
+    const names = size === 1 ? await soloNames(ctx, att) : shuffle(TEAM_NAMES);
     const ids = [];
     const keys: string[] = [];
     for (let i = 0; i < n; i++) {
@@ -40,6 +44,13 @@ export const make = mutation({
     for (let i = 0; i < att.length; i++) await ctx.db.patch(att[i]._id, { teamId: ids[i % n] });
   },
 });
+
+/** Solo team names for these players, in order: each one's own name, numbered when two share it. */
+async function soloNames(ctx: QueryCtx, att: Doc<"attendance">[]) {
+  const names: string[] = [];
+  for (const a of att) names.push(soloName((await ctx.db.get(a.playerId))?.name ?? "Player", names));
+  return names;
+}
 
 /** For a team computer: the team with this key tonight, or null. */
 export const byKey = query({
@@ -70,7 +81,10 @@ export const setAuto = mutation({
     if (!on) return;
     const session = { ...s, autoTeams: undefined };
     for (const a of await sessionAttendance(ctx, s._id))
-      if (inTeamPool(a) && !a.teamId) await ctx.db.patch(a._id, { teamId: await teamFor(ctx, session) });
+      if (inTeamPool(a) && !a.teamId) {
+        const name = (await ctx.db.get(a.playerId))?.name ?? "Player";
+        await ctx.db.patch(a._id, { teamId: await teamFor(ctx, session, name) });
+      }
   },
 });
 

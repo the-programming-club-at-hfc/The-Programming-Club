@@ -72,27 +72,37 @@ export function cleanPlayer(name: string, email: string) {
 
 export const unusedName = (taken: string[]) => shuffle(TEAM_NAMES).find((n) => !taken.includes(n)) ?? `Team ${taken.length + 1}`;
 
-/** A new, empty team with its own name and team key. */
-export async function newTeam(ctx: MutationCtx, sessionId: Id<"sessions">) {
+/** A solo player's team name: their own, numbered if another team already has it tonight ("Alex 2"). */
+export const soloName = (name: string, taken: string[]) => {
+  let n = name;
+  for (let i = 2; taken.includes(n); i++) n = `${name} ${i}`;
+  return n;
+};
+
+/** A new, empty team with its own name and team key. Given a player's name, a solo team named after them. */
+export async function newTeam(ctx: MutationCtx, sessionId: Id<"sessions">, player?: string) {
   const teams = await sessionTeams(ctx, sessionId);
+  const taken = teams.map((t) => t.name);
   return ctx.db.insert("teams", {
     sessionId,
-    name: unusedName(teams.map((t) => t.name)),
+    name: player ? soloName(player, taken) : unusedName(taken),
     score: 0,
     key: newTeamKey(teams.map((t) => t.key)),
   });
 }
 
 /**
- * Where a student who just joined goes. With auto teams (the default), the smallest team that isn't full (2, or
- * tonight's last Make teams size), or a new one. With auto teams off, the smallest team once officers have made teams, and no team before that.
+ * Where a student who just joined goes. With auto teams (the default): on a solo night (also the default), a team of
+ * their own named after them; otherwise the smallest team that isn't full (tonight's Make teams size), or a new one.
+ * With auto teams off, no team until officers have made teams, then the smallest one (or their own, solo).
  */
-export async function teamFor(ctx: MutationCtx, session: Doc<"sessions">) {
+export async function teamFor(ctx: MutationCtx, session: Doc<"sessions">, name: string) {
   const teams = await sessionTeams(ctx, session._id);
+  const auto = session.autoTeams !== false;
+  const full = session.teamSize ?? 1;
+  if (full === 1) return auto || teams.length ? newTeam(ctx, session._id, name) : undefined;
   const att = await sessionAttendance(ctx, session._id);
   const size = (t: Id<"teams">) => att.filter((a) => a.teamId === t).length;
-  const auto = session.autoTeams !== false;
-  const full = session.teamSize ?? 2;
   const open = auto ? teams.filter((t) => size(t._id) < full) : teams;
   if (open.length) return open.reduce((best, t) => (size(t._id) < size(best._id) ? t : best))._id;
   return auto ? newTeam(ctx, session._id) : undefined;
@@ -136,7 +146,7 @@ export async function addToSession(
     .collect();
   const prior = (await Promise.all(history.map((h) => ctx.db.get(h.sessionId)))).some((s) => s && !s.practice);
 
-  const teamId = officer ? undefined : await teamFor(ctx, session);
+  const teamId = officer ? undefined : await teamFor(ctx, session, player.name);
 
   const token = randomToken();
   await ctx.db.insert("attendance", {

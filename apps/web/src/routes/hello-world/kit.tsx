@@ -123,12 +123,12 @@ function GamePlan() {
           <AgendaList rows={MATCH_AGENDA} compact />
           <div className="space-y-4 text-lg">
             <p>
-              Members scan a QR code on the TV and land on a team. Each game night is one main game played over a few rounds, and the last
-              round counts double so anyone can still win.
+              Members scan a QR code on the TV and they’re in: solo by default, or on a team when officers pick teams. Each game night is
+              one main game played over a few rounds, and the last round counts double so anyone can still win.
             </p>
             <p>
-              Showing up earns more XP than winning, and teams are reshuffled every week. Two Cup nights reset everyone to zero, so a
-              first-timer can win.
+              Showing up earns more XP than winning, and teams (when there are teams) are reshuffled every week. Two Cup nights reset
+              everyone to zero, so a first-timer can win.
             </p>
             <p className="text-base text-dim">
               Details:{" "}

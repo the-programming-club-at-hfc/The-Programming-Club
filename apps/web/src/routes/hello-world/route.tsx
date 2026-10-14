@@ -9,7 +9,7 @@ export const Route = createFileRoute("/hello-world")({
       { title: `${CLUB.season} · ${CLUB.name} at ${CLUB.school}` },
       {
         name: "description",
-        content: "An eight-week team game league for HFC programmers of every level. Wednesdays 5–6 p.m., no experience needed.",
+        content: "An eight-week coding game league for HFC programmers of every level. Wednesdays 5–6 p.m., no experience needed.",
       },
     ],
   }),

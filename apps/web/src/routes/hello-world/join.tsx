@@ -15,6 +15,7 @@ import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
 import { gamesIn, useJustEnded, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import { CLUB, isHfcEmail } from "#/lib/season";
+import { teamWords } from "#/lib/words";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/hello-world/join")({
@@ -355,6 +356,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   // The team key only matters while a team-computer game is the round being played or the card on the TV.
   const round = live.round !== null && live.round < wk.lineup.length ? wk.lineup[live.round].label : "";
   const teamComputer = gamesIn(round).some(usesTeamComputer) || (s.mode === "card" && !!s.game && usesTeamComputer(s.game));
+  const solo = live.teamSize === 1;
+  const w = teamWords(solo);
   return (
     <Wrap className="flex min-h-dvh max-w-2xl flex-col py-5">
       <p className="text-sm text-dim">
@@ -381,7 +384,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             <>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-dim">Your team</p>
+                  <p className="text-dim">{w.yourTeam}</p>
                   <h2 className="mt-1 text-2xl sm:text-3xl">{me.team.name}</h2>
                   <p className="mt-2 font-semibold">
                     {ordinal(me.team.rank)} of {me.team.of}
@@ -389,16 +392,17 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 </div>
                 <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
               </div>
-              <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>
+              {!solo && <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>}
               {me.team.key && teamComputer && (
                 <p className="mt-1 text-sm text-dim">
-                  Team computer key: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
+                  {w.key}: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
                 </p>
               )}
             </>
           ) : (
             <p className="text-xl font-semibold">
-              You’re in. Teams get picked in a minute.<span className="blink"> _</span>
+              {w.waiting}
+              <span className="blink"> _</span>
             </p>
           )}
         </div>
@@ -420,14 +424,14 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             <PuzzleStatus live={live} index={s.index} teamId={me.team._id} />
           ) : (
             <div className="card p-5">
-              <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} />
+              <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} solo={solo} />
             </div>
           )}
         </div>
       )}
       {s.mode === "wiki" && s.wikiReady && (
         <p className="card mt-5 p-6 text-xl font-bold">
-          Wiki Race next! Open {CLUB.url}/wiki on your team computer. It jumps to the start article when the race starts.
+          Wiki Race next! Open {CLUB.url}/wiki on your {w.computer}. It jumps to the start article when the race starts.
         </p>
       )}
       {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
@@ -450,9 +454,9 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
-        {!me.officer && me.team && <p className="w-full">Want to team up with a friend? Ask an officer to switch your team.</p>}
+        {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
         {me.officer ? (
-          <PlayTonight token={token} playing={me.playing} />
+          <PlayTonight token={token} playing={me.playing} when={w.officerPlays} />
         ) : (
           <p>
             Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
@@ -467,8 +471,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   );
 }
 
-/** An officer's switch for nights when a team is short: on puts them on the smallest team. */
-function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
+/** An officer's switch for nights when a team is short: on puts them on the smallest team (their own, solo). */
+function PlayTonight({ token, playing, when }: { token: string; playing: boolean; when: string }) {
   const setPlaying = useMutation(api.players.setPlaying);
   const [error, setError] = useState("");
   return (
@@ -480,7 +484,7 @@ function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
         onChange={(e) => sender(setError)(setPlaying({ token, playing: e.target.checked }))}
       />
       Play tonight
-      {!playing && <span className="font-normal text-dim">(when a team is short)</span>}
+      {!playing && <span className="font-normal text-dim">({when})</span>}
       {error && <span className="font-normal text-signal">{error}</span>}
     </label>
   );
@@ -543,6 +547,7 @@ function TeamRace({
       error={error}
       onFinish={(clicks) => send(finish({ token, card: key, clicks }))}
       onUndo={() => send(undo({ token, card: key }))}
+      solo={live.teamSize === 1}
     />
   );
 }
@@ -581,6 +586,7 @@ function TeamAnswer({
       error={error}
       onPick={(p) => send(pick({ token, card: key, ...p }))}
       onLock={(step) => send(lock({ token, card: key, step }))}
+      solo={live.teamSize === 1}
     />
   );
 }
@@ -591,6 +597,7 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
   const key = cardKey("fix", index);
   const mine = board?.card === key ? board.fixed.find((f) => f.teamId === teamId) : undefined;
   const done = !!live.screen.revealed || live.scored.includes(key);
+  const w = teamWords(live.teamSize === 1);
   const status = mine
     ? done && mine.result
       ? `Fixed! +${mine.result.points}`
@@ -602,8 +609,8 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
     <div className="space-y-3">
       <div className={`rounded-[10px] p-5 ${mine ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
         <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">{status}</p>
-        {!done && <p className="mt-2 font-semibold">Fix it on your team computer. This phone keeps you posted.</p>}
-        {mine?.result?.first && <p className="mt-2 font-semibold">First team to fix it.</p>}
+        {!done && <p className="mt-2 font-semibold">Fix it on your {w.computer}. This phone keeps you posted.</p>}
+        {mine?.result?.first && <p className="mt-2 font-semibold">{w.first} to fix it.</p>}
       </div>
       <div className="card p-5">
         <CardView game="fix" index={index} answer={done} hint={!!live.screen.hint} />
@@ -618,6 +625,7 @@ function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; team
   const key = cardKey("puzzle", index);
   const mine = board?.card === key ? board.teams.find((t) => t.teamId === teamId) : undefined;
   const done = !!live.screen.revealed || live.scored.includes(key);
+  const w = teamWords(live.teamSize === 1);
   const times = [mine?.part1Ms ?? null, mine?.part2Ms ?? null];
   const n = times.filter((ms) => ms !== null).length;
   const status = done
@@ -633,12 +641,16 @@ function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; team
         <p className="mt-2 font-semibold">
           {times.map((ms, i) => `Part ${i + 1}: ${ms === null ? "not yet" : `★ at ${fmtElapsed(ms)}`}`).join(" · ")}
         </p>
-        {firsts.length > 0 && <p className="mt-1 font-semibold">First team to the {firsts.join(" and ")} star.</p>}
-        {!done && <p className="mt-1">Answers go in on your team computer. This phone keeps you posted.</p>}
+        {firsts.length > 0 && (
+          <p className="mt-1 font-semibold">
+            {w.first} to the {firsts.join(" and ")} star.
+          </p>
+        )}
+        {!done && <p className="mt-1">Answers go in on your {w.computer}. This phone keeps you posted.</p>}
       </div>
       {!done && live.screen.hint && <Hint text={`Part ${n ? 2 : 1}: ${PUZZLES[index].hint[n ? 1 : 0]}`} />}
       <div className="card p-5">
-        <CardView game="puzzle" index={index} answer={done} />
+        <CardView game="puzzle" index={index} answer={done} solo={w.solo} />
       </div>
     </div>
   );

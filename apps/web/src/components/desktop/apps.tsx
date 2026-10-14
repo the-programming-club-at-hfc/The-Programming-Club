@@ -153,7 +153,7 @@ function WorldCup() {
       </div>
       <h3 className="mt-5 text-2xl lowercase">hello, world cup</h3>
       <p className="mt-2 leading-relaxed">
-        Season 0 is a team game league: eight Wednesdays of Wikipedia races, bug hunts, and code relays. No experience needed, and you can
+        Season 0 is a coding game league: eight Wednesdays of Wikipedia races, bug hunts, and code relays. No experience needed, and you can
         start any week.
       </p>
       <div className="mt-5 flex flex-wrap gap-2">
@@ -212,7 +212,7 @@ function Officers() {
 
 const STEPS = [
   { title: "Come to a meeting", body: `${CLUB.day}, ${CLUB.time}, in ${CLUB.room}. Any week is a good week to start.` },
-  { title: "Join the game", body: "Scan the code on the TV and sign in with your name and HawkMail. You’ll be on a team in a minute." },
+  { title: "Join the game", body: "Scan the code on the TV and sign in with your name and HawkMail. You’re in the game in a minute." },
   {
     title: "Tell us what you want to do",
     body: `Email ${CLUB.advisor.name} your interests to get on the member list, or fill out a Club Interest form with the Office of Student Activities in M-105.`,
