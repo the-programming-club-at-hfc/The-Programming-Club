@@ -79,7 +79,7 @@ function WeekTiles({ plan }: { plan: WeekPlan[] }) {
     return () => clearInterval(id);
   }, [plan.length]);
   return (
-    <ol className="grid grid-cols-4 gap-x-[3px] gap-y-6 lg:grid-cols-8">
+    <ol className="grid grid-cols-4 gap-x-4 gap-y-6 lg:grid-cols-8">
       {plan.map((w, i) => {
         const t = weekTile(w);
         return (
