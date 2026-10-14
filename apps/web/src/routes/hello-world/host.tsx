@@ -1206,7 +1206,7 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
                 <button className="btn btn-sm" onClick={() => run(bonus({ attendanceId: r._id, delta: -1 }))} aria-label="Less bonus XP">
                   −
                 </button>
-                <span className="w-16 text-center text-sm" title="Bonus XP (friend, costume)">
+                <span className="w-16 text-center text-sm" title="Bonus XP (bringing a friend)">
                   +{r.bonusXp} XP
                 </span>
                 <button className="btn btn-sm" onClick={() => run(bonus({ attendanceId: r._id, delta: 1 }))} aria-label="More bonus XP">

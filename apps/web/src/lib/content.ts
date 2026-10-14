@@ -28,7 +28,6 @@ export const WEEKS: Week[] = [
     title: "Spooky Bugs",
     pitch: "Halloween Bug Hunt. Every snippet hides exactly one bug, and your team has 90 seconds to find it.",
     games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round, double points: Fix it for real, spooky"],
-    bonus: "Come in costume for +5 XP. Anything counts: a hat, cat ears, a Halloween shirt.",
     showXp: 3,
   },
   {
@@ -417,11 +416,6 @@ export const XP: Xp[] = [
     pts: "+2",
     what: "Bring someone new",
     note: "You and the classmate you bring each get +2.",
-  },
-  {
-    pts: "+5",
-    what: "Come in costume to Spooky Bugs",
-    note: "Anything counts: a hat, cat ears, a Halloween shirt.",
   },
 ];
 export const COMEBACKS: string[] = [
