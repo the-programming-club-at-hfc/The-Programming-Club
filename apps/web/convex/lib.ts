@@ -46,7 +46,7 @@ export async function teamByKey(ctx: QueryCtx, sessionId: Id<"sessions">, key: s
   return (await sessionTeams(ctx, sessionId)).find((t) => t.key === k) ?? null;
 }
 
-/** Whether this check-in goes into teams: everyone except officers who are running the night. */
+/** Whether this check-in goes into teams and season XP: everyone except officers who are running the night. */
 export const inTeamPool = (a: Doc<"attendance">) => !a.officer || !!a.playing;
 
 export const randomToken = () => Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 8)).join("");

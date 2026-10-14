@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { addToSession, requireOpenSession, teamFor } from "./lib";
+import { addToSession, inTeamPool, requireOpenSession, teamFor } from "./lib";
 import { isOfficerEmail, requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
 import { isHfcEmail } from "../src/lib/season";
@@ -145,13 +145,13 @@ export const me = query({
     const [session, player] = await Promise.all([ctx.db.get(a.sessionId), ctx.db.get(a.playerId)]);
     if (!session || !player) return null;
 
-    // Practice nights and officer check-ins don't count toward season XP (same as the leaderboard).
+    // Practice nights don't count toward season XP, and officer check-ins only when they played (same as the leaderboard).
     const all = await ctx.db
       .query("attendance")
       .withIndex("by_player", (q) => q.eq("playerId", a.playerId))
       .collect();
     const nights = await Promise.all(all.map((h) => ctx.db.get(h.sessionId)));
-    const history = all.filter((h, i) => nights[i] && !nights[i].practice && !h.officer);
+    const history = all.filter((h, i) => nights[i] && !nights[i].practice && inTeamPool(h));
     const seasonXp = history.reduce((n, h) => n + h.showXp + (h.placeXp ?? 0) + h.bonusXp, 0);
 
     let team = null;
