@@ -125,7 +125,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         <H>What this club is</H>
         <Big>
           <li className="m-rise" style={at(3)}>
-            A friendly place to learn and practice programming together, whatever your level.
+            A friendly place to learn and practice programming together.
           </li>
           <li className="m-rise" style={at(4)}>
             Workshops, group projects, talks, and other things that build real skills.
@@ -137,8 +137,8 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       </div>
       <dl className="space-y-6 self-center">
         {[
-          ["Who can join", "All currently enrolled HFC students"],
-          ["Experience", "All majors and skill levels welcome"],
+          ["Who can join", "Any HFC student"],
+          ["Experience", "Any major, any level"],
           ["Fees", "None, all free!"],
         ].map(([k, v], n) => (
           <div key={k} className="m-rise border-l-[6px] border-sky pl-6" style={at(6 + n)}>
