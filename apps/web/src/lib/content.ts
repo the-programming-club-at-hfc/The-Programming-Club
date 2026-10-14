@@ -19,8 +19,8 @@ export const WEEKS: Week[] = [
     games: [
       "Guess the Language (warm-up)",
       "Tech Pictionary: round 1",
-      "Tech Pictionary: speed round",
-      "Final round, double points: Tech Pictionary",
+      "Tech Pictionary: round 2",
+      "Final round, double points: Tech Pictionary, round 3",
     ],
     showXp: 3,
   },
@@ -379,7 +379,7 @@ export const GAMES: Game[] = [
       "Your team has 60 seconds. After that, other teams get one guess each to steal.",
     ],
     scoring: "2 points for a correct guess, 1 for a steal.",
-    variants: ["Speed round: teams take turns, with one minute on the clock per team."],
+    variants: [],
     tip: "Zero prep and works with any number of people. Use it to fill the time while the room fills up.",
   },
   {

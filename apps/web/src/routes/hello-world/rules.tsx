@@ -74,12 +74,16 @@ function Rules() {
                   <strong>Scoring.</strong> {g.scoring}
                 </p>
                 <details className="mt-5 text-[0.95rem]">
-                  <summary className="cursor-pointer font-semibold text-dim hover:text-ink">Variants and an officer tip</summary>
-                  <ul className="prose-list mt-3">
-                    {g.variants.map((v) => (
-                      <li key={v}>{v}</li>
-                    ))}
-                  </ul>
+                  <summary className="cursor-pointer font-semibold text-dim hover:text-ink">
+                    {g.variants.length ? "Variants and an officer tip" : "Officer tip"}
+                  </summary>
+                  {g.variants.length > 0 && (
+                    <ul className="prose-list mt-3">
+                      {g.variants.map((v) => (
+                        <li key={v}>{v}</li>
+                      ))}
+                    </ul>
+                  )}
                   <p className="text-dim italic">{g.tip}</p>
                 </details>
               </div>
