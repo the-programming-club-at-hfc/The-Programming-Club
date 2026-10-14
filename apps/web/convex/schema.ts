@@ -55,7 +55,6 @@ export default defineSchema({
     week: v.number(),
     title: v.string(),
     pitch: v.string(),
-    lesson: v.optional(v.string()),
     bonus: v.optional(v.string()),
     startsAt: v.number(),
     cancelled: v.boolean(),

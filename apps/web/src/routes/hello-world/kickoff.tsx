@@ -5,7 +5,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { AgendaList, Code, Picto, weekTile } from "#/components/ui";
-import { FEEDBACK, GAMES, MATCH_AGENDA, REMIX_MENU, WALL_CATEGORIES } from "#/lib/content";
+import { FEEDBACK, GAMES, MATCH_AGENDA, WALL_CATEGORIES } from "#/lib/content";
 import { useSchedule } from "#/lib/schedule";
 import type { WeekPlan } from "#/lib/schedule";
 import { useJoinCode } from "#/components/officer";
@@ -158,8 +158,8 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         Because programmers start counting at zero.
       </p>
       <p className="m-rise mx-auto mt-6 max-w-[48ch] text-[clamp(1.2rem,1.7vw,1.8rem)] text-balance text-dim" style={at(6)}>
-        We’re starting mid-semester, so the rest of it is for getting the club up and running. Tell us the projects, events, and trips
-        you want, and we’ll do our best to plan them into Season 1.
+        We’re starting mid-semester, so the rest of it is for getting the club up and running. Tell us the projects, events, and trips you
+        want, and we’ll do our best to plan them into Season 1.
       </p>
     </div>,
     <div>
@@ -188,7 +188,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
       <div>
         <H>How a night works</H>
         <div className="m-rise text-2xl" style={at(3)}>
-          <AgendaList rows={MATCH_AGENDA.slice(0, 6)} compact />
+          <AgendaList rows={MATCH_AGENDA.slice(0, 5)} compact />
         </div>
       </div>
       <ul className="space-y-6 self-center text-[clamp(1.3rem,1.8vw,1.9rem)]">
@@ -229,7 +229,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
             The Final is two Advent of Code–style puzzles.
           </li>
           <li className="m-rise" style={at(7)}>
-            The winners sign the Golden Keycap.
+            The winners sign the Golden Keycap, then we hand out the season awards.
           </li>
         </Big>
       </div>
@@ -274,23 +274,6 @@ function slides(plan: WeekPlan[]): ReactNode[] {
           ))}
         </ul>
       </div>
-    </div>,
-    <div>
-      <H>Pick the games for Boss Battle</H>
-      <p className="m-rise text-[clamp(1.2rem,1.8vw,1.9rem)] text-dim" style={at(3)}>
-        Put a dot next to the two you want on {fmtDate(plan[6].start, { month: "long", day: "numeric" })}.
-      </p>
-      <ul className="mt-8 grid gap-x-12 sm:grid-cols-2">
-        {REMIX_MENU.map((g, k) => (
-          <li
-            key={g}
-            className="m-rise border-b-2 border-dashed border-line py-5 font-bold text-[clamp(1.6rem,2.6vw,2.8rem)]"
-            style={at(4 + Math.floor(k / 2))}
-          >
-            {g}
-          </li>
-        ))}
-      </ul>
     </div>,
     <div className="grid gap-12 lg:grid-cols-2">
       <div>

@@ -116,6 +116,29 @@ const PICTOS = {
       />
     </>
   ),
+  demo: (
+    <>
+      {/* Presenting a project: code on the screen, pointing at it. */}
+      <rect x="50" y="12" width="40" height="44" rx="2" {...S} strokeWidth="6" />
+      <path {...S} strokeWidth="5" d="M63 26l-7 8 7 8M77 26l7 8-7 8M72 23l-4 22" />
+      <path {...S} strokeWidth="6" d="M60 56l-4 30M80 56l4 30" />
+      <circle cx="25" cy="20" r="8" {...F} />
+      <path {...S} strokeWidth="10" d="M27 33l3 25M28 41l-8 13M30 58l-8 28M30 58l8 28" />
+      <path {...S} strokeWidth="10" d="M28 38l13-4 11-5" className="pa pa-point" style={at(28, 38)} />
+    </>
+  ),
+  study: (
+    <>
+      {/* An open book, and a slice of pizza for the study break. */}
+      <path {...S} strokeWidth="6" d="M48 46c-10-7-23-9-36-7v40c13-2 26 0 36 7 10-7 23-9 36-7V39c-13-2-26 0-36 7ZM48 46v40" />
+      <g className="pa pa-wobble" style={at(70, 18)}>
+        <path {...F} d="M56 7c10-3 21-1 31 5L69 38Z" />
+        <circle cx="66" cy="15" r="3.5" fill="#7ec3eb" />
+        <circle cx="76" cy="17" r="3" fill="#7ec3eb" />
+        <circle cx="70" cy="26" r="2.5" fill="#7ec3eb" />
+      </g>
+    </>
+  ),
   keycap: (
     <>
       <path {...F} d="M22 16h52c3 0 5 2 5 5l9 58c1 4-2 7-6 7H14c-4 0-7-3-6-7l9-58c0-3 2-5 5-5Z" />
@@ -183,7 +206,8 @@ export const GAME_TILE: Record<string, { picto: PictoId; tile: string }> = {
 export function weekTile(w: Pick<Week, "kind" | "games">): { picto: PictoId; tile: string } {
   if (w.kind === "cup") return { picto: "keycap", tile: "tile-gold" };
   if (w.kind === "kickoff") return { picto: "people", tile: "tile-pine" };
-  if (w.kind === "wrap") return { picto: "people", tile: "tile-sky" };
+  if (w.kind === "showcase") return { picto: "demo", tile: "tile-silver" };
+  if (w.kind === "wrap") return { picto: "study", tile: "tile-sky" };
   const id = w.games.filter((g) => !g.includes("(warm-up)")).flatMap(gamesIn)[0];
   return id ? GAME_TILE[id] : { picto: "people", tile: "tile-silver" };
 }
@@ -252,13 +276,13 @@ export const Wrap = ({ children, className = "", id }: { children: ReactNode; cl
 );
 
 const toneOf = (r: Agenda) =>
-  /Trophy/.test(r.what)
+  /Trophy|awards/.test(r.what)
     ? "var(--color-gold)"
     : /double points/.test(r.what)
       ? "var(--color-sun)"
       : /Round|Race|Relay|Hunt|Output|Puzzle/.test(r.what)
         ? "var(--color-meadow)"
-        : /lesson|Opening|Meet|club is|Season 0 works/.test(r.what)
+        : /Opening|Meet|club is|Season 0 works/.test(r.what)
           ? "var(--color-sky)"
           : /Standings|standings|feedback|Wrap/.test(r.what)
             ? "var(--color-pine)"

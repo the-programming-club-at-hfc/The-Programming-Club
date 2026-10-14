@@ -458,7 +458,6 @@ function LineupPanel({
         week,
         title: w.title,
         pitch: w.pitch,
-        lesson: w.lesson,
         bonus: w.bonus,
         startsAt: w.start.getTime(),
         cancelled: w.cancelled,

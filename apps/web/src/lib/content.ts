@@ -15,8 +15,6 @@ export const WEEKS: Week[] = [
     kind: "match",
     title: "Wiki Race Night",
     pitch: "Get from Pizza to the Moon using only Wikipedia links. Fastest team wins.",
-    lesson:
-      "Wikipedia is a graph (3 min): articles are nodes, links are edges, and the fastest route is a shortest-path problem. Hub pages like “United States” are the highways.",
     games: [
       "Tech Pictionary (warm-up)",
       "Wiki Race: Classic",
@@ -29,7 +27,6 @@ export const WEEKS: Week[] = [
     kind: "match",
     title: "Spooky Bugs",
     pitch: "Halloween Bug Hunt. Every snippet hides exactly one bug, and your team has 90 seconds to find it.",
-    lesson: "How to read an error message (3 min): the last line tells you what went wrong, and the line number tells you where to look.",
     games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round, double points: Fix it for real, spooky"],
     bonus: "Come in costume for +1 XP.",
     showXp: 3,
@@ -46,7 +43,6 @@ export const WEEKS: Week[] = [
     title: "Code Relay Night",
     pitch:
       "One keyboard per team. Only the driver types, and you swap every two minutes. A dress rehearsal for the Final’s Advent of Code–style puzzles.",
-    lesson: "Pair programming (3 min): the driver types, the navigators think ahead. Real teams work this way.",
     games: [
       "Whiteboard Relay (warm-up)",
       "Code Relay: round 1",
@@ -59,34 +55,27 @@ export const WEEKS: Week[] = [
     kind: "cup",
     title: "The Final",
     pitch:
-      "The Season 0 championship: two Advent of Code–style puzzles, a warm-up for the real thing in December. Everyone starts at zero, the Midseason champions defend the Keycap, and the winners sign it.",
+      "The Season 0 championship: two Advent of Code–style puzzles, a warm-up for the real thing in December. Everyone starts at zero, the Midseason champions defend the Keycap, and the winners sign it. Then the Season 0 awards.",
     games: ["Puzzle 1: easy, played as a relay", "Final round, double points: Puzzle 2, medium"],
-    bonus: "Stay to the end for an invite to the club’s Advent of Code private leaderboard. It starts Dec 1.",
+    bonus: "Stay to the end for the awards and an invite to the club’s Advent of Code private leaderboard. It starts Dec 1.",
     showXp: 3,
   },
   {
-    kind: "match",
-    title: "Boss Battle",
+    kind: "showcase",
+    title: "Demo Night",
     pitch:
-      "The Final is done, so this one is just for fun. Every team takes on the officers in the games you voted for at the kickoff. A short, relaxed night before Thanksgiving.",
-    games: ["Top-voted game vs. officers", "Second-voted game vs. officers", "Final round, double points: crowd’s choice"],
-    bonus: "Double show-up XP (+6) for coming the night before a holiday. If nobody votes: Wiki Race, Bug Hunt, Guess the Language.",
+      "Show off what you’ve been building: a class project, a side project, something half-finished. Two minutes each, any skill level, no judging. A short, relaxed night before Thanksgiving.",
+    games: ["Officers demo first", "Your demos: 2 minutes each", "Hang out and trade feedback"],
     note: "Campus is open (the College closes Thursday and Friday for Thanksgiving), but expect a smaller crowd.",
-    showXp: 6,
+    showXp: 3,
   },
   {
     kind: "wrap",
-    title: "Wrap Party & Study Hall",
+    title: "Study & Snacks",
     pitch:
-      "No competition the week before finals. Snacks (pizza if funding comes through), the Season 0 awards, show-and-tell for anything you’ve been building, then stay to study or get help with class projects.",
-    games: [
-      "Season 0 awards",
-      "Show & tell: 2-minute demos",
-      "Season 1 brainstorm",
-      "Advent of Code together (club leaderboard)",
-      "Study hall & project help",
-    ],
-    bonus: "Awards count XP through week 7, so tonight is just for celebrating.",
+      "No competition the week before finals. Snacks (pizza if funding comes through), then study, get help with class projects, or just hang out.",
+    games: ["Snacks", "Study hall & project help", "Advent of Code together (club leaderboard)", "Season 1 brainstorm"],
+    bonus: "Advent of Code starts Dec 1, so bring your Day 1 solution to compare.",
     showXp: 3,
   },
 ];
@@ -94,26 +83,20 @@ export const WEEKS: Week[] = [
 export const MATCH_AGENDA: Agenda[] = [
   {
     t: "5:00",
-    len: 8,
+    len: 10,
     what: "Lobby",
     detail:
-      "Scan the QR to join, squad up into teams of 2–3, warm-up game on screen. Late joiners land on the smallest team automatically.",
+      "Scan the QR to join, squad up into teams of 2–3, warm-up game on screen, then a one-minute rules recap. Late joiners land on the smallest team automatically.",
   },
   {
-    t: "5:08",
-    len: 4,
-    what: "Mini-lesson",
-    detail: "One beginner concept tied to tonight’s game, then a one-minute rules recap.",
-  },
-  {
-    t: "5:12",
-    len: 15,
+    t: "5:10",
+    len: 16,
     what: "Round 1",
     detail: "Tonight’s main game, easy version.",
   },
   {
-    t: "5:27",
-    len: 15,
+    t: "5:26",
+    len: 16,
     what: "Round 2",
     detail: "Same game, harder or with a twist. Late arrivals join here.",
   },
@@ -165,7 +148,7 @@ export const KICKOFF_AGENDA: Agenda[] = [
     t: "5:26",
     len: 10,
     what: "Your turn: feedback",
-    detail: "Sticky-note wall and dot vote, or the feedback form on phones.",
+    detail: "Sticky-note wall, or the feedback form on phones.",
   },
   {
     t: "5:36",
@@ -281,21 +264,22 @@ export const FINAL_AGENDA: Agenda[] = [
   },
   {
     t: "5:50",
-    len: 2,
-    what: "How we solved it",
-    detail: "An officer walks through the solution. Skip it if you’re running late.",
-  },
-  {
-    t: "5:52",
     len: 3,
     what: "Final standings",
     detail: "Reveal from last place to first. If there’s a tie, play one sudden-death question.",
   },
   {
-    t: "5:55",
-    len: 5,
-    what: "Trophy + what’s next",
-    detail: "Winners sign the Golden Keycap. Invite everyone to the club’s Advent of Code private leaderboard, which starts Dec 1.",
+    t: "5:53",
+    len: 3,
+    what: "Trophy",
+    detail: "Winners sign the Golden Keycap. Post the puzzle solutions in the Teams group afterward.",
+  },
+  {
+    t: "5:56",
+    len: 4,
+    what: "Season 0 awards",
+    detail:
+      "Season MVP, Rookie of the Season, and Best Bug. Then invite everyone to the club’s Advent of Code private leaderboard, which starts Dec 1.",
   },
 ];
 
@@ -342,7 +326,7 @@ export const GAMES: Game[] = [
       "Paper backup: if phones or Wi-Fi act up, teams write the line and the fix, hold them up together, and officers score by hand.",
       "Fix it for real (the double-points final on Bug Hunt nights): one buggy Python program, 4 minutes. Each team edits and runs it on its team computer at /hello-world/fix, and the site marks the team Fixed! once every test passes. +3 for a fix, +2 more for the first team to fix it, all doubled.",
     ],
-    tip: "Keep a note of the best wrong answer each week, and read it out without naming the team. It decides the “Best Bug” award at the Wrap Party.",
+    tip: "Keep a note of the best wrong answer each week, and read it out without naming the team. It decides the “Best Bug” award at the Final.",
   },
   {
     id: "relay",
@@ -439,11 +423,6 @@ export const XP: Xp[] = [
     what: "Theme bonus",
     note: "Costume at Spooky Bugs, and similar.",
   },
-  {
-    pts: "+6",
-    what: "Show up to Boss Battle",
-    note: "Double the usual show-up XP, for coming the night before Thanksgiving.",
-  },
 ];
 export const COMEBACKS: string[] = [
   "The final round of every night is worth double, championships included.",
@@ -459,7 +438,7 @@ export const AWARDS: Award[] = [
   },
   {
     name: "Season MVP",
-    how: "Most XP through week 7. Being there every week is how you get it.",
+    how: "Most XP through the Final. Being there every week is how you get it.",
   },
   {
     name: "Rookie of the Season",
@@ -534,7 +513,7 @@ export const SUPPLIES: { tier: string; items: string[] }[] = [
   {
     tier: "If there’s funding",
     items: [
-      "Pizza on the two championship nights and the Wrap Party (ask Student Activities about event food funding). Order halal and vegetarian options.",
+      "Pizza on the two championship nights and Study & Snacks (ask Student Activities about event food funding). Order halal and vegetarian options.",
       "Candy for weekly winners and Pictionary steals",
       "Printed posters (ask whether Student Activities prints for clubs)",
     ],

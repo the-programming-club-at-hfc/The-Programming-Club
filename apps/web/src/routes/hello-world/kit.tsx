@@ -67,8 +67,8 @@ const RISKS = [
 
 const QUESTIONS = [
   "Does the overall idea work for this semester, or should we change it up?",
-  "Do the dates work: Midseason Cup Nov 4, Final Nov 18, Wrap Party & Study Hall Dec 2?",
-  "Keep the Nov 25 Boss Battle, or skip it for Thanksgiving?",
+  "Do the dates work: Midseason Cup Nov 4, Final and awards Nov 18, Demo Night Nov 25, Study & Snacks Dec 2?",
+  "Keep the Nov 25 Demo Night, or skip it for Thanksgiving?",
   "Golden Keycap as the prize? Any of the other prize ideas?",
   "About $30 for trophy paint and prizes, and should we ask Student Activities about pizza?",
   "Do the roles above work for everyone?",
@@ -148,8 +148,8 @@ function GamePlan() {
           ))}
         </ol>
         <p className="mt-4 text-sm text-dim">
-          The Final is on Nov 18 so it stays clear of end-of-semester crunch. Dec 2 is a no-pressure Wrap Party &amp; Study Hall with awards
-          and show-and-tell demos. Officers can change any week in the{" "}
+          The Final and the season awards are on Nov 18 so they stay clear of end-of-semester crunch. Nov 25 is Demo Night, and Dec 2 is
+          Study &amp; Snacks: food, studying, and hanging out. Officers can change any week in the{" "}
           <Link to="/hello-world/schedule" className="underline underline-offset-2">
             season planner
           </Link>

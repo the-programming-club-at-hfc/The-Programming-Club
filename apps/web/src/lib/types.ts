@@ -1,14 +1,13 @@
-export type WeekKind = "kickoff" | "match" | "cup" | "wrap";
+export type WeekKind = "kickoff" | "match" | "cup" | "showcase" | "wrap";
 
 export interface Week {
   kind: WeekKind;
   title: string;
   pitch: string;
-  lesson?: string;
   games: string[];
   bonus?: string;
   note?: string;
-  /** XP for showing up that week (doubled on Boss Battle). */
+  /** XP for showing up that week. */
   showXp: number;
 }
 

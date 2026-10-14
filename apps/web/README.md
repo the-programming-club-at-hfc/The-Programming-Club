@@ -27,7 +27,7 @@ TanStack Start (React, Vite) · Convex (real-time database) · Clerk (officer si
 
 ## Editing
 
-- **A week's games, title, description, mini-lesson, bonus, or date, or cancelling a week:** officers do this at `/schedule` (the season planner). No deploy needed; changes go live right away. "Reset to the original plan" brings back the defaults.
+- **A week's games, title, description, bonus, or date, or cancelling a week:** officers do this at `/schedule` (the season planner). No deploy needed; changes go live right away. "Reset to the original plan" brings back the defaults.
 - **Club info, advisor contact, who can join, default season dates, officer names:** `src/lib/season.ts`
 - **School rules for the site:** no HFC logos of any kind, including the HFC Student Clubs logo (the manual's social media policy bars HFC logos on club channels), and the required "not an official HFC channel" disclaimer (`src/components/site.tsx`). Name the club "The Programming Club at Henry Ford College", never "Henry Ford College Programming Club". Club web pages need approval from the Office of Student Activities (Student Clubs Policy Manual, "Web Pages").
 - **Who can sign in as an officer:** the `OFFICER_EMAILS` env var (comma-separated) on the Convex deployment, read by `convex/officers.ts`. Emails stay out of the repo, and changes need no deploy.
