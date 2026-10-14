@@ -61,9 +61,9 @@ export function nextMeeting(plan: WeekPlan[], now = Date.now()): { i: number; li
   return null;
 }
 
-/** 1-based week number officers most likely want to start tonight. */
+/** 1-based week number officers most likely want to start tonight. A week stays picked until 12 hours after its meeting. */
 export function likelyWeek(plan: WeekPlan[], now = Date.now()) {
-  const n = nextMeeting(plan, now + 12 * HOUR);
+  const n = nextMeeting(plan, now - 12 * HOUR);
   return n ? n.i + 1 : plan.length;
 }
 
