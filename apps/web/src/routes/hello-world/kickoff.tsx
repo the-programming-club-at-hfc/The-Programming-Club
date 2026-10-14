@@ -38,6 +38,29 @@ function JoinBox() {
   );
 }
 
+// Tonight's teams, live: they pop in when an officer makes teams in /host, and late joiners show up on theirs.
+function Teams() {
+  const live = useQuery(api.sessions.live);
+  if (!live) return null;
+  if (!live.teams.length)
+    return (
+      <p className="m-rise mt-10 text-xl text-dim" style={at(4)}>
+        {live.roster.length} here. Officers: make teams in /host.
+      </p>
+    );
+  return (
+    <ul className="mx-auto mt-10 grid max-w-[1300px] grid-cols-2 gap-[3px] text-left lg:grid-cols-4">
+      {live.teams.map((t, k) => (
+        <li key={t._id} className={`tile m-pop ${TEAM_TILES[k % TEAM_TILES.length]} p-5`} style={at(4 + Math.min(k, 7))}>
+          <p className="text-[clamp(1.2rem,1.7vw,1.8rem)] leading-tight font-extrabold">{t.name}</p>
+          <p className="mt-1 text-[clamp(1rem,1.3vw,1.4rem)] leading-snug">{t.members.join(", ") || "Nobody yet"}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+const TEAM_TILES = ["tile-sky", "tile-meadow", "tile-sun", "tile-silver"];
+
 const at = (i: number) => ({ "--i": i }) as CSSProperties;
 
 function Words({ text, i = 0 }: { text: string; i?: number }) {
@@ -303,15 +326,16 @@ function slides(plan: WeekPlan[]): ReactNode[] {
     </div>,
     <div className="text-center">
       <h2
-        className="text-[clamp(3rem,7vw,7.5rem)] leading-[0.9] tracking-[-0.045em] lowercase m-slam"
+        className="m-slam text-[clamp(3rem,6vw,6.5rem)] leading-[0.9] tracking-[-0.045em] lowercase"
         style={{ "--base": "200ms" } as CSSProperties}
       >
         Squad up.
       </h2>
-      <p className="m-rise mt-10 text-[clamp(1.5rem,2.4vw,2.6rem)]" style={at(3)}>
+      <p className="m-rise mt-6 text-[clamp(1.4rem,2.2vw,2.4rem)]" style={at(3)}>
         Teams of 2–3. Open programmingclub.dev/wiki on your team’s computer.
       </p>
-      <a href="/hello-world/tv" className="m-pop btn btn-primary mt-12 text-3xl" style={at(5)}>
+      <Teams />
+      <a href="/hello-world/tv" className="m-pop btn btn-primary mt-10 text-2xl" style={at(5)}>
         Switch the TV to the game
       </a>
     </div>,
