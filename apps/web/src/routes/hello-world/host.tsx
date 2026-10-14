@@ -10,7 +10,7 @@ import type { GameId, Screen } from "#/components/game";
 import { NextPanel, WordPeek, nextWord } from "#/components/next";
 import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
-import { WIKI_RACES } from "#/lib/content";
+import { WIKI_RACES, wikiUrl } from "#/lib/content";
 import { deckFor, filtersFor } from "#/lib/flow";
 import type { Filter } from "#/lib/flow";
 import { isAnswerGame, wikiSeconds } from "#/lib/grading";
@@ -1055,7 +1055,6 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
     const from = fresh.length ? fresh : pool;
     setRace(from[Math.floor(Math.random() * from.length)]);
   };
-  const url = (t: string) => `https://en.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}`;
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
@@ -1092,11 +1091,11 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
       {race && (
         <>
           <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-4 border-line bg-mist p-4 text-center">
-            <a href={url(race.from)} target="_blank" rel="noreferrer" className="font-bold text-2xl hover:underline">
+            <a href={wikiUrl(race.from)} target="_blank" rel="noreferrer" className="font-bold text-2xl hover:underline">
               {race.from}
             </a>
             <span className="text-dim">→</span>
-            <a href={url(race.to)} target="_blank" rel="noreferrer" className="font-bold text-2xl text-ink hover:underline">
+            <a href={wikiUrl(race.to)} target="_blank" rel="noreferrer" className="font-bold text-2xl text-ink hover:underline">
               {race.to}
             </a>
           </div>

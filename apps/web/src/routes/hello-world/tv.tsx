@@ -203,6 +203,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 <div className="bg-mist p-[3vw]">
                   <p className="text-[1.6vw] text-dim">Start here</p>
                   <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiFrom}</p>
+                  <p className="mt-[1.2vw] text-[1.6vw] font-bold">Team computers: {CLUB.url}/wiki</p>
                 </div>
                 <div className="tile tile-sky p-[3vw]">
                   <p className="text-[1.6vw]">Get to</p>

@@ -290,7 +290,7 @@ export const GAMES: Game[] = [
     need: "1 phone or laptop per team to race on, internet, and a phone to tap “We made it!”",
     time: "5 min per race",
     steps: [
-      "The TV shows a start and a target article. It’s on your phones too. Everyone opens the start article.",
+      "The TV shows a start and a target article. It’s on your phones too. Open programmingclub.dev/wiki on your team’s computer and it jumps to the start article.",
       "On “Go,” click only the blue links inside the article. No search bar, no typing URLs.",
       "The back button is allowed. So is Ctrl+F (find on page).",
       "When you land on the target, anyone on your team taps “We made it!” on a phone and raises a hand, keeping the target article open. A referee comes over to check it. Tapped by mistake? Undo it until the referee checks.",
@@ -542,6 +542,8 @@ export const REMIX_MENU: string[] = [
   "Bug Bounty (write bugs for other teams)",
   "More Code Relay",
 ];
+
+export const wikiUrl = (title: string) => `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 
 export const WIKI_RACES: WikiRace[] = [
   {

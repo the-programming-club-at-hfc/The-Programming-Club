@@ -68,7 +68,7 @@ const Big = ({ children }: { children: ReactNode }) => (
 
 // The Wiki Race rules in content.ts are written to read on a phone; these are the short version for the TV.
 const RACE_STEPS = [
-  "The TV shows a start and a target. Open the start article.",
+  "On your team’s computer, open programmingclub.dev/wiki. It jumps to the start article.",
   "On “Go,” click only links inside the article. No search bar, no typing URLs.",
   "The back button and Ctrl+F are fine.",
   "Land on the target? Tap “We made it!” on a phone and raise a hand.",
@@ -309,7 +309,7 @@ function slides(plan: WeekPlan[]): ReactNode[] {
         Squad up.
       </h2>
       <p className="m-rise mt-10 text-[clamp(1.5rem,2.4vw,2.6rem)]" style={at(3)}>
-        Teams of 2–3. Open wikipedia.org on your team’s computer.
+        Teams of 2–3. Open programmingclub.dev/wiki on your team’s computer.
       </p>
       <a href="/hello-world/tv" className="m-pop btn btn-primary mt-12 text-3xl" style={at(5)}>
         Switch the TV to the game
