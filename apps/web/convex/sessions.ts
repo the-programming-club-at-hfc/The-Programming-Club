@@ -67,11 +67,12 @@ export const live = query({
 export const final = query({
   args: {},
   handler: async (ctx) => {
-    const s = await ctx.db
+    // The night that ended last, which isn't the newest one when an older night was reopened and ended again.
+    const ended = await ctx.db
       .query("sessions")
       .withIndex("by_status", (q) => q.eq("status", "ended"))
-      .order("desc")
-      .first();
+      .collect();
+    const s = ended.reduce<(typeof ended)[number] | null>((a, b) => (!a || (b.endedAt ?? 0) > (a.endedAt ?? 0) ? b : a), null);
     if (!s) return null;
     const [teams, att] = await Promise.all([sessionTeams(ctx, s._id), sessionAttendance(ctx, s._id)]);
     // What End night stored, the same numbers phones and /scores show.
@@ -138,6 +139,7 @@ export const start = mutation({
       timer: { durationMs: 90_000, remainingMs: 90_000, relay: false },
       practice: practice || undefined,
       teamSize: 1,
+      playerPoints: true,
     });
   },
 });

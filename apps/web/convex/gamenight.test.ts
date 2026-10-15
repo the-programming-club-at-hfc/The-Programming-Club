@@ -311,6 +311,54 @@ describe("teams", () => {
     expect(await teams()).toHaveLength(2);
   });
 
+  test("taking a solo player off their team: no empty team left behind, but not while their answers wait for a reveal", async () => {
+    const { t, officer, startNight, join, attendance, teams, show } = setup();
+    const code = await startNight();
+    const tokens = [await join(code, student(1)), await join(code, student(2)), await join(code, student(3))];
+    const row = async (i: number) => (await attendance()).find((a) => a.token === tokens[i])!;
+    await show({ mode: "card", game: "output", index: 0 });
+    await t.mutation(api.answers.pick, { token: tokens[0], card: "output:0", choice: OUTPUTS[0].answer });
+    await expect(officer.mutation(api.teams.move, { attendanceId: (await row(0))._id, teamId: null })).rejects.toThrow(
+      "Finish the round first",
+    );
+    await show({ mode: "card", game: "output", index: 0, revealed: true });
+
+    // The host's team picker: onto someone else's team, then off to no team.
+    await officer.mutation(api.teams.move, { attendanceId: (await row(0))._id, teamId: (await row(1)).teamId! });
+    expect((await teams()).map((tm) => tm.name).sort()).toEqual(["Student 2", "Student 3"]);
+    await officer.mutation(api.teams.move, { attendanceId: (await row(1))._id, teamId: null });
+    expect((await teams()).map((tm) => tm.name).sort()).toEqual(["Student 2", "Student 3"]); // Student 1 is still on it
+    await officer.mutation(api.teams.removePlayer, { attendanceId: (await row(2))._id });
+    expect((await teams()).map((tm) => tm.name)).toEqual(["Student 2"]);
+  });
+
+  test("Play tonight off on a team night leaves the partner's team as it is", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    await join(code, student(1));
+    await officer.mutation(api.teams.make, { size: 2 });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    const team = (await attendance()).find((a) => a.token === ada)!.teamId!;
+    await officer.mutation(api.teams.score, { teamId: team, delta: 3 });
+    await t.mutation(api.players.setPlaying, { token: ada, playing: false });
+    expect((await teams()).map((tm) => [tm._id, tm.score])).toEqual([[team, 3]]);
+  });
+
+  test("the TV's final standings are the night that ended last, even an older one ended again", async () => {
+    const { t, officer, startNight, join, attendance } = setup();
+    await join(await startNight(1), student(1));
+    await officer.mutation(api.sessions.end, {});
+    const week1 = (await attendance())[0].sessionId;
+    later(60);
+    await join(await startNight(2), student(2));
+    await officer.mutation(api.sessions.end, {});
+    later(60);
+    await officer.mutation(api.sessions.reopen, { sessionId: week1 });
+    await officer.mutation(api.sessions.end, {});
+    expect((await t.query(api.sessions.final, {}))!.week).toBe(1);
+  });
+
   test("auto teams fill teams up to the last Make teams size", async () => {
     const { t, officer, startNight, join, attendance, teams } = setup();
     const code = await startNight();
@@ -769,28 +817,57 @@ describe("ending the night", () => {
     }
   });
 
-  test("a night from before solo mode: reopening and ending it again keeps its place XP, and it stays a team night", async () => {
-    const { t, officer, nightWithTeams, attendance, join } = setup();
-    const { code, teams } = await nightWithTeams(4);
-    await officer.mutation(api.teams.score, { teamId: teams[0]._id, delta: 5 });
-    await officer.mutation(api.teams.score, { teamId: teams[1]._id, delta: 2 });
-    await officer.mutation(api.sessions.end, {});
-    const before = (await attendance()).map((a) => [a.token, a.placeXp]);
-    // What the old code left behind: no teamSize, no player points.
-    await t.run(async (ctx) => {
-      for (const a of await ctx.db.query("attendance").collect()) await ctx.db.patch(a._id, { points: undefined });
-      for (const s of await ctx.db.query("sessions").collect()) await ctx.db.patch(s._id, { teamSize: undefined });
+  /** A team night as the code before player points left it: team scores only, and teamSize only if Make teams ran. */
+  async function oldNight(keepSize: boolean) {
+    const ctx = setup();
+    const { code, teams } = await ctx.nightWithTeams(4);
+    await ctx.officer.mutation(api.teams.score, { teamId: teams[0]._id, delta: 5 });
+    await ctx.officer.mutation(api.teams.score, { teamId: teams[1]._id, delta: 2 });
+    await ctx.t.run(async (db) => {
+      for (const a of await db.db.query("attendance").collect()) await db.db.patch(a._id, { points: undefined });
+      for (const s of await db.db.query("sessions").collect())
+        await db.db.patch(s._id, { playerPoints: undefined, ...(!keepSize && { teamSize: undefined }) });
     });
-    // The TV shows what End night stored.
-    expect((await t.query(api.sessions.final, {}))!.teams.map((tm) => tm.xp)).toEqual([3, 2]);
+    return { ...ctx, code, teams };
+  }
 
-    await officer.mutation(api.sessions.reopen, { sessionId: (await attendance())[0].sessionId });
-    expect((await t.query(api.sessions.live, {}))!.teamSize).toBe(2);
-    await join(code, student(5)); // teams of 2 are full: a new team, not one named after them
-    expect((await t.query(api.sessions.live, {}))!.teams.map((tm) => tm.name)).not.toContain("Student 5");
+  test("a night from before player points: reopening and ending it again keeps its place XP, and it stays a team night", async () => {
+    for (const keepSize of [false, true]) {
+      const { t, officer, attendance, join, code } = await oldNight(keepSize);
+      await t.run(async (db) => {
+        // Ended by the old code: place XP stored from team standings.
+        for (const s of await db.db.query("sessions").collect()) await db.db.patch(s._id, { status: "ended", endedAt: Date.now() });
+        const teams = await db.db.query("teams").collect();
+        for (const a of await db.db.query("attendance").collect()) {
+          const score = teams.find((tm) => tm._id === a.teamId)?.score ?? 0;
+          await db.db.patch(a._id, { placeXp: score === 5 ? 3 : score === 2 ? 2 : 0 });
+        }
+      });
+      const before = (await attendance()).map((a) => [a.token, a.placeXp]);
+      // The TV shows what End night stored.
+      expect((await t.query(api.sessions.final, {}))!.teams.map((tm) => tm.xp)).toEqual([3, 2]);
+
+      await officer.mutation(api.sessions.reopen, { sessionId: (await attendance())[0].sessionId });
+      expect((await t.query(api.sessions.live, {}))!.teamSize).toBe(2);
+      await join(code, student(5)); // teams of 2 are full: a new team, not one named after them
+      expect((await t.query(api.sessions.live, {}))!.teams.map((tm) => tm.name)).not.toContain("Student 5");
+      await officer.mutation(api.sessions.end, {});
+      const after = new Map((await attendance()).map((a) => [a.token, a.placeXp]));
+      for (const [token, xp] of before) expect(after.get(token as string)).toBe(xp);
+    }
+  });
+
+  test("a night from before player points that's still open: scoring first doesn't lose the old points", async () => {
+    const { officer, attendance, teams } = await oldNight(false);
+    // The trailing team gets +4: 6 to the leaders' 5.
+    await officer.mutation(api.teams.score, { teamId: teams[1]._id, delta: 4 });
     await officer.mutation(api.sessions.end, {});
-    const after = new Map((await attendance()).map((a) => [a.token, a.placeXp]));
-    for (const [token, xp] of before) expect(after.get(token as string)).toBe(xp);
+    const att = await attendance();
+    const xpOf = (i: number) => teams[i].tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp);
+    expect([xpOf(0), xpOf(1)]).toEqual([
+      [2, 2],
+      [3, 3],
+    ]);
   });
 
   test("practice nights stay out of XP, the leaderboard, and the attendance sheet", async () => {

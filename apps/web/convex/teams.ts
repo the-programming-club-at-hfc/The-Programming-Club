@@ -17,6 +17,7 @@ import {
   soloName,
   teamByKey,
   teamFor,
+  joinTeam,
   leaveTeam,
   unscoredCards,
   upgradeOldNight,
@@ -145,9 +146,14 @@ export const move = mutation({
   handler: async (ctx, { attendanceId, teamId }) => {
     await requireOfficer(ctx);
     const a = await ctx.db.get(attendanceId);
-    if (!a) return;
+    const session = a && (await ctx.db.get(a.sessionId));
+    if (!a || !session || a.teamId === (teamId ?? undefined)) return;
+    const s = await upgradeOldNight(ctx, session);
+    const me = (await ctx.db.get(a._id))!;
+    if (teamId) await joinTeam(ctx, s, me, teamId);
+    else await leaveTeam(ctx, s, me);
     // Putting an officer on a team means they're playing tonight.
-    await ctx.db.patch(attendanceId, { teamId: teamId ?? undefined, ...(a.officer && { playing: !!teamId }) });
+    if (a.officer) await ctx.db.patch(a._id, { playing: !!teamId });
   },
 });
 
@@ -175,7 +181,8 @@ export const removePlayer = mutation({
   handler: async (ctx, { attendanceId }) => {
     await requireOfficer(ctx);
     const a = await ctx.db.get(attendanceId);
-    if (a) await leaveTeam(ctx, a);
+    const s = a && (await ctx.db.get(a.sessionId));
+    if (a && s) await leaveTeam(ctx, s, a);
     await ctx.db.delete(attendanceId);
   },
 });

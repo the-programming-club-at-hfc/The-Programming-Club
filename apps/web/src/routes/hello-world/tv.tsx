@@ -609,7 +609,10 @@ function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[
           // Down each column, then across, so the order reads like standings.
           <ol
             className="mt-[2vw] grid grid-flow-col gap-x-[2.5vw] gap-y-[0.7vw]"
-            style={{ gridTemplateRows: `repeat(${Math.min(PER_COLUMN, shown.length)}, auto)`, gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+            style={{
+              gridTemplateRows: `repeat(${Math.min(PER_COLUMN, shown.length)}, auto)`,
+              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            }}
           >
             {shown.map((t) => {
               const rank = placeOf(

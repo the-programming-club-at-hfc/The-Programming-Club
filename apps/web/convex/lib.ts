@@ -186,29 +186,53 @@ export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
   return open;
 }
 
-/** Nights from before solo mode have no teamSize and no player points: they were team nights, and each player's
- *  points were their team's. Fill both in before anything (Make teams, End night) relies on them. */
+/** Nights from before players kept their own points: each player's points were their team's, and a night with no
+ *  teamSize was a team night. Fill both in before anything that scores, moves players, or hands out place XP. */
 export async function upgradeOldNight(ctx: MutationCtx, s: Doc<"sessions">) {
-  if (s.teamSize !== undefined) return s;
+  if (s.playerPoints) return s;
   const teams = new Map((await sessionTeams(ctx, s._id)).map((t) => [t._id, t.score]));
-  for (const a of await sessionAttendance(ctx, s._id))
-    if (a.teamId && a.points === undefined) await ctx.db.patch(a._id, { points: teams.get(a.teamId) ?? 0 });
-  await ctx.db.patch(s._id, { teamSize: 2 });
-  return { ...s, teamSize: 2 as const };
+  for (const a of await sessionAttendance(ctx, s._id)) if (a.teamId) await ctx.db.patch(a._id, { points: teams.get(a.teamId) ?? 0 });
+  const up = { playerPoints: true, teamSize: s.teamSize ?? 2 } as const;
+  await ctx.db.patch(s._id, up);
+  return { ...s, ...up };
+}
+
+/** Whether a team has answers, fixes, stars, or a finish in on a card tonight that hasn't been scored yet. */
+async function hasUnscored(ctx: QueryCtx, s: Doc<"sessions">, teamId: Id<"teams">) {
+  for (const table of ["answers", "fixes", "stars", "races"] as const)
+    for (const row of await ctx.db
+      .query(table)
+      .withIndex("by_team_card", (q) => q.eq("teamId", teamId))
+      .collect())
+      if (!(s.scored ?? []).includes(row.card)) return true;
+  return false;
 }
 
 /** Take a player off their team, keeping their own points. A team left empty goes too, so a solo player's old team
  *  never sits on the board (with their points) without them. */
-export async function leaveTeam(ctx: MutationCtx, a: Doc<"attendance">) {
+export async function leaveTeam(ctx: MutationCtx, s: Doc<"sessions">, a: Doc<"attendance">) {
   if (!a.teamId) return;
+  const empty = !(await sessionAttendance(ctx, s._id)).some((o) => o.teamId === a.teamId && o._id !== a._id);
+  // Their answers in on a card not yet revealed would score nobody.
+  if (empty && (await hasUnscored(ctx, s, a.teamId))) throw new ConvexError("Finish the round first: reveal it, then move them.");
   await ctx.db.patch(a._id, { teamId: undefined });
-  if (!(await sessionAttendance(ctx, a.sessionId)).some((o) => o.teamId === a.teamId)) await ctx.db.delete(a.teamId);
+  if (empty) await ctx.db.delete(a.teamId);
+}
+
+/** Put a player on a team (off theirs first). Alone on it, the team starts from the points they already earned. */
+export async function joinTeam(ctx: MutationCtx, s: Doc<"sessions">, a: Doc<"attendance">, teamId: Id<"teams">) {
+  await leaveTeam(ctx, s, a);
+  await ctx.db.patch(a._id, { teamId });
+  if ((await sessionAttendance(ctx, s._id)).filter((o) => o.teamId === teamId).length === 1)
+    await ctx.db.patch(teamId, { score: a.points ?? 0 });
 }
 
 /** Add points to a team and to each player on it now, so a player's points survive teams being remade. */
 export async function award(ctx: MutationCtx, teamId: Id<"teams">, points: number) {
   const team = await ctx.db.get(teamId);
-  if (!team || !points) return;
+  const s = team && (await ctx.db.get(team.sessionId));
+  if (!team || !s || !points) return;
+  await upgradeOldNight(ctx, s);
   await ctx.db.patch(team._id, { score: team.score + points });
   for (const a of await sessionAttendance(ctx, team.sessionId))
     if (a.teamId === team._id) await ctx.db.patch(a._id, { points: (a.points ?? 0) + points });

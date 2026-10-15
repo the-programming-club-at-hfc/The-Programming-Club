@@ -461,7 +461,8 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
       </p>
       {live.unrevealed.length > 0 && (
         <p className="mt-1 text-sm font-semibold">
-          Finish the round first: put {live.unrevealed.map(cardName).join(", ")} back up and reveal it, then you can switch modes.
+          Finish the round first: reveal {live.unrevealed.map(cardName).join(", ")} (put it back on the TV if it’s gone), then you can
+          switch modes.
         </p>
       )}
       {live.teams.length === 0 ? (
