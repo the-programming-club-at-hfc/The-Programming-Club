@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { openSession, requireOpenSession, sessionTeams } from "./lib";
+import { award, openSession, requireOpenSession, sessionTeams } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { wikiAwardsFor, wikiKey, wikiPlaces } from "../src/lib/grading";
 
@@ -158,12 +158,11 @@ export async function scoreWikiReveal(ctx: MutationCtx, s: Doc<"sessions">) {
   });
   if (!r) return;
   for (const { team: teamId, place, points } of r.awards) {
-    const team = teams.find((t) => t._id === teamId)!;
     const row = rows.find((x) => x.teamId === teamId);
     const result = { points, place: place ?? undefined };
     if (row) await ctx.db.patch(row._id, { result });
     else await ctx.db.insert("races", { sessionId: s._id, teamId, card: w.key, result });
-    await ctx.db.patch(team._id, { score: team.score + points });
+    await award(ctx, teamId, points);
   }
   await ctx.db.patch(s._id, { scored: r.scored });
 }

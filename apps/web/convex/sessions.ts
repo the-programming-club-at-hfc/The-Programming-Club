@@ -2,7 +2,17 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { CODE_LETTERS, inTeamPool, openSession, placeXpFor, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
+import {
+  CODE_LETTERS,
+  inTeamPool,
+  unscoredCards,
+  openSession,
+  placeXpFor,
+  requireOpenSession,
+  sessionAttendance,
+  sessionTeams,
+  upgradeOldNight,
+} from "./lib";
 import { screenV } from "./schema";
 import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
@@ -42,10 +52,55 @@ export const live = query({
       round: s.round ?? null,
       autoTeams: s.autoTeams !== false,
       teamSize: s.teamSize ?? 2,
+      // Cards with answers in that haven't been revealed yet ("game:index" or a race): teams stay put until they are.
+      unrevealed: await unscoredCards(ctx, s),
       teams: teams
         .map((t) => ({ _id: t._id, name: t.name, score: t.score, members: roster.filter((r) => r.teamId === t._id).map((r) => r.name) }))
         .sort((a, b) => b.score - a.score),
       roster,
+    };
+  },
+});
+
+/** The last night that ended: final standings and the place XP each team's players earned (none on practice nights).
+ *  Names only, like `live`. The TV shows it after End night, and phones look up their XP for it. */
+export const final = query({
+  args: {},
+  handler: async (ctx) => {
+    // The night that ended last, which isn't the newest one when an older night was reopened and ended again.
+    const ended = await ctx.db
+      .query("sessions")
+      .withIndex("by_status", (q) => q.eq("status", "ended"))
+      .collect();
+    const s = ended.reduce<(typeof ended)[number] | null>((a, b) => (!a || (b.endedAt ?? 0) > (a.endedAt ?? 0) ? b : a), null);
+    if (!s) return null;
+    const [teams, att] = await Promise.all([sessionTeams(ctx, s._id), sessionAttendance(ctx, s._id)]);
+    // What End night stored, the same numbers phones and /scores show.
+    const roster = await Promise.all(
+      att
+        .filter((a) => a.teamId)
+        .map(async (a) => ({ name: (await ctx.db.get(a.playerId))?.name ?? "?", teamId: a.teamId, xp: a.placeXp ?? 0 })),
+    );
+    return {
+      _id: s._id,
+      week: s.week,
+      endedAt: s.endedAt ?? s.startedAt,
+      practice: !!s.practice,
+      solo: s.teamSize === 1,
+      teams: teams
+        .map((t) => {
+          const members = roster.filter((r) => r.teamId === t._id);
+          // Teammates share their place XP unless teams were remade mid-night; then each player's shows by their name.
+          const same = members.every((m) => m.xp === members[0].xp);
+          return {
+            _id: t._id,
+            name: t.name,
+            score: t.score,
+            xp: s.practice ? undefined : same ? (members[0]?.xp ?? 0) : undefined,
+            members: members.map((m) => (s.practice || same ? m.name : `${m.name} +${m.xp}`)),
+          };
+        })
+        .sort((a, b) => b.score - a.score),
     };
   },
 });
@@ -83,6 +138,8 @@ export const start = mutation({
       screen: { mode: "lobby" },
       timer: { durationMs: 90_000, remainingMs: 90_000, relay: false },
       practice: practice || undefined,
+      teamSize: 1,
+      playerPoints: true,
     });
   },
 });
@@ -92,13 +149,11 @@ export const end = mutation({
   args: {},
   handler: async (ctx) => {
     await requireOfficer(ctx);
-    const s = await requireOpenSession(ctx);
+    const s = await upgradeOldNight(ctx, await requireOpenSession(ctx));
     await scoreUnrevealedPuzzles(ctx, s);
-    const teams = await sessionTeams(ctx, s._id);
-    const xp = placeXpFor(teams);
-    for (const a of await sessionAttendance(ctx, s._id)) {
-      await ctx.db.patch(a._id, { placeXp: a.teamId ? (xp.get(a.teamId) ?? 0) : 0 });
-    }
+    const att = await sessionAttendance(ctx, s._id);
+    const xp = placeXpFor(att);
+    for (const a of att) await ctx.db.patch(a._id, { placeXp: xp.get(a._id) ?? 0 });
     await ctx.db.patch(s._id, { status: "ended", endedAt: Date.now() });
   },
 });
@@ -109,6 +164,8 @@ export const reopen = mutation({
   handler: async (ctx, { sessionId }) => {
     await requireOfficer(ctx);
     if (await openSession(ctx)) throw new ConvexError("Another night is already running.");
+    const s = await ctx.db.get(sessionId);
+    if (s) await upgradeOldNight(ctx, s);
     await ctx.db.patch(sessionId, { status: "open", endedAt: undefined });
   },
 });
@@ -290,6 +347,7 @@ export const attendanceExport = query({
           status: email.endsWith("@hawkmail.hfcc.edu") ? "HFC student" : email.endsWith("@hfcc.edu") ? "HFC staff" : "Guest",
           team: a.teamId ? (teams.get(a.teamId) ?? "") : "",
           firstTime: a.firstTime,
+          broughtBy: a.broughtBy ?? "",
           xp: a.showXp + (a.placeXp ?? 0) + a.bonusXp,
         };
       }),

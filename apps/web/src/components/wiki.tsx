@@ -1,6 +1,7 @@
 // Wiki Race on phones: "We made it!" for the team (Fewest Clicks: the click count). Presentational only: the join page
 // wires it to Convex, and the officer test page drives it with local state, so both show exactly the same thing.
 import { useState } from "react";
+import { teamWords } from "#/lib/words";
 import { fmtElapsed } from "./game";
 import { ordinal } from "./ui";
 
@@ -46,10 +47,13 @@ interface RoundProps {
   error?: string;
   onFinish: (clicks?: number) => void;
   onUndo: () => void;
+  /** A solo night: the copy speaks to one player. */
+  solo?: boolean;
 }
 
 /** What a phone shows during a Wiki Race: the race, the team's finish button, then its points once it's scored. */
 export function WikiRound(p: RoundProps) {
+  const w = teamWords(p.solo);
   const [sure, setSure] = useState(false);
   const [count, setCount] = useState("");
   const n = Number(count);
@@ -61,7 +65,7 @@ export function WikiRound(p: RoundProps) {
       <WikiPair from={p.from} to={p.to} />
       {p.clicks && !p.revealed && <p className="font-semibold">Fewest clicks wins. Count every link you click.</p>}
       {p.revealed ? (
-        <RaceBanner result={p.result} />
+        <RaceBanner result={p.result} you={w.You} />
       ) : finished ? (
         <div className="rounded-[10px] bg-meadow p-5 text-[#12332b]" role="status">
           <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">You made it!</p>
@@ -80,7 +84,7 @@ export function WikiRound(p: RoundProps) {
           </p>
           {finished.ok === null && (
             <button className="btn btn-sm mt-3" onClick={p.onUndo}>
-              Undo: we’re not there yet
+              {w.notThere}
             </button>
           )}
         </div>
@@ -96,7 +100,7 @@ export function WikiRound(p: RoundProps) {
           {sure ? (
             <>
               <p className="text-center text-xl font-bold">
-                {p.clicks ? `Send ${n} click${n === 1 ? "" : "s"} for your team?` : `On the ${p.to} article?`}
+                {p.clicks ? `Send ${n} click${n === 1 ? "" : "s"}${w.sendFor}?` : `On the ${p.to} article?`}
               </p>
               <p className="mt-1 text-center text-dim">You can undo it until the referee checks.</p>
               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -110,7 +114,7 @@ export function WikiRound(p: RoundProps) {
                     p.onFinish(p.clicks ? n : undefined);
                   }}
                 >
-                  {p.clicks ? "Yes, send it" : "Yes, we made it"}
+                  {p.clicks ? "Yes, send it" : w.yesMadeIt}
                 </button>
               </div>
             </>
@@ -136,9 +140,11 @@ export function WikiRound(p: RoundProps) {
                 disabled={p.clicks && !valid}
                 onClick={() => setSure(true)}
               >
-                We made it!
+                {w.madeIt}
               </button>
-              <p className="mt-2 text-center text-sm text-dim">Anyone on your team can tap it once you land on {p.to}.</p>
+              <p className="mt-2 text-center text-sm text-dim">
+                {w.anyoneTaps} once you land on {p.to}.
+              </p>
             </>
           )}
         </div>
@@ -153,7 +159,7 @@ export function WikiRound(p: RoundProps) {
 }
 
 /** "2nd place! +4" or "+1 for playing" once the race is scored. */
-function RaceBanner({ result }: { result: RaceResult | null }) {
+function RaceBanner({ result, you }: { result: RaceResult | null; you: string }) {
   const place = result?.place;
   const tone = place !== undefined && place <= 3 ? "bg-meadow text-[#12332b]" : place !== undefined ? "bg-sun text-[#12332b]" : "bg-mist";
   return (
@@ -161,7 +167,7 @@ function RaceBanner({ result }: { result: RaceResult | null }) {
       <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">
         {!result ? "Race over" : place !== undefined ? `${ordinal(place)} place! +${result.points}` : `+${result.points} for playing`}
       </p>
-      {result && place === undefined && <p className="mt-2 font-semibold">Your team didn’t finish this time.</p>}
+      {result && place === undefined && <p className="mt-2 font-semibold">{you} didn’t finish this time.</p>}
     </div>
   );
 }

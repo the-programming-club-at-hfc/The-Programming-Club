@@ -19,6 +19,7 @@ import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB, fmtDate, isCupWeek } from "#/lib/season";
+import { teamWords } from "#/lib/words";
 
 export const Route = createFileRoute("/hello-world/host")({
   head: () => ({ meta: [{ title: `Host · ${CLUB.season}` }, { name: "robots", content: "noindex" }] }),
@@ -380,7 +381,11 @@ function TimerPanel({ live }: { live: Live }) {
       </div>
       <div className="mt-2 flex flex-wrap justify-center gap-2">
         {[30, 45, 60, 90, 120, 300, 720].map((s) => (
-          <button key={s} className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: s, relay: s === 720 }))}>
+          <button
+            key={s}
+            className="btn btn-sm"
+            onClick={() => run(timer({ action: "set", seconds: s, relay: live.teamSize > 1 && s === 720 }))}
+          >
             {fmtClock(s * 1000)}
           </button>
         ))}
@@ -395,6 +400,13 @@ function TimerPanel({ live }: { live: Live }) {
   );
 }
 
+// How tonight is played. A night is all solo or all teams; solo is the default.
+const MODES = [
+  [1, "Solo"],
+  [2, "Teams of 2"],
+  [3, "Teams of 3"],
+] as const;
+
 function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | null> }) {
   const make = useMutation(api.teams.make);
   const add = useMutation(api.teams.add);
@@ -404,21 +416,38 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
   const setDouble = useMutation(api.sessions.setDouble);
   const resetScores = useMutation(api.teams.resetScores);
   const setAuto = useMutation(api.teams.setAuto);
-  const shuffleTeams = (size: 2 | 3) =>
-    (!live.teams.length || confirm("Reshuffle everyone into new teams? Tonight’s team scores reset.")) && run(make({ size }));
+  const w = teamWords(live.teamSize === 1);
+  // Picking a mode (even tonight's) remakes tonight's teams. Points carry over: each new team starts from its players' average.
+  const setMode = (size: 1 | 2 | 3) =>
+    (!live.teams.length ||
+      confirm(
+        size === 1
+          ? "Put everyone on a team of their own? Everyone keeps their own points."
+          : `Reshuffle everyone into teams of ${size}? Each team starts from its players’ average points.`,
+      )) &&
+    run(make({ size }));
 
   return (
     <Panel title="Teams & scores">
-      <div className="flex flex-wrap gap-2">
-        <button className="btn btn-sm btn-coin" onClick={() => shuffleTeams(2)}>
-          Make teams of 2
-        </button>
-        <button className="btn btn-sm" onClick={() => shuffleTeams(3)}>
-          Teams of 3
-        </button>
-        <button className="btn btn-sm" onClick={() => run(add())}>
-          Add team
-        </button>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="How tonight is played">
+        {MODES.map(([size, label]) => (
+          <button
+            key={size}
+            className={`btn btn-sm ${live.teamSize === size ? "btn-on" : ""}`}
+            onClick={() => setMode(size)}
+            disabled={live.unrevealed.length > 0}
+            aria-pressed={live.teamSize === size}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {!w.solo && (
+          <button className="btn btn-sm" onClick={() => run(add())}>
+            Add team
+          </button>
+        )}
         <button className={`btn btn-sm ${live.double ? "btn-on" : ""}`} onClick={() => run(setDouble({ on: !live.double }))}>
           {live.double ? "Double points: on" : "Double points"}
         </button>
@@ -427,16 +456,17 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         </button>
       </div>
       <p className="mt-2 text-sm text-dim">
-        {live.autoTeams
-          ? `Everyone who joins lands on a team of up to ${live.teamSize}. Make teams reshuffles everyone, and late joiners then fill teams up to that size.`
-          : "Joiners wait without a team until you make teams. Late joiners then go on the smallest team."}
+        <strong className="text-ink">Tonight: {MODES[live.teamSize - 1][1].toLowerCase()}.</strong>{" "}
+        {live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff} Pressing a mode, even tonight’s, remakes every team. Nobody loses points.
       </p>
-      {live.teams.length === 0 ? (
-        <p className="mt-4 text-dim">
-          {live.autoTeams
-            ? "No teams yet. They fill in as people join."
-            : "No teams yet. Once people have joined, make teams and they’ll see theirs on their phones."}
+      {live.unrevealed.length > 0 && (
+        <p className="mt-1 text-sm font-semibold">
+          Finish the round first: reveal {live.unrevealed.map(cardName).join(", ")} (put it back on the TV if it’s gone), then you can
+          switch modes.
         </p>
+      )}
+      {live.teams.length === 0 ? (
+        <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>
       ) : (
         <ol className="mt-3 divide-y-2 divide-grid/60">
           {live.teams.map((t) => (
@@ -452,9 +482,9 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
                 >
                   {t.name}
                 </button>
-                <span className="text-sm text-dim">{t.members.join(", ") || "empty"}</span>
+                {t.members.join(", ") !== t.name && <span className="text-sm text-dim">{t.members.join(", ") || "empty"}</span>}
                 {keys[t._id] && (
-                  <span className="chip text-sm" title="Team computer key (also on the team’s phones)">
+                  <span className="chip text-sm" title={w.keyTitle}>
                     {keys[t._id]}
                   </span>
                 )}
@@ -491,7 +521,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         </ol>
       )}
       {live.teams.length > 0 && (
-        <button className="btn btn-sm mt-3 text-dim" onClick={() => confirm("Set every team’s score to 0?") && run(resetScores())}>
+        <button className="btn btn-sm mt-3 text-dim" onClick={() => confirm(`Set every ${w.team}’s score to 0?`) && run(resetScores())}>
           Reset scores to 0
         </button>
       )}
@@ -644,6 +674,14 @@ function LineupPanel({
     </Panel>
   );
 }
+
+/** "output:2" as "Output? #3", and a race key as "Wiki Race: From → To", for officers. */
+const cardName = (key: string) => {
+  const [game, rest] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+  return game === "wiki"
+    ? `Wiki Race: ${rest.replace(">", " → ")}`
+    : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
+};
 
 type Tab = GameId | "wiki" | "pictionary";
 const TABS: [Tab, string][] = [
@@ -814,7 +852,7 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
               timer({
                 action: "set",
                 seconds: secs,
-                relay: game === "relay" || (game === "puzzle" && !!PUZZLES[index].relay),
+                relay: live.teamSize > 1 && (game === "relay" || (game === "puzzle" && !!PUZZLES[index].relay)),
                 autostart: true,
               }),
             )
@@ -830,7 +868,7 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
             : "On the TV. The answer below is only on your screen."
           : "Preview. The answer is only on your screen."}
       </p>
-      {onTv && isAnswerGame(game) && <AnswerStatus />}
+      {onTv && isAnswerGame(game) && <AnswerStatus live={live} />}
       {onTv && game === "fix" && <FixStatus live={live} />}
       {onTv && game === "puzzle" && <PuzzleStatus live={live} index={index} />}
       <div className="mt-2 border-4 border-line bg-mist p-4">
@@ -843,9 +881,10 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
 const mark = (ok?: boolean) => (ok ? "✓" : "✗");
 
 /** Phone answers for the card on the TV: who has picked or locked, then what each team got. */
-function AnswerStatus() {
+function AnswerStatus({ live }: { live: Live }) {
   const data = useQuery(api.answers.host);
   if (!data) return null;
+  const w = teamWords(live.teamSize === 1);
   const locked = data.teams.filter((t) => t.pick?.locked).length;
   // For Output?'s sudden-death tiebreaker: the first team to lock in the right answer.
   const firstRight = data.scored
@@ -855,7 +894,7 @@ function AnswerStatus() {
     <div className="mt-3 border-4 border-line p-3">
       <p className="font-bold">{data.scored ? "Scored from phones" : `Phone answers: ${locked} of ${data.teams.length} locked in`}</p>
       {data.teams.length === 0 ? (
-        <p className="text-sm text-dim">No teams yet.</p>
+        <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
         <ul className="mt-1 divide-y-2 divide-grid/60">
           {data.teams.map((t) => {
@@ -897,7 +936,7 @@ function AnswerStatus() {
       <p className="mt-2 text-xs text-dim">
         {data.scored
           ? "Points went on the board when you revealed. Use the score buttons to fix anything."
-          : "Revealing adds the points automatically, once. If phones or Wi-Fi fail, teams use whiteboards and you score with the buttons."}
+          : `Revealing adds the points automatically, once. If phones or Wi-Fi fail, ${w.teams} use whiteboards and you score with the buttons.`}
       </p>
     </div>
   );
@@ -910,11 +949,12 @@ function FixStatus({ live }: { live: Live }) {
   if (!data) return null;
   const s = live.screen;
   const fixedCount = data.teams.filter((t) => t.fixed).length;
+  const w = teamWords(live.teamSize === 1);
   return (
     <div className="mt-3 border-4 border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-bold">
-          {data.scored ? "Scored" : `Fixed: ${fixedCount} of ${data.teams.length} teams`} · team computers at /hello-world/fix
+          {data.scored ? "Scored" : `Fixed: ${fixedCount} of ${data.teams.length} ${w.teams}`} · {w.computers} at /hello-world/fix
         </p>
         {!s.revealed && !data.scored && (
           <button
@@ -927,7 +967,7 @@ function FixStatus({ live }: { live: Live }) {
         )}
       </div>
       {data.teams.length === 0 ? (
-        <p className="text-sm text-dim">No teams yet.</p>
+        <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
         <ul className="mt-1 divide-y-2 divide-grid/60">
           {data.teams.map((t) => (
@@ -953,7 +993,7 @@ function FixStatus({ live }: { live: Live }) {
       <p className="mt-2 text-xs text-dim">
         {data.scored
           ? "Points went on the board when you revealed. Use the score buttons to fix anything."
-          : "Team computers mark a team fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points."}
+          : `${w.Computers} mark a ${w.team} fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points.`}
       </p>
     </div>
   );
@@ -977,6 +1017,7 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
   const key = `puzzle:${index}`;
   if (board?.card !== key) return null;
   const s = live.screen;
+  const w = teamWords(live.teamSize === 1);
   const halfway = live.timer.card === key && remaining <= live.timer.durationMs / 2;
   const count = (part: "part1Ms" | "part2Ms") => board.teams.filter((t) => t[part] !== null).length;
   const star = (ms: number | null, first: boolean) => (
@@ -988,7 +1029,7 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
     <div className="mt-3 border-4 border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-bold">
-          {board.scored ? "Scored" : `Part 1: ${count("part1Ms")} of ${board.teams.length} · Part 2: ${count("part2Ms")}`} · team computers
+          {board.scored ? "Scored" : `Part 1: ${count("part1Ms")} of ${board.teams.length} · Part 2: ${count("part2Ms")}`} · {w.computers}{" "}
           at /hello-world/fix
         </p>
         {!s.revealed && !board.scored && (
@@ -1002,11 +1043,11 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
         )}
       </div>
       {board.teams.length === 0 ? (
-        <p className="text-sm text-dim">No teams yet.</p>
+        <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
         <ul className="mt-1 divide-y-2 divide-grid/60">
           {board.teams.map((t) => {
-            const x = extra?.wrong.find((w) => w.teamId === t.teamId);
+            const x = extra?.wrong.find((r) => r.teamId === t.teamId);
             const wait = t.lockedUntil === null ? 0 : Math.ceil((t.lockedUntil - now) / 1000);
             const a = answers?.teams.find((k) => k.teamId === t.teamId);
             return (
@@ -1037,10 +1078,10 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
         <p className="flex-1 text-xs text-dim">
           {board.scored
             ? "Points went on the board when you revealed. Use the score buttons to fix anything."
-            : "Each team has its own input. A wrong answer locks the team out for 30 seconds. Revealing adds +3 per part 1 star, +5 per part 2 star, and +2 more for the first team to each star, doubled on double points. Ending the night scores a puzzle you never revealed."}
+            : `Each ${w.team} gets a different input. A wrong answer locks the ${w.team} out for 30 seconds. Revealing adds +3 per part 1 star, +5 per part 2 star, and +2 more for the first ${w.team} to each star, doubled on double points. Ending the night scores a puzzle you never revealed.`}
         </p>
         <button className="btn btn-sm text-dim" onClick={() => setShowKey(!showKey)} aria-pressed={showKey}>
-          {showKey ? "Hide answers" : "Show each team’s answers"}
+          {showKey ? "Hide answers" : `Show each ${w.team}’s answers`}
         </button>
       </div>
     </div>
@@ -1055,14 +1096,15 @@ function WikiStatus({ live }: { live: Live }) {
   const done = new Set(data.finished.map((f) => f.teamId));
   const racing = live.teams.filter((t) => !done.has(t._id));
   const points = new Map(data.results?.map((r) => [r.teamId, r.result?.points ?? 0]));
+  const w = teamWords(live.teamSize === 1);
   return (
     <div className="mt-3 border-4 border-line p-3">
       <p className="font-bold">
-        {data.scored ? "Scored" : `Finished: ${data.finished.filter((f) => f.ok !== false).length} of ${data.teams} teams`}
+        {data.scored ? "Scored" : `Finished: ${data.finished.filter((f) => f.ok !== false).length} of ${data.teams} ${w.teams}`}
         {data.clicks && " · Fewest Clicks"}
       </p>
       {data.teams === 0 ? (
-        <p className="text-sm text-dim">No teams yet.</p>
+        <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
         <ul className="mt-1 divide-y-2 divide-grid/60">
           {data.finished.map((f) => (
@@ -1112,7 +1154,7 @@ function WikiStatus({ live }: { live: Live }) {
       <p className="mt-2 text-xs text-dim">
         {data.scored
           ? "Points went on the board when the race ended. Use the score buttons to fix anything."
-          : "Glance at each team’s screen: ✓ it counts, ✗ not there yet (the team can tap again). Unchecked finishes count. Ending the race scores it once: 5, 4, 3 by place, 2 for any other finish, 1 for playing, doubled on double points."}
+          : `Glance at each ${w.team}’s screen: ✓ it counts, ✗ not there yet (the ${w.team} can tap again). Unchecked finishes count. Ending the race scores it once: 5, 4, 3 by place, 2 for any other finish, 1 for playing, doubled on double points.`}
       </p>
     </div>
   );
@@ -1226,7 +1268,8 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
           </div>
           {onTv && s.wikiReady && (
             <p className="mt-3 text-sm text-dim">
-              On the TV: open {CLUB.url}/wiki. Start shows the race and sends every team computer to the start article at once.
+              On the TV: open {CLUB.url}/wiki. Start shows the race and sends every {teamWords(live.teamSize === 1).computer} to the start
+              article at once.
             </p>
           )}
           {onTv && !s.wikiReady && <WikiStatus live={live} />}
@@ -1306,7 +1349,7 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
                 <button className="btn btn-sm" onClick={() => run(bonus({ attendanceId: r._id, delta: -1 }))} aria-label="Less bonus XP">
                   −
                 </button>
-                <span className="w-16 text-center text-sm" title="Bonus XP (bringing a friend)">
+                <span className="w-16 text-center text-sm" title="Bonus XP (bringing a friend, costume)">
                   +{r.bonusXp} XP
                 </span>
                 <button className="btn btn-sm" onClick={() => run(bonus({ attendanceId: r._id, delta: 1 }))} aria-label="More bonus XP">

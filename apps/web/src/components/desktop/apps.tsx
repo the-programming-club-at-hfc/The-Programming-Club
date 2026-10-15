@@ -3,11 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { InstagramLink } from "#/components/instagram";
 import { Disclaimer } from "#/components/site";
 import { GAME_TILE, Picto, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
-import { CLUB, OFFICERS, fmtDate } from "#/lib/season";
+import { CLUB, OFFICERS, fmtDate, isHalloweenMonth } from "#/lib/season";
 import { api } from "../../../convex/_generated/api";
 import { Dashboard } from "./dashboard";
 
@@ -69,6 +70,7 @@ function About() {
           </div>
         ))}
       </dl>
+      <InstagramLink className="link" />
     </div>
   );
 }
@@ -99,6 +101,7 @@ function Meetings() {
   const plan = useSchedule();
   const now = useNow();
   const next = now === null ? null : nextMeeting(plan, now);
+  const costume = plan.find((w) => w.bonus && /costume/i.test(w.bonus) && !w.cancelled);
   return (
     <div>
       {next && now !== null && (
@@ -116,6 +119,9 @@ function Meetings() {
             </p>
           </div>
         </div>
+      )}
+      {isHalloweenMonth() && costume && (
+        <p className="mb-4 text-sm font-semibold text-[#c2410c]">Come to {costume.title} in costume for +3 XP.</p>
       )}
       <ol className="divide-y divide-line">
         {plan.map((w, i) => {
@@ -153,7 +159,7 @@ function WorldCup() {
       </div>
       <h3 className="mt-5 text-2xl lowercase">hello, world cup</h3>
       <p className="mt-2 leading-relaxed">
-        Season 0 is a team game league: eight Wednesdays of Wikipedia races, bug hunts, and code relays. No experience needed, and you can
+        Season 0 is a coding game league: eight Wednesdays of Wikipedia races, bug hunts, and code relays. No experience needed, and you can
         start any week.
       </p>
       <div className="mt-5 flex flex-wrap gap-2">
@@ -164,6 +170,9 @@ function WorldCup() {
           See the six games
         </Link>
       </div>
+      <p className="mt-4 border-t border-line pt-4 text-sm text-dim">
+        Game-night photos and results go up on Instagram. <InstagramLink className="link text-ink" />
+      </p>
     </div>
   );
 }
@@ -212,7 +221,7 @@ function Officers() {
 
 const STEPS = [
   { title: "Come to a meeting", body: `${CLUB.day}, ${CLUB.time}, in ${CLUB.room}. Any week is a good week to start.` },
-  { title: "Join the game", body: "Scan the code on the TV and sign in with your name and HawkMail. You’ll be on a team in a minute." },
+  { title: "Join the game", body: "Scan the code on the TV and sign in with your name and HawkMail. You’re in the game in a minute." },
   {
     title: "Tell us what you want to do",
     body: `Email ${CLUB.advisor.name} your interests to get on the member list, or fill out a Club Interest form with the Office of Student Activities in M-105.`,

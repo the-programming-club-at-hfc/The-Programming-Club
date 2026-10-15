@@ -3,7 +3,7 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { openSession, sessionTeams } from "./lib";
+import { award, openSession, sessionTeams } from "./lib";
 import { BUGS } from "../src/lib/content";
 import { GRACE_MS, LANGUAGES, answersOpen, awardsFor, cardKey, choices, clockLeft, isAnswerGame } from "../src/lib/grading";
 
@@ -201,7 +201,7 @@ export async function scoreReveal(ctx: MutationCtx, s: Doc<"sessions">) {
     const team = await ctx.db.get(row.teamId);
     if (!team || team.sessionId !== s._id) continue;
     await ctx.db.patch(row._id, { result: { ...grade, points } });
-    if (points) await ctx.db.patch(team._id, { score: team.score + points });
+    await award(ctx, team._id, points);
   }
   await ctx.db.patch(s._id, { scored: r.scored });
 }

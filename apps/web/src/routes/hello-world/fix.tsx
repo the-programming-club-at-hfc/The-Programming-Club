@@ -13,6 +13,7 @@ import { PUZZLES, puzzleSeed } from "#/lib/puzzles";
 import { usePython } from "#/lib/python";
 import type { Python } from "#/lib/python";
 import { CLUB } from "#/lib/season";
+import { teamWords } from "#/lib/words";
 
 // A team's lab computer for Fix it for real and puzzles. No sign-in: the computer enters the team key shown on the team's phones.
 export const Route = createFileRoute("/hello-world/fix")({
@@ -63,13 +64,15 @@ function Message({ title, children }: { title: string; children?: React.ReactNod
 /** The team key is on every teammate's phone, so only the team itself can send answers from this computer. */
 function TeamKeyForm({ live, wrong, onKey }: { live: Live; wrong: boolean; onKey: (key: string) => void }) {
   const [key, setKey] = useState("");
+  const w = teamWords(live.teamSize === 1);
   return (
     <Wrap className="max-w-xl py-12">
-      <p className="font-bold text-pine">Team computer</p>
-      <h1 className="text-[clamp(2.4rem,7vw,3.6rem)] lowercase">which team is this?</h1>
+      <p className="font-bold text-pine">{w.Computer}</p>
+      <h1 className="text-[clamp(2.4rem,7vw,3.6rem)] lowercase">{w.whichTeam}</h1>
       {live.teams.length === 0 ? (
         <p className="mt-4 text-lg text-dim">
-          Teams aren’t made yet. Your team key shows up on your phones once the game starts.<span className="blink"> _</span>
+          {w.notMade}
+          <span className="blink"> _</span>
         </p>
       ) : (
         <form
@@ -81,8 +84,7 @@ function TeamKeyForm({ live, wrong, onKey }: { live: Live; wrong: boolean; onKey
         >
           <label className="block">
             <span className="text-lg text-dim">
-              Type the team key from any teammate’s phone (it shows once the game starts, and an officer has it too). This computer
-              remembers it for tonight.
+              {w.typeKey} (it shows once the game starts, and an officer has it too). This computer remembers it for tonight.
             </span>
             <input
               className="field narrow mt-4 text-center text-5xl font-extrabold tracking-[0.3em] uppercase"
@@ -99,12 +101,12 @@ function TeamKeyForm({ live, wrong, onKey }: { live: Live; wrong: boolean; onKey
               autoCapitalize="characters"
               spellCheck={false}
               autoFocus
-              aria-label="Team key"
+              aria-label={w.keyLabel}
             />
           </label>
           {wrong && (
             <p role="alert" className="mt-3 font-semibold text-signal">
-              That key isn’t a team tonight. Check a teammate’s phone and try again.
+              {w.wrongKey}
             </p>
           )}
           <button className="btn btn-primary mt-4 w-full text-lg" disabled={key.length !== 4}>
@@ -133,11 +135,12 @@ function TeamComputer({
   const s = live.screen;
   const game = s.mode === "card" && (s.game === "fix" || s.game === "puzzle") ? s.game : undefined;
   const index = game ? s.index : undefined;
+  const w = teamWords(live.teamSize === 1);
   return (
     <Wrap className="py-8">
       <header className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2">
         <div>
-          <p className="text-dim">Team computer</p>
+          <p className="text-dim">{w.Computer}</p>
           <h1 className="text-3xl">{team.name}</h1>
         </div>
         <p className="narrow text-5xl leading-none font-extrabold">{team.score}</p>
@@ -149,7 +152,7 @@ function TeamComputer({
           </p>
         )}
         <button className={`link text-dim ${index === undefined ? "ml-auto" : ""}`} onClick={onSwitch}>
-          Not {team.name}? Switch team
+          Not {team.name}? {w.switchTeam}
         </button>
       </header>
       {index !== undefined && game === "puzzle" ? (
@@ -269,6 +272,7 @@ function LivePuzzle({
       result={mine?.result ?? null}
       saveKey={`hwc.puzzleCode.${live._id}.${teamId}.${key}`}
       onSubmit={(part, answer) => submit({ teamKey, card: key, part, answer })}
+      solo={live.teamSize === 1}
     />
   );
 }

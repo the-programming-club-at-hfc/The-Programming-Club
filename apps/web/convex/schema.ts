@@ -95,8 +95,11 @@ export default defineSchema({
     round: v.optional(v.number()),
     // false when officers turned auto teams off for tonight. Missing means on: joiners land on a team of up to teamSize.
     autoTeams: v.optional(v.boolean()),
-    // The size of tonight's last Make teams, which auto teams fill up to. Missing means 2.
-    teamSize: v.optional(v.union(v.literal(2), v.literal(3))),
+    // Solo (1), where every player is a team of one named after them, or teams of 2 or 3, from tonight's last Make
+    // teams; auto teams fill up to it. New nights start solo; missing means a night from before solo mode: teams of 2.
+    teamSize: v.optional(v.union(v.literal(1), v.literal(2), v.literal(3))),
+    // Players' own points (attendance.points) are kept. Missing on nights from before that; see lib.upgradeOldNight.
+    playerPoints: v.optional(v.boolean()),
   })
     .index("by_status", ["status"])
     .index("by_code", ["code"]),
@@ -122,6 +125,8 @@ export default defineSchema({
     showXp: v.number(),
     placeXp: v.optional(v.number()),
     bonusXp: v.number(),
+    // Points this player earned tonight, kept when teams are remade (teams.make starts each team from its members' average).
+    points: v.optional(v.number()),
     // An officer's check-in: counts for attendance but stays out of teams and the leaderboard unless they opt in to play.
     officer: v.optional(v.boolean()),
     playing: v.optional(v.boolean()),

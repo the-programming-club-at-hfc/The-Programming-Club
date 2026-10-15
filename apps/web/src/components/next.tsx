@@ -16,6 +16,7 @@ import { PUZZLES } from "#/lib/puzzles";
 import type { GameId } from "#/lib/grading";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB } from "#/lib/season";
+import { teamWords } from "#/lib/words";
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type Action = { label: string; go: () => Promise<unknown> | undefined; keys?: false };
@@ -108,6 +109,7 @@ export function NextPanel({
   const after = following < rounds.length ? rounds[following] : null;
   const s = live.screen;
   const teams = live.teams.length;
+  const w = teamWords(live.teamSize === 1);
   const timeUp = remaining === 0;
 
   // This round's puzzle, while it's up and unrevealed: done once every team has both stars, and its hint unlocks at half time.
@@ -154,10 +156,15 @@ export function NextPanel({
     if (r?.kind === "deck" && r.game) {
       if (card === null) return alert("This deck is out of cards for tonight. Pick one by hand under Games.");
       await setScreen({ screen: { mode: "card", game: r.game, index: card, revealed: false } });
-      await timer({ action: "set", seconds: cardSeconds(r.game, card), relay: r.game === "relay", autostart: true });
+      await timer({ action: "set", seconds: cardSeconds(r.game, card), relay: live.teamSize > 1 && r.game === "relay", autostart: true });
     } else if (r?.kind === "puzzle" && r.puzzle !== undefined) {
       await setScreen({ screen: { mode: "card", game: "puzzle", index: r.puzzle, revealed: false } });
-      await timer({ action: "set", seconds: cardSeconds("puzzle", r.puzzle), relay: !!PUZZLES[r.puzzle].relay, autostart: true });
+      await timer({
+        action: "set",
+        seconds: cardSeconds("puzzle", r.puzzle),
+        relay: live.teamSize > 1 && !!PUZZLES[r.puzzle].relay,
+        autostart: true,
+      });
     } else if (race) {
       // The get-ready screen: Start (the "go" step) shows the race and starts the clock.
       await readyRace(race);
@@ -199,7 +206,7 @@ export function NextPanel({
   } else if (step === "show") {
     const label =
       r.kind === "wiki" && race
-        ? "Get ready: team computers to /wiki"
+        ? `Get ready: ${w.computers} to /wiki`
         : r.kind === "puzzle" && r.puzzle !== undefined
           ? `Show the puzzle: ${puzzleTitle(r.puzzle)}`
           : r.kind === "pictionary"
@@ -299,13 +306,9 @@ export function NextPanel({
         </div>
       )}
       {ready && (
-        <p className="mt-2 font-bold text-pine">{allIn ? (allStars ? "Every team has both stars." : "Every team is in.") : "Time’s up."}</p>
+        <p className="mt-2 font-bold text-pine">{allIn ? `Every ${w.team} ${allStars ? "has both stars" : "is in"}.` : "Time’s up."}</p>
       )}
-      {teams === 0 && (step === "start" || step === "show") && (
-        <p className="mt-2 font-semibold text-signal">
-          No teams yet. Make teams (or turn on Auto teams) under Teams & scores so phones can play.
-        </p>
-      )}
+      {teams === 0 && (step === "start" || step === "show") && <p className="mt-2 font-semibold text-signal">{w.nobodyPlaying}</p>}
       {r?.kind === "pictionary" && word && step !== "show" && (
         <>
           <WordPeek word={word} />
@@ -316,7 +319,7 @@ export function NextPanel({
       )}
       {manual && (
         <p className="mt-3 text-sm">
-          <strong>Score this one by hand</strong> with the team buttons{rules ? `: ${rules.scoring}` : "."}
+          <strong>Score this one by hand</strong> with the score buttons{rules ? `: ${rules.scoring}` : "."}
         </p>
       )}
       <div className="mt-3 space-y-0.5 text-sm text-dim">
@@ -333,14 +336,15 @@ export function NextPanel({
         {r?.kind === "puzzle" && r.puzzle !== undefined && step === "show" && (
           <p>
             Next puzzle: {puzzleTitle(r.puzzle)}, {fmtClock(cardSeconds("puzzle", r.puzzle) * 1000)}
-            {PUZZLES[r.puzzle].relay ? " with relay chimes every 2 minutes" : ""}
-            {" · "}team computers at /hello-world/fix
+            {!w.solo && PUZZLES[r.puzzle].relay ? " with relay chimes every 2 minutes" : ""}
+            {" · "}
+            {w.computers} at /hello-world/fix
           </p>
         )}
         {step === "hint" && <p>Half the time is gone, so the hint is unlocked.</p>}
         {step === "go" && (
           <p>
-            On the TV: open {CLUB.url}/wiki. Start shows {s.wikiFrom} → {s.wikiTo} and sends every team computer there at once.
+            On the TV: open {CLUB.url}/wiki. Start shows {s.wikiFrom} → {s.wikiTo} and sends every {w.computer} there at once.
           </p>
         )}
         {race && (step === "show" || step === "choose") && (

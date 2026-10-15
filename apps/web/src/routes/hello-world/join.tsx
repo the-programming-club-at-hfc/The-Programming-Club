@@ -7,14 +7,16 @@ import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
 import { CardView, Hint, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { InstagramLink } from "#/components/instagram";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { WikiPair, WikiRound } from "#/components/wiki";
 import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
-import { gamesIn, useSchedule, usesTeamComputer } from "#/lib/schedule";
+import { gamesIn, useJustEnded, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import { CLUB, isHfcEmail } from "#/lib/season";
+import { teamWords } from "#/lib/words";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/hello-world/join")({
@@ -37,12 +39,15 @@ const notHfc = (email: string, left: boolean) => {
 function Join() {
   const { code: codeFromQr } = Route.useSearch();
   const live = useQuery(api.sessions.live);
+  // After End night, this phone's token for the night that just ended, to show what it earned.
+  const last = useJustEnded(live !== null);
+  const sessionId = live ? live._id : (last?._id ?? null);
   const [token, setToken] = useState<string | null>(null);
   const me = useQuery(api.players.me, token ? { token } : "skip");
 
   useEffect(() => {
-    setToken(live ? localStorage.getItem(tokenKey(live._id)) : null);
-  }, [live?._id]);
+    setToken(sessionId ? localStorage.getItem(tokenKey(sessionId)) : null);
+  }, [sessionId]);
 
   useEffect(() => {
     // An officer removed this player, or the token is stale.
@@ -52,12 +57,13 @@ function Join() {
     }
   }, [token, me, live]);
 
-  if (live === undefined)
+  if (live === undefined || (live === null && (last === undefined || (token && me === undefined))))
     return (
       <Center>
         <p className="text-dim">Loading…</p>
       </Center>
     );
+  if (live === null && me?.ended) return <NightOver me={me} />;
   if (live === null)
     return (
       <Center>
@@ -71,6 +77,9 @@ function Join() {
         <Link to="/hello-world/season" className="btn mt-8">
           See this week’s game
         </Link>
+        <p className="mt-8">
+          <InstagramLink className="link" />
+        </p>
       </Center>
     );
 
@@ -88,6 +97,35 @@ function Join() {
     );
   }
   return <JoinForm initialCode={codeFromQr ?? ""} sessionId={live._id} onJoined={setToken} />;
+}
+
+/** After End night: what tonight earned, and the season board. */
+function NightOver({ me }: { me: Me }) {
+  const t = me.tonight;
+  return (
+    <Center>
+      <p className="text-dim">
+        Week {me.week} is over. Thanks, {me.name}!
+      </p>
+      {t ? (
+        <>
+          <h1 className="mt-3 text-[clamp(2.4rem,7vw,3.6rem)]">You earned {t.show + t.place + t.bonus} XP tonight</h1>
+          <p className="mx-auto mt-4 max-w-[40ch] text-lg text-dim">
+            {t.show} for coming{t.place > 0 && `, +${t.place} for your place`}
+            {t.bonus > 0 && `, +${t.bonus} bonus`}. Season XP: {me.seasonXp}.
+          </p>
+        </>
+      ) : (
+        <h1 className="mt-3 text-[clamp(2.4rem,7vw,3.6rem)] lowercase">{me.practice ? "practice night" : "see you next week"}</h1>
+      )}
+      {me.practice && <p className="mx-auto mt-4 max-w-[40ch] text-lg text-dim">Nothing tonight counts toward XP.</p>}
+      <Link to="/hello-world/scores" className="btn btn-primary mt-8">
+        See the scores
+      </Link>
+      <p className="mt-8 text-dim">Got photos from tonight? Tag us.</p>
+      <InstagramLink className="link mt-1" />
+    </Center>
+  );
 }
 
 function Center({ children }: { children: React.ReactNode }) {
@@ -324,6 +362,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   // The team key only matters while a team-computer game is the round being played or the card on the TV.
   const round = live.round !== null && live.round < wk.lineup.length ? wk.lineup[live.round].label : "";
   const teamComputer = gamesIn(round).some(usesTeamComputer) || (s.mode === "card" && !!s.game && usesTeamComputer(s.game));
+  const solo = live.teamSize === 1;
+  const w = teamWords(solo);
   return (
     <Wrap className="flex min-h-dvh max-w-2xl flex-col py-5">
       <p className="text-sm text-dim">
@@ -350,7 +390,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             <>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-dim">Your team</p>
+                  <p className="text-dim">{w.yourTeam}</p>
                   <h2 className="mt-1 text-2xl sm:text-3xl">{me.team.name}</h2>
                   <p className="mt-2 font-semibold">
                     {ordinal(me.team.rank)} of {me.team.of}
@@ -358,16 +398,17 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 </div>
                 <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
               </div>
-              <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>
+              {!solo && <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>}
               {me.team.key && teamComputer && (
                 <p className="mt-1 text-sm text-dim">
-                  Team computer key: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
+                  {w.key}: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
                 </p>
               )}
             </>
           ) : (
             <p className="text-xl font-semibold">
-              You’re in. Teams get picked in a minute.<span className="blink"> _</span>
+              {w.waiting}
+              <span className="blink"> _</span>
             </p>
           )}
         </div>
@@ -389,14 +430,14 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             <PuzzleStatus live={live} index={s.index} teamId={me.team._id} />
           ) : (
             <div className="card p-5">
-              <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} />
+              <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} solo={solo} />
             </div>
           )}
         </div>
       )}
       {s.mode === "wiki" && s.wikiReady && (
         <p className="card mt-5 p-6 text-xl font-bold">
-          Wiki Race next! Open {CLUB.url}/wiki on your team computer. It jumps to the start article when the race starts.
+          Wiki Race next! Open {CLUB.url}/wiki on your {w.computer}. It jumps to the start article when the race starts.
         </p>
       )}
       {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
@@ -419,9 +460,9 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
-        {!me.officer && me.team && <p className="w-full">Want to team up with a friend? Ask an officer to switch your team.</p>}
+        {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
         {me.officer ? (
-          <PlayTonight token={token} playing={me.playing} />
+          <PlayTonight token={token} playing={me.playing} when={w.officerPlays} />
         ) : (
           <p>
             Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
@@ -431,13 +472,14 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         <button onClick={onSwitch} className="link">
           Not {me.name}? Switch player
         </button>
+        <InstagramLink className="w-full justify-center border-t border-line pt-3" />
       </div>
     </Wrap>
   );
 }
 
-/** An officer's switch for nights when a team is short: on puts them on the smallest team. */
-function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
+/** An officer's switch for nights when a team is short: on puts them on the smallest team (their own, solo). */
+function PlayTonight({ token, playing, when }: { token: string; playing: boolean; when: string }) {
   const setPlaying = useMutation(api.players.setPlaying);
   const [error, setError] = useState("");
   return (
@@ -449,7 +491,7 @@ function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
         onChange={(e) => sender(setError)(setPlaying({ token, playing: e.target.checked }))}
       />
       Play tonight
-      {!playing && <span className="font-normal text-dim">(when a team is short)</span>}
+      {!playing && <span className="font-normal text-dim">({when})</span>}
       {error && <span className="font-normal text-signal">{error}</span>}
     </label>
   );
@@ -512,6 +554,7 @@ function TeamRace({
       error={error}
       onFinish={(clicks) => send(finish({ token, card: key, clicks }))}
       onUndo={() => send(undo({ token, card: key }))}
+      solo={live.teamSize === 1}
     />
   );
 }
@@ -550,6 +593,7 @@ function TeamAnswer({
       error={error}
       onPick={(p) => send(pick({ token, card: key, ...p }))}
       onLock={(step) => send(lock({ token, card: key, step }))}
+      solo={live.teamSize === 1}
     />
   );
 }
@@ -560,6 +604,7 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
   const key = cardKey("fix", index);
   const mine = board?.card === key ? board.fixed.find((f) => f.teamId === teamId) : undefined;
   const done = !!live.screen.revealed || live.scored.includes(key);
+  const w = teamWords(live.teamSize === 1);
   const status = mine
     ? done && mine.result
       ? `Fixed! +${mine.result.points}`
@@ -571,8 +616,8 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
     <div className="space-y-3">
       <div className={`rounded-[10px] p-5 ${mine ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
         <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">{status}</p>
-        {!done && <p className="mt-2 font-semibold">Fix it on your team computer. This phone keeps you posted.</p>}
-        {mine?.result?.first && <p className="mt-2 font-semibold">First team to fix it.</p>}
+        {!done && <p className="mt-2 font-semibold">Fix it on your {w.computer}. This phone keeps you posted.</p>}
+        {mine?.result?.first && <p className="mt-2 font-semibold">{w.first} to fix it.</p>}
       </div>
       <div className="card p-5">
         <CardView game="fix" index={index} answer={done} hint={!!live.screen.hint} />
@@ -587,6 +632,7 @@ function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; team
   const key = cardKey("puzzle", index);
   const mine = board?.card === key ? board.teams.find((t) => t.teamId === teamId) : undefined;
   const done = !!live.screen.revealed || live.scored.includes(key);
+  const w = teamWords(live.teamSize === 1);
   const times = [mine?.part1Ms ?? null, mine?.part2Ms ?? null];
   const n = times.filter((ms) => ms !== null).length;
   const status = done
@@ -602,12 +648,16 @@ function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; team
         <p className="mt-2 font-semibold">
           {times.map((ms, i) => `Part ${i + 1}: ${ms === null ? "not yet" : `★ at ${fmtElapsed(ms)}`}`).join(" · ")}
         </p>
-        {firsts.length > 0 && <p className="mt-1 font-semibold">First team to the {firsts.join(" and ")} star.</p>}
-        {!done && <p className="mt-1">Answers go in on your team computer. This phone keeps you posted.</p>}
+        {firsts.length > 0 && (
+          <p className="mt-1 font-semibold">
+            {w.first} to the {firsts.join(" and ")} star.
+          </p>
+        )}
+        {!done && <p className="mt-1">Answers go in on your {w.computer}. This phone keeps you posted.</p>}
       </div>
       {!done && live.screen.hint && <Hint text={`Part ${n ? 2 : 1}: ${PUZZLES[index].hint[n ? 1 : 0]}`} />}
       <div className="card p-5">
-        <CardView game="puzzle" index={index} answer={done} />
+        <CardView game="puzzle" index={index} answer={done} solo={w.solo} />
       </div>
     </div>
   );

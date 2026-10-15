@@ -412,3 +412,7 @@ export function wikiAwardsFor<T>(o: {
     }),
   };
 }
+
+/** Place among `all` scores: ties share a place without skipping the next (13, 13, 11 is 1st, 1st, 2nd), so teammates,
+ *  who always tie, never push the next team down. */
+export const placeOf = (score: number, all: number[]) => 1 + new Set(all.filter((o) => o > score)).size;

@@ -2,7 +2,8 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { addToSession, requireOpenSession, teamFor } from "./lib";
+import { addToSession, inTeamPool, joinTeam, leaveTeam, requireOpenSession, teamFor, upgradeOldNight } from "./lib";
+import { placeOf } from "../src/lib/grading";
 import { isOfficerEmail, requireOfficer } from "./officers";
 import { IDEA_MAX, cleanIdea } from "../src/lib/ideas";
 import { isHfcEmail } from "../src/lib/season";
@@ -129,11 +130,18 @@ export const setPlaying = mutation({
       .unique();
     const session = a && (await ctx.db.get(a.sessionId));
     if (!a?.officer || session?.status !== "open") throw new ConvexError("Only officers can switch that, during the night.");
-    await ctx.db.patch(a._id, { playing, teamId: playing ? (a.teamId ?? (await teamFor(ctx, session))) : undefined });
+    const s = await upgradeOldNight(ctx, session);
+    const me = (await ctx.db.get(a._id))!;
+    if (!playing) await leaveTeam(ctx, s, me);
+    else if (!me.teamId) {
+      const teamId = await teamFor(ctx, s, (await ctx.db.get(a.playerId))?.name ?? "Player");
+      if (teamId) await joinTeam(ctx, s, me, teamId);
+    }
+    await ctx.db.patch(a._id, { playing });
   },
 });
 
-/** A member's own view: their team, its rank, and their XP so far. */
+/** A member's own view: their team, its rank, their XP so far, and tonight's. */
 export const me = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
@@ -145,13 +153,13 @@ export const me = query({
     const [session, player] = await Promise.all([ctx.db.get(a.sessionId), ctx.db.get(a.playerId)]);
     if (!session || !player) return null;
 
-    // Practice nights and officer check-ins don't count toward season XP (same as the leaderboard).
+    // Practice nights don't count toward season XP, and officer check-ins only when they played (same as the leaderboard).
     const all = await ctx.db
       .query("attendance")
       .withIndex("by_player", (q) => q.eq("playerId", a.playerId))
       .collect();
     const nights = await Promise.all(all.map((h) => ctx.db.get(h.sessionId)));
-    const history = all.filter((h, i) => nights[i] && !nights[i].practice && !h.officer);
+    const history = all.filter((h, i) => nights[i] && !nights[i].practice && inTeamPool(h));
     const seasonXp = history.reduce((n, h) => n + h.showXp + (h.placeXp ?? 0) + h.bonusXp, 0);
 
     let team = null;
@@ -174,7 +182,10 @@ export const me = query({
           name: mine.name,
           key: mine.key ?? null,
           score: mine.score,
-          rank: 1 + teams.filter((t) => t.score > mine.score).length,
+          rank: placeOf(
+            mine.score,
+            teams.map((t) => t.score),
+          ),
           of: teams.length,
           members: names,
         };
@@ -190,6 +201,8 @@ export const me = query({
       team,
       seasonXp,
       weeks: history.length,
+      // This night's XP by the same rules (place XP lands when the night ends); null when it doesn't count.
+      tonight: !session.practice && inTeamPool(a) ? { show: a.showXp, place: a.placeXp ?? 0, bonus: a.bonusXp } : null,
     };
   },
 });

@@ -9,11 +9,14 @@ export const CLUB = {
   time: "5–6 p.m.",
   room: "Room E-178",
   url: "programmingclub.dev",
+  instagram: "hfc.codes",
   // Who can join, word for word as on approved club flyers (Student Clubs Policy Manual: only enrolled students participate).
   eligibility: "Open to all currently enrolled HFC students",
   advisor: { name: "Sreya Sadasivapetkar", email: "ssadasivapetkar@hfcc.edu", office: "E-162I" },
   timeZone: "America/Detroit",
 };
+
+export const INSTAGRAM_URL = `https://www.instagram.com/${CLUB.instagram}/`;
 
 /** HFC student (@hawkmail.hfcc.edu) and staff (@hfcc.edu) emails: the only ones members join with, since the club is HFC-only. */
 export const isHfcEmail = (email: string) => /@(hawkmail\.)?hfcc\.edu$/i.test(email.trim());

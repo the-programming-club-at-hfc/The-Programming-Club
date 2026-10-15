@@ -8,6 +8,7 @@ import type { Puzzle } from "#/lib/puzzles";
 import { cardSeconds } from "#/lib/grading";
 import { Code } from "./ui";
 import { sfx } from "#/lib/sound";
+import { teamWords } from "#/lib/words";
 
 export type Screen = Doc<"sessions">["screen"];
 export type Timer = Doc<"sessions">["timer"];
@@ -141,12 +142,15 @@ export function CardView({
   answer,
   hint = false,
   size = "md",
+  solo = false,
 }: {
   game: GameId;
   index: number;
   answer: boolean;
   hint?: boolean;
   size?: "md" | "xl";
+  /** A solo night: puzzles are solved alone, on your own computer. */
+  solo?: boolean;
 }) {
   const big = size === "xl";
   const codeCls = big ? "text-[clamp(1.4rem,2.6vw,3rem)]" : "";
@@ -156,7 +160,8 @@ export function CardView({
     return (
       <div>
         <p className={`text-dim ${big ? "text-[clamp(1.1rem,1.6vw,1.8rem)]" : ""}`}>
-          Solve it on your team computer, in any language. {p.relay ? "One keyboard: swap drivers at every chime." : "Everyone helps."}
+          Solve it on your {teamWords(solo).computer}, in any language.{" "}
+          {!solo && (p.relay ? "One keyboard: swap drivers at every chime." : "Everyone helps.")}
           <LevelChip level={p.level} />
         </p>
         <h3 className={`mt-3 lowercase ${big ? "text-[clamp(2.4rem,4.5vw,5rem)]" : "text-3xl"}`}>{p.name}</h3>
@@ -258,7 +263,7 @@ export function CardView({
     return (
       <div>
         <p className="text-dim">
-          Any language. Only the driver types; swap at every chime.
+          {solo ? "Any language." : "Any language. Only the driver types; swap at every chime."}
           <LevelChip level={r.level} />
         </p>
         <h3 className={`mt-3 lowercase ${big ? "text-[clamp(2.4rem,4.5vw,5rem)]" : "text-3xl"}`}>{r.name}</h3>

@@ -189,9 +189,206 @@ describe("teams", () => {
     expect(att.find((a) => a.officer)!.teamId).toBe(undefined);
   });
 
-  test("auto teams, on by default: joiners fill teams of up to 2, then up to the last Make teams size", async () => {
+  test("solo by default: each joiner gets a team of their own, named after them", async () => {
     const { t, officer, startNight, join, attendance, teams } = setup();
     const code = await startNight();
+    for (let i = 1; i <= 3; i++) await join(code, student(i));
+    // Same name, different person: numbered so the TV can tell them apart.
+    await join(code, { name: "Student 1", email: "other1@hawkmail.hfcc.edu" });
+    await join(code, { name: "Grace", email: GRACE });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const live = (await t.query(api.sessions.live, {}))!;
+    expect([live.autoTeams, live.teamSize]).toEqual([true, 1]);
+    expect(live.teams.map((tm) => [tm.name, tm.members]).sort(([a], [b]) => (a < b ? -1 : 1))).toEqual([
+      ["Student 1", ["Student 1"]],
+      ["Student 1 2", ["Student 1"]],
+      ["Student 2", ["Student 2"]],
+      ["Student 3", ["Student 3"]],
+    ]);
+    expect((await attendance()).filter((a) => a.officer).map((a) => a.teamId)).toEqual([undefined, undefined]);
+    expect(new Set((await teams()).map((tm) => tm.key)).size).toBe(4);
+    // Play tonight puts an officer on a team of their own too.
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    const team = (await t.query(api.players.me, { token: ada }))!.team!;
+    expect([team.name, team.members]).toEqual(["Ada", ["Ada"]]);
+  });
+
+  test("Make teams with size 1: everyone solo with their own points, and late joiners get their own", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    for (let i = 1; i <= 5; i++) await join(code, student(i));
+    await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await officer.mutation(api.teams.make, { size: 2 });
+    expect(await teams()).toHaveLength(2);
+    const scored = (await teams())[0]._id;
+    await officer.mutation(api.teams.score, { teamId: scored, delta: 3 });
+    const players = await t.run((ctx) => ctx.db.query("players").collect());
+    const onScored = new Set(
+      (await attendance()).filter((a) => a.teamId === scored).map((a) => players.find((p) => p._id === a.playerId)!.name),
+    );
+
+    await officer.mutation(api.teams.make, { size: 1 });
+    const live = (await t.query(api.sessions.live, {}))!;
+    expect(live.teamSize).toBe(1);
+    expect(live.teams.map((tm) => [tm.name, tm.members, tm.score]).sort()).toEqual(
+      [1, 2, 3, 4, 5].map((i) => [`Student ${i}`, [`Student ${i}`], onScored.has(`Student ${i}`) ? 3 : 0]),
+    );
+    expect((await attendance()).find((a) => a.officer)!.teamId).toBe(undefined);
+    await join(code, student(6));
+    expect((await t.query(api.sessions.live, {}))!.teams.find((tm) => tm.name === "Student 6")!.members).toEqual(["Student 6"]);
+  });
+
+  test("switching modes never loses points: teams start from their players' average, solo gives each their own back", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    for (let i = 1; i <= 4; i++) await join(code, student(i));
+    const lookup = async () => {
+      const players = await t.run((ctx) => ctx.db.query("players").collect());
+      const byName = new Map(players.map((p) => [p.name, p._id]));
+      const att = await attendance();
+      return (name: string) => att.find((a) => a.playerId === byName.get(name))!;
+    };
+    const teamOf = async (name: string) => (await lookup())(name).teamId!;
+    for (const [name, pts] of [
+      ["Student 1", 8],
+      ["Student 2", 4],
+      ["Student 3", 3],
+      ["Student 4", 1],
+    ] as const)
+      await officer.mutation(api.teams.score, { teamId: await teamOf(name), delta: pts });
+
+    await officer.mutation(api.teams.make, { size: 2 });
+    const pairs = await teams();
+    expect(pairs).toHaveLength(2);
+    const of = await lookup();
+    for (const team of pairs) {
+      const pts = (await attendance()).filter((a) => a.teamId === team._id).map((a) => a.points ?? 0);
+      expect(team.score).toBe(Math.round((pts[0] + pts[1]) / 2));
+    }
+    // Points as a pair go to both players.
+    await officer.mutation(api.teams.score, { teamId: of("Student 1").teamId!, delta: 2 });
+
+    await officer.mutation(api.teams.make, { size: 1 });
+    const live = (await t.query(api.sessions.live, {}))!;
+    const back = Object.fromEntries(live.teams.map((tm) => [tm.name, tm.score]));
+    const mate = [2, 3, 4].map((i) => `Student ${i}`).find((n) => of(n).teamId === of("Student 1").teamId)!;
+    expect(back["Student 1"]).toBe(10);
+    expect(back[mate]).toBe({ "Student 2": 4, "Student 3": 3, "Student 4": 1 }[mate]! + 2);
+
+    await officer.mutation(api.teams.resetScores, {});
+    expect((await attendance()).every((a) => !a.points)).toBe(true);
+  });
+
+  test("teams can't be remade mid-round: answers in but not revealed lock the mode until the reveal", async () => {
+    const { t, officer, nightWithTeams, show } = setup();
+    const { teams } = await nightWithTeams(4);
+    await show({ mode: "card", game: "output", index: 0 });
+    expect((await t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
+    await t.mutation(api.answers.pick, { token: teams[0].tokens[0], card: "output:0", choice: OUTPUTS[0].answer });
+    // Still locked after the card leaves the TV unrevealed.
+    await show({ mode: "scoreboard" });
+    expect((await t.query(api.sessions.live, {}))!.unrevealed).toEqual(["output:0"]);
+    await expect(officer.mutation(api.teams.make, { size: 1 })).rejects.toThrow("Finish the round first");
+
+    await show({ mode: "card", game: "output", index: 0, revealed: true });
+    expect((await t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
+    await officer.mutation(api.teams.make, { size: 1 });
+  });
+
+  test("Play tonight off and back on, solo: the officer's own points come back, and no empty team is left behind", async () => {
+    const { t, officer, startNight, join, teams } = setup();
+    const code = await startNight();
+    await join(code, student(1));
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    const mine = async () => (await t.query(api.players.me, { token: ada }))!.team;
+    await officer.mutation(api.teams.score, { teamId: (await mine())!._id, delta: 4 });
+
+    await t.mutation(api.players.setPlaying, { token: ada, playing: false });
+    expect((await teams()).map((tm) => tm.name)).toEqual(["Student 1"]);
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    expect([(await mine())!.name, (await mine())!.score]).toEqual(["Ada", 4]);
+    expect(await teams()).toHaveLength(2);
+  });
+
+  test("taking a solo player off their team: no empty team left behind, but not while their answers wait for a reveal", async () => {
+    const { t, officer, startNight, join, attendance, teams, show } = setup();
+    const code = await startNight();
+    const tokens = [await join(code, student(1)), await join(code, student(2)), await join(code, student(3))];
+    const row = async (i: number) => (await attendance()).find((a) => a.token === tokens[i])!;
+    await show({ mode: "card", game: "output", index: 0 });
+    await t.mutation(api.answers.pick, { token: tokens[0], card: "output:0", choice: OUTPUTS[0].answer });
+    await expect(officer.mutation(api.teams.move, { attendanceId: (await row(0))._id, teamId: null })).rejects.toThrow(
+      "Finish the round first",
+    );
+    await show({ mode: "card", game: "output", index: 0, revealed: true });
+
+    // The host's team picker: onto someone else's team, then off to no team.
+    await officer.mutation(api.teams.move, { attendanceId: (await row(0))._id, teamId: (await row(1)).teamId! });
+    expect((await teams()).map((tm) => tm.name).sort()).toEqual(["Student 2", "Student 3"]);
+    await officer.mutation(api.teams.move, { attendanceId: (await row(1))._id, teamId: null });
+    expect((await teams()).map((tm) => tm.name).sort()).toEqual(["Student 2", "Student 3"]); // Student 1 is still on it
+    await officer.mutation(api.teams.removePlayer, { attendanceId: (await row(2))._id });
+    expect((await teams()).map((tm) => tm.name)).toEqual(["Student 2"]);
+  });
+
+  test("Auto teams back on: a player taken off their team gets a team starting from their own points", async () => {
+    const { officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    const token = await join(code, student(1));
+    const row = async () => (await attendance()).find((a) => a.token === token)!;
+    await officer.mutation(api.teams.score, { teamId: (await row()).teamId!, delta: 5 });
+    await officer.mutation(api.teams.move, { attendanceId: (await row())._id, teamId: null });
+    await officer.mutation(api.teams.setAuto, { on: false });
+    await officer.mutation(api.teams.setAuto, { on: true });
+    expect((await teams()).map((tm) => [tm.name, tm.score])).toEqual([["Student 1", 5]]);
+  });
+
+  test("Remove team waits for the round: a team with answers in can't be removed until the reveal", async () => {
+    const { t, officer, startNight, join, teams, show } = setup();
+    const code = await startNight();
+    const token = await join(code, student(1));
+    await show({ mode: "card", game: "output", index: 0 });
+    await t.mutation(api.answers.pick, { token, card: "output:0", choice: OUTPUTS[0].answer });
+    const [team] = await teams();
+    await expect(officer.mutation(api.teams.remove, { teamId: team._id })).rejects.toThrow("Finish the round first");
+    await show({ mode: "card", game: "output", index: 0, revealed: true });
+    await officer.mutation(api.teams.remove, { teamId: team._id });
+    expect(await teams()).toHaveLength(0);
+  });
+
+  test("Play tonight off on a team night leaves the partner's team as it is", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    await join(code, student(1));
+    await officer.mutation(api.teams.make, { size: 2 });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    const team = (await attendance()).find((a) => a.token === ada)!.teamId!;
+    await officer.mutation(api.teams.score, { teamId: team, delta: 3 });
+    await t.mutation(api.players.setPlaying, { token: ada, playing: false });
+    expect((await teams()).map((tm) => [tm._id, tm.score])).toEqual([[team, 3]]);
+  });
+
+  test("the TV's final standings are the night that ended last, even an older one ended again", async () => {
+    const { t, officer, startNight, join, attendance } = setup();
+    await join(await startNight(1), student(1));
+    await officer.mutation(api.sessions.end, {});
+    const week1 = (await attendance())[0].sessionId;
+    later(60);
+    await join(await startNight(2), student(2));
+    await officer.mutation(api.sessions.end, {});
+    later(60);
+    await officer.mutation(api.sessions.reopen, { sessionId: week1 });
+    await officer.mutation(api.sessions.end, {});
+    expect((await t.query(api.sessions.final, {}))!.week).toBe(1);
+  });
+
+  test("auto teams fill teams up to the last Make teams size", async () => {
+    const { t, officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    // Picking teams of 2 before anyone joins sets the night's size.
+    await officer.mutation(api.teams.make, { size: 2 });
     for (let i = 1; i <= 7; i++) await join(code, student(i));
     await join(code, { name: "Grace", email: GRACE });
     const att = await attendance();
@@ -210,16 +407,27 @@ describe("teams", () => {
   });
 
   test("with auto teams off, joiners wait for Make teams; turning it back on places them", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
-    const code = await startNight();
-    await officer.mutation(api.teams.setAuto, { on: false });
-    for (let i = 1; i <= 4; i++) await join(code, student(i));
-    expect(await teams()).toHaveLength(0);
-    expect((await t.query(api.sessions.live, {}))!.autoTeams).toBe(false);
-    await expect(t.mutation(api.teams.setAuto, { on: true })).rejects.toThrow("Only club officers");
-    await officer.mutation(api.teams.setAuto, { on: true });
-    expect((await attendance()).every((a) => a.teamId)).toBe(true);
-    expect(await teams()).toHaveLength(2);
+    // [size, teams for 4 players, teams once a 5th joins with auto off again: smallest team, or their own when solo]
+    for (const [size, count, late] of [
+      [2, 2, 2],
+      [1, 4, 5],
+    ] as const) {
+      const { t, officer, startNight, join, attendance, teams } = setup();
+      const code = await startNight();
+      await officer.mutation(api.teams.make, { size });
+      await officer.mutation(api.teams.setAuto, { on: false });
+      for (let i = 1; i <= 4; i++) await join(code, student(i));
+      expect(await teams()).toHaveLength(0);
+      expect((await t.query(api.sessions.live, {}))!.autoTeams).toBe(false);
+      await expect(t.mutation(api.teams.setAuto, { on: true })).rejects.toThrow("Only club officers");
+      await officer.mutation(api.teams.setAuto, { on: true });
+      expect((await attendance()).every((a) => a.teamId)).toBe(true);
+      expect(await teams()).toHaveLength(count);
+      await officer.mutation(api.teams.setAuto, { on: false });
+      await join(code, student(5));
+      expect((await attendance()).every((a) => a.teamId)).toBe(true);
+      expect(await teams()).toHaveLength(late);
+    }
   });
 
   test("Play tonight puts an officer on a team, and off again", async () => {
@@ -516,23 +724,23 @@ describe("points", () => {
 });
 
 describe("ending the night", () => {
-  test("place XP: 3, 2, 1 by rank, ties share the higher place", () => {
-    const xp = (...scores: number[]) => {
-      const teams = scores.map((score, i) => ({ _id: `t${i}`, score }) as unknown as Doc<"teams">);
-      return teams.map((tm) => placeXpFor(teams).get(tm._id));
+  test("place XP: 3, 2, 1 by each player's own points; ties share a place and don't skip the next", () => {
+    const xp = (...points: number[]) => {
+      const att = points.map((p, i) => ({ _id: `a${i}`, teamId: `t${i}`, points: p }) as unknown as Doc<"attendance">);
+      return att.map((a) => placeXpFor(att).get(a._id));
     };
     expect(xp(9, 5, 2, 1)).toEqual([3, 2, 1, 0]);
-    expect(xp(5, 5, 2)).toEqual([3, 3, 1]);
+    expect(xp(13, 13, 11, 9, 4)).toEqual([3, 3, 2, 1, 0]);
     expect(xp(4, 0, 0)).toEqual([3, 0, 0]);
   });
 
-  test("place XP by rank (ties share), nothing for 0 points or for officers, and officers off the leaderboard", async () => {
-    const { t, officer, nightWithTeams, join, attendance, score } = setup();
+  test("place XP by rank (ties share), nothing for 0 points or for officers running the night, who stay off the leaderboard", async () => {
+    const { t, officer, nightWithTeams, attendance, score } = setup();
     const { code, teams } = await nightWithTeams(8);
     const [a, b, c, d] = teams;
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
-    const grace = await join(code, { name: "Grace", email: GRACE });
-    await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // joins the smallest team
+    const grace = await t.mutation(api.players.join, { code, name: "Grace", email: GRACE, broughtBy: "Student 1" });
+    await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // a new team, with 0 points
     // c and d tie for 3rd with 0 points, which earns nothing.
     await officer.mutation(api.teams.score, { teamId: a._id, delta: 10 });
     await officer.mutation(api.teams.score, { teamId: b._id, delta: 10 });
@@ -551,14 +759,32 @@ describe("ending the night", () => {
     expect(xpOf(ada)).toBe(0);
     expect(await score(d._id)).toBe(0);
 
+    // The TV's final standings: each team's points and place XP, names only.
+    const final = (await t.query(api.sessions.final, {}))!;
+    expect(final.teams.map((tm) => [tm.score, tm.xp])).toEqual([
+      [10, 3],
+      [10, 3],
+      [0, 0],
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(JSON.stringify(final)).not.toContain("@");
+
     const board = await t.query(api.stats.leaderboard, {});
-    expect(board).toHaveLength(8);
-    expect(board.some((r) => r.name === "Ada" || r.name === "Grace")).toBe(false);
+    // Ada ran the night; Grace played, so she counts like everyone else.
+    expect(board).toHaveLength(9);
+    expect(board.some((r) => r.name === "Ada")).toBe(false);
+    expect(board.find((r) => r.name === "Grace")!.xp).toBe(3);
     expect(board[0].xp).toBe(3 + 3);
-    // Teams c and d scored nothing, so their players get show XP plus any bonus.
+    // Teams c, d, and Grace's scored nothing, so their players get show XP plus any bonus.
     expect(board.filter((r) => r.xp === 3 + 2)).toHaveLength(1);
-    expect(board.filter((r) => r.xp === 3)).toHaveLength(3);
+    expect(board.filter((r) => r.xp === 3)).toHaveLength(4);
     expect((await t.query(api.players.me, { token: ada }))!.seasonXp).toBe(0);
+    expect((await t.query(api.players.me, { token: grace }))!.seasonXp).toBe(3);
+    // Phones after End night: what tonight earned, nothing for an officer who ran it.
+    expect((await t.query(api.players.me, { token: a.tokens[0] }))!.tonight).toEqual({ show: 3, place: 3, bonus: 0 });
+    expect((await t.query(api.players.me, { token: d.tokens[0] }))!.tonight).toEqual({ show: 3, place: 0, bonus: 2 });
+    expect((await t.query(api.players.me, { token: ada }))!.tonight).toBe(null);
     expect((await t.query(api.players.me, { token: a.tokens[0] }))!.seasonXp).toBe(6);
 
     // Officers still count for attendance.
@@ -566,6 +792,114 @@ describe("ending the night", () => {
     const sheet = await officer.query(api.sessions.attendanceExport, { sessionId });
     expect(sheet.rows).toHaveLength(10);
     expect(sheet.rows.filter((r) => r.status === "HFC student")).toHaveLength(8);
+    // Who brought whom stays on the sheet after the night, for the +2 friend XP.
+    expect(sheet.rows.find((r) => r.name === "Grace")!.broughtBy).toBe("Student 1");
+  });
+
+  test("place XP on a solo night: each player's own rank, ties share without skipping", async () => {
+    const { t, officer, startNight, join, attendance } = setup();
+    const code = await startNight();
+    const tokens = [];
+    for (let i = 1; i <= 5; i++) tokens.push(await join(code, student(i)));
+    const live = (await t.query(api.sessions.live, {}))!;
+    const team = (i: number) => live.teams.find((tm) => tm.name === student(i).name)!._id;
+    for (const [i, pts] of [
+      [1, 5],
+      [2, 5],
+      [3, 2],
+      [4, 1],
+    ])
+      await officer.mutation(api.teams.score, { teamId: team(i), delta: pts });
+    await officer.mutation(api.sessions.end, {});
+    const att = await attendance();
+    expect(tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp)).toEqual([3, 3, 2, 1, 0]);
+    expect((await t.query(api.stats.leaderboard, {})).map((r) => r.xp)).toEqual([6, 6, 5, 4, 3]);
+  });
+
+  test("a night that switched solo to teams: place XP still goes by each player's own points", async () => {
+    const { t, officer, startNight, join, attendance } = setup();
+    const code = await startNight();
+    const tokens = [];
+    for (let i = 1; i <= 4; i++) tokens.push(await join(code, student(i)));
+    const solo = (await t.query(api.sessions.live, {}))!.teams;
+    for (const [i, pts] of [
+      [1, 8],
+      [2, 4],
+      [3, 3],
+      [4, 1],
+    ])
+      await officer.mutation(api.teams.score, { teamId: solo.find((tm) => tm.name === student(i).name)!._id, delta: pts });
+    await officer.mutation(api.teams.make, { size: 2 });
+    await officer.mutation(api.sessions.end, {});
+
+    const att = await attendance();
+    expect(tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp)).toEqual([3, 2, 1, 0]);
+    // Teammates with different place XP show it by their names on the TV.
+    const final = (await t.query(api.sessions.final, {}))!;
+    for (const tm of final.teams) {
+      expect(tm.xp).toBe(undefined);
+      expect(tm.members.every((m) => /\+\d$/.test(m))).toBe(true);
+    }
+  });
+
+  /** A team night as the code before player points left it: team scores only, and teamSize only if Make teams ran. */
+  async function oldNight(keepSize: boolean) {
+    const ctx = setup();
+    const { code, teams } = await ctx.nightWithTeams(4);
+    await ctx.officer.mutation(api.teams.score, { teamId: teams[0]._id, delta: 5 });
+    await ctx.officer.mutation(api.teams.score, { teamId: teams[1]._id, delta: 2 });
+    await ctx.t.run(async (db) => {
+      for (const a of await db.db.query("attendance").collect()) await db.db.patch(a._id, { points: undefined });
+      for (const s of await db.db.query("sessions").collect())
+        await db.db.patch(s._id, { playerPoints: undefined, ...(!keepSize && { teamSize: undefined }) });
+    });
+    return { ...ctx, code, teams };
+  }
+
+  test("a night from before player points: reopening and ending it again keeps its place XP, and it stays a team night", async () => {
+    for (const keepSize of [false, true]) {
+      const { t, officer, attendance, join, code } = await oldNight(keepSize);
+      await t.run(async (db) => {
+        // Ended by the old code: place XP stored from team standings.
+        for (const s of await db.db.query("sessions").collect()) await db.db.patch(s._id, { status: "ended", endedAt: Date.now() });
+        const teams = await db.db.query("teams").collect();
+        for (const a of await db.db.query("attendance").collect()) {
+          const score = teams.find((tm) => tm._id === a.teamId)?.score ?? 0;
+          await db.db.patch(a._id, { placeXp: score === 5 ? 3 : score === 2 ? 2 : 0 });
+        }
+      });
+      const before = (await attendance()).map((a) => [a.token, a.placeXp]);
+      // The TV shows what End night stored.
+      expect((await t.query(api.sessions.final, {}))!.teams.map((tm) => tm.xp)).toEqual([3, 2]);
+
+      await officer.mutation(api.sessions.reopen, { sessionId: (await attendance())[0].sessionId });
+      expect((await t.query(api.sessions.live, {}))!.teamSize).toBe(2);
+      await join(code, student(5)); // teams of 2 are full: a new team, not one named after them
+      expect((await t.query(api.sessions.live, {}))!.teams.map((tm) => tm.name)).not.toContain("Student 5");
+      await officer.mutation(api.sessions.end, {});
+      const after = new Map((await attendance()).map((a) => [a.token, a.placeXp]));
+      for (const [token, xp] of before) expect(after.get(token as string)).toBe(xp);
+    }
+  });
+
+  test("a night from before player points that's still open: removing a team keeps its players' points", async () => {
+    const { officer, attendance, teams } = await oldNight(false);
+    await officer.mutation(api.teams.remove, { teamId: teams[0]._id });
+    const att = await attendance();
+    expect(teams[0].tokens.map((tk) => att.find((a) => a.token === tk)!.points)).toEqual([5, 5]);
+  });
+
+  test("a night from before player points that's still open: scoring first doesn't lose the old points", async () => {
+    const { officer, attendance, teams } = await oldNight(false);
+    // The trailing team gets +4: 6 to the leaders' 5.
+    await officer.mutation(api.teams.score, { teamId: teams[1]._id, delta: 4 });
+    await officer.mutation(api.sessions.end, {});
+    const att = await attendance();
+    const xpOf = (i: number) => teams[i].tokens.map((tk) => att.find((a) => a.token === tk)!.placeXp);
+    expect([xpOf(0), xpOf(1)]).toEqual([
+      [2, 2],
+      [3, 3],
+    ]);
   });
 
   test("practice nights stay out of XP, the leaderboard, and the attendance sheet", async () => {
@@ -574,6 +908,7 @@ describe("ending the night", () => {
     const token = await join(code, student(1));
     await officer.mutation(api.sessions.end, {});
     expect(await t.query(api.stats.leaderboard, {})).toEqual([]);
+    expect((await t.query(api.sessions.final, {}))!.teams.every((tm) => tm.xp === undefined)).toBe(true);
     expect((await t.query(api.players.me, { token }))!.seasonXp).toBe(0);
     await expect(officer.query(api.sessions.attendanceExport, { sessionId: (await attendance())[0].sessionId })).rejects.toThrow(
       "Practice nights",
@@ -593,5 +928,8 @@ describe("ending the night", () => {
     }
     const [row] = await t.query(api.stats.leaderboard, {});
     expect([row.xp, row.weeks, row.founder]).toEqual([2 * (3 + 3), 2, true]);
+    // Each night's breakdown, for /scores. Names only: no emails on this public query.
+    expect(row.nights).toEqual([1, 2].map((week) => ({ week, show: 3, place: 3, bonus: 0 })));
+    expect(JSON.stringify(await t.query(api.stats.leaderboard, {}))).not.toContain("@");
   });
 });

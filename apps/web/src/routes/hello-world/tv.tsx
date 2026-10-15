@@ -3,16 +3,20 @@ import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { InstagramQr } from "#/components/instagram";
 import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
-import { cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
-import { nextMeeting, useSchedule } from "#/lib/schedule";
+import { cardKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
+import { nextMeeting, useJustEnded, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
+import { teamWords } from "#/lib/words";
+import type { TeamWords } from "#/lib/words";
 
 export const Route = createFileRoute("/hello-world/tv")({
   head: () => ({ meta: [{ title: `TV · ${CLUB.season}` }] }),
@@ -53,7 +57,7 @@ function TvScreen() {
       className="theme-pine relative flex h-screen flex-col overflow-hidden"
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
-      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <Attract /> : null}
+      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <AfterNight /> : null}
       {!sound && (
         <button
           className="absolute top-4 right-4 z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim"
@@ -79,6 +83,19 @@ function CodeSquares({ code, className = "" }: { code: string; className?: strin
         </span>
       ))}
     </span>
+  );
+}
+
+/** After End night: the final standings for a while, then the attract screen. */
+function AfterNight() {
+  const last = useJustEnded();
+  if (last === undefined) return null;
+  return last ? (
+    <div className="flex-1 overflow-hidden p-[3.5vw]">
+      <Scoreboard teams={last.teams} solo={last.solo} practice={last.practice} final />
+    </div>
+  ) : (
+    <Attract />
   );
 }
 
@@ -109,6 +126,7 @@ function Attract() {
           </p>
         )}
         <p className="mt-[0.8vw] text-[1.5vw] text-dim">Grab a seat. The game starts soon.</p>
+        <InstagramQr compact className="mt-[2.5vw]" />
       </div>
     </div>
   );
@@ -125,6 +143,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const plan = useSchedule();
   const wk = plan[live.week - 1];
   const wt = weekTile(wk);
+  const w = teamWords(live.teamSize === 1);
   const deckTile = s.game ? GAME_TILE[s.game] : null;
   const answerable = s.mode === "card" && isAnswerGame(s.game) && s.index !== undefined;
   const boardData = useQuery(api.answers.board, answerable ? {} : "skip");
@@ -159,7 +178,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
       <div className={s.mode === "slides" ? "flex min-h-0 flex-1" : "flex-1 overflow-hidden p-[3.5vw]"}>
         {s.mode === "slides" && <Slides screen={s} />}
         {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
-        {s.mode === "scoreboard" && <Scoreboard live={live} />}
+        {s.mode === "scoreboard" && <Scoreboard teams={live.teams} solo={live.teamSize === 1} practice={live.practice} />}
         {s.mode === "timer" && (
           <div className="grid h-full place-items-center">
             <BigTimer remaining={remaining} running={running} swap={isSwapMoment(live.timer, remaining)} size="text-[34vw]" />
@@ -176,12 +195,12 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
               {DECKS[s.game].name}
               {board && board.locked !== null && !s.revealed && board.teams > 0 && (
                 <span className="ml-auto">
-                  <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} teams locked in
+                  <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} {w.teams} locked in
                 </span>
               )}
               {fixBoard && !done && fixBoard.teams > 0 && (
                 <span className="ml-auto">
-                  <span className="narrow text-[2.6vw] font-extrabold">{fixBoard.fixed.length}</span> of {fixBoard.teams} teams fixed it
+                  <span className="narrow text-[2.6vw] font-extrabold">{fixBoard.fixed.length}</span> of {fixBoard.teams} {w.teams} fixed it
                 </span>
               )}
               {puzzleBoard && !done && stars !== null && stars > 0 && (
@@ -191,10 +210,10 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
               )}
             </p>
             <div className={board?.results || fixBoard || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
-              <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" />
+              <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" solo={w.solo} />
               {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
-              {fixBoard && <FixList board={fixBoard} done={done} />}
-              {puzzleBoard && <StarBoard board={puzzleBoard} done={done} />}
+              {fixBoard && <FixList board={fixBoard} done={done} w={w} />}
+              {puzzleBoard && <StarBoard board={puzzleBoard} done={done} w={w} />}
             </div>
           </div>
         )}
@@ -202,9 +221,9 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
           <div className="grid h-full place-items-center text-center">
             <div>
               <p className="text-[2vw] font-bold text-dim">Wiki Race{s.wikiClicks ? ": Fewest Clicks" : ""} · get ready</p>
-              <p className="mt-[1.5vw] text-[2.4vw]">Team computers, open</p>
+              <p className="mt-[1.5vw] text-[2.4vw]">{w.openOn}</p>
               <p className="mt-[0.5vw] text-[6vw] leading-[1] font-extrabold tracking-[-0.03em]">{CLUB.url}/wiki</p>
-              <p className="mt-[2vw] text-[1.8vw] text-dim">The start and target go up when the race starts, for every team at once.</p>
+              <p className="mt-[2vw] text-[1.8vw] text-dim">The start and target go up when the race starts, for {w.everyone} at once.</p>
             </div>
           </div>
         )}
@@ -215,7 +234,9 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 <div className="bg-mist p-[3vw]">
                   <p className="text-[1.6vw] text-dim">Start here</p>
                   <p className="mt-[0.8vw] text-[5vw] leading-[0.95] font-extrabold tracking-[-0.03em]">{s.wikiFrom}</p>
-                  <p className="mt-[1.2vw] text-[1.6vw] font-bold">Team computers: {CLUB.url}/wiki</p>
+                  <p className="mt-[1.2vw] text-[1.6vw] font-bold">
+                    {w.Computers}: {CLUB.url}/wiki
+                  </p>
                 </div>
                 <div className="tile tile-sky p-[3vw]">
                   <p className="text-[1.6vw]">Get to</p>
@@ -224,10 +245,10 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
               </div>
               <p className="text-[1.5vw] text-dim">
                 {s.wikiClicks ? "Fewest clicks wins. Count every link you click. " : ""}
-                Links inside the article only. No search bar. Back button and Ctrl+F are fine. Tap “We made it!” on a phone when you land.
+                Links inside the article only. No search bar. Back button and Ctrl+F are fine. Tap “{w.madeIt}” on a phone when you land.
               </p>
             </div>
-            {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} />}
+            {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} w={w} />}
           </div>
         )}
         {s.mode === "message" && (
@@ -289,36 +310,59 @@ function useCountSound(card: string | undefined, n: number | null) {
   }, [card, n]);
 }
 
+/** One row per team beside the card. Solo nights make that one per player, so past 7 they go to one tight line each,
+ *  and past 12 the rest are counted instead of listed. */
+function TeamRows<T>({ rows, row }: { rows: T[]; row: (r: T, tight: boolean) => ReactNode }) {
+  const tight = rows.length > 7;
+  return (
+    <>
+      <ol className={`mt-[1vw] flex flex-col ${tight ? "gap-[0.3vw]" : "gap-[0.5vw]"}`}>{rows.slice(0, 12).map((r) => row(r, tight))}</ol>
+      {rows.length > 12 && <p className="mt-[0.6vw] text-[1.3vw] text-dim">+ {rows.length - 12} more</p>}
+    </>
+  );
+}
+
+// A row's padding, name, and end number at full size and tight.
+const ROW = (tight: boolean) => (tight ? "py-[0.35vw]" : "py-[0.8vw]");
+const NAME = (tight: boolean) => (tight ? "text-[1.4vw]" : "text-[1.8vw]");
+const END = (tight: boolean) => (tight ? "text-[1.8vw]" : "text-[2.6vw]");
+
 /** Fix it for real: the teams that fixed it, in order, with their times. Points join them once it's scored. No code. */
-function FixList({ board, done }: { board: FixBoard; done: boolean }) {
+function FixList({ board, done, w }: { board: FixBoard; done: boolean; w: TeamWords }) {
   return (
     <div>
-      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your team computer</p>}
+      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your {w.computer}</p>}
       {board.fixed.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
       ) : (
-        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
-          {board.fixed.map((f, i) => (
-            <li key={f.teamId} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
-              <span className="narrow text-[2.4vw] leading-none font-extrabold text-meadow">{i + 1}</span>
+        <TeamRows
+          rows={board.fixed.map((f, i) => ({ ...f, i }))}
+          row={(f, tight) => (
+            <li
+              key={f.teamId}
+              className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
+            >
+              <span className={`narrow ${END(tight)} leading-none font-extrabold text-meadow`}>{f.i + 1}</span>
               <span className="min-w-0">
-                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{f.name}</span>
-                <span className="block text-[1.2vw] text-dim">
-                  {f.ms === null ? "fixed" : `fixed at ${fmtElapsed(f.ms)}`}
-                  {f.result?.first ? " · first" : ""}
-                </span>
+                <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{f.name}</span>
+                {!tight && (
+                  <span className="block text-[1.2vw] text-dim">
+                    {f.ms === null ? "fixed" : `fixed at ${fmtElapsed(f.ms)}`}
+                    {f.result?.first ? " · first" : ""}
+                  </span>
+                )}
               </span>
-              <span className="narrow text-[2.6vw] leading-none font-extrabold">{f.result ? `+${f.result.points}` : "✓"}</span>
+              <span className={`narrow ${END(tight)} leading-none font-extrabold`}>{f.result ? `+${f.result.points}` : "✓"}</span>
             </li>
-          ))}
-        </ol>
+          )}
+        />
       )}
     </div>
   );
 }
 
 /** Puzzles: every team's stars, most first, with times on the puzzle's clock. Points join them once it's scored. Never answers. */
-function StarBoard({ board, done }: { board: PuzzleBoard; done: boolean }) {
+function StarBoard({ board, done, w }: { board: PuzzleBoard; done: boolean; w: TeamWords }) {
   const star = (ms: number | null, first: boolean) => (
     <span className={`block text-[1.2vw] ${ms === null ? "text-dim" : ""}`}>
       <span className={ms === null ? "" : "text-gold"}>{ms === null ? "☆" : "★"}</span>
@@ -327,35 +371,47 @@ function StarBoard({ board, done }: { board: PuzzleBoard; done: boolean }) {
   );
   return (
     <div>
-      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your team computer</p>}
+      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your {w.computer}</p>}
       {board.teams.length === 0 ? (
-        <p className="mt-[1vw] text-[1.6vw] text-dim">No teams yet.</p>
+        <p className="mt-[1vw] text-[1.6vw] text-dim">{w.noTeams}</p>
       ) : (
-        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
-          {board.teams.map((t) => (
-            <li key={t.teamId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.7vw]">
-              <span className="min-w-0 truncate text-[1.8vw] leading-tight font-extrabold">{t.name}</span>
-              <span>
-                {star(t.part1Ms, t.first1)}
-                {star(t.part2Ms, t.first2)}
-              </span>
-              {done && <span className="narrow text-[2.6vw] leading-none font-extrabold">+{t.result?.points ?? 0}</span>}
+        <TeamRows
+          rows={board.teams}
+          row={(t, tight) => (
+            <li
+              key={t.teamId}
+              className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
+            >
+              <span className={`min-w-0 truncate ${NAME(tight)} leading-tight font-extrabold`}>{t.name}</span>
+              {tight ? (
+                // Just the stars: no room for times.
+                <span className="text-[1.4vw] leading-none text-gold">
+                  {t.part1Ms === null ? "☆" : "★"}
+                  {t.part2Ms === null ? "☆" : "★"}
+                </span>
+              ) : (
+                <span>
+                  {star(t.part1Ms, t.first1)}
+                  {star(t.part2Ms, t.first2)}
+                </span>
+              )}
+              {done && <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{t.result?.points ?? 0}</span>}
             </li>
-          ))}
-        </ol>
+          )}
+        />
       )}
     </div>
   );
 }
 
 /** Wiki Race: the finish order with places and times (or click counts), then every team's points once it's scored. */
-function RaceList({ board, done }: { board: WikiBoard; done: boolean }) {
+function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: TeamWords }) {
   const rows = board.results
     ? board.results.map((r) => ({
         key: r.teamId,
         name: r.name,
         place: r.result?.place ?? null,
-        note: null,
+        note: null as string | null,
         end: `+${r.result?.points ?? 0}`,
       }))
     : board.finished
@@ -372,29 +428,32 @@ function RaceList({ board, done }: { board: WikiBoard; done: boolean }) {
   return (
     <div>
       {!done && (
-        <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">
+        <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">
           {board.clicks ? "Fewest clicks so far" : "Finish order"}
         </p>
       )}
       {rows.length === 0 ? (
-        <p className="mt-[1vw] text-[1.6vw] text-dim">Nobody yet. Tap “We made it!” on a phone when you land.</p>
+        <p className="mt-[1vw] text-[1.6vw] text-dim">Nobody yet. Tap “{w.madeIt}” on a phone when you land.</p>
       ) : (
-        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
-          {rows.map((r) => (
-            <li key={r.key} className="grid grid-cols-[3.4vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
-              <span className={`narrow text-[2.2vw] leading-none font-extrabold ${r.place !== null ? "text-meadow" : "text-dim"}`}>
+        <TeamRows
+          rows={rows}
+          row={(r, tight) => (
+            <li key={r.key} className={`grid grid-cols-[3.4vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}>
+              <span
+                className={`narrow ${tight ? "text-[1.6vw]" : "text-[2.2vw]"} leading-none font-extrabold ${r.place !== null ? "text-meadow" : "text-dim"}`}
+              >
                 {r.place !== null ? ordinal(r.place) : "–"}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{r.name}</span>
-                {(r.note || (board.results && r.place === null)) && (
+                <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{r.name}</span>
+                {!tight && (r.note || (board.results && r.place === null)) && (
                   <span className="block text-[1.2vw] text-dim">{r.note || "for playing"}</span>
                 )}
               </span>
-              <span className="narrow text-[2.6vw] leading-none font-extrabold">{r.end}</span>
+              <span className={`narrow ${END(tight)} leading-none font-extrabold`}>{r.end}</span>
             </li>
-          ))}
-        </ol>
+          )}
+        />
       )}
     </div>
   );
@@ -403,24 +462,29 @@ function RaceList({ board, done }: { board: WikiBoard; done: boolean }) {
 /** Who got what on the revealed card. Picks stay hidden until now. */
 function Results({ results, bug }: { results: NonNullable<Board["results"]>; bug: boolean }) {
   return (
-    <ol className="flex flex-col gap-[0.5vw]">
-      {results.map(({ _id, name, result: r }) => (
-        <li key={_id} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
-          <span className={`text-[2.4vw] leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}>
-            {r?.correct || r?.points ? "✓" : "✗"}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{name}</span>
-            {(bug || !r) && (
-              <span className="block text-[1.2vw] text-dim">
-                {!r ? "no answer" : `line ${r.line ? "✓" : "✗"} · fix ${r.fix ? "✓" : "✗"}${r.early ? " · early" : ""}`}
-              </span>
-            )}
-          </span>
-          <span className="narrow text-[2.6vw] leading-none font-extrabold">+{r?.points ?? 0}</span>
-        </li>
-      ))}
-    </ol>
+    <div>
+      <TeamRows
+        rows={results}
+        row={({ _id, name, result: r }, tight) => (
+          <li key={_id} className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}>
+            <span
+              className={`${END(tight)} leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}
+            >
+              {r?.correct || r?.points ? "✓" : "✗"}
+            </span>
+            <span className="min-w-0">
+              <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{name}</span>
+              {!tight && (bug || !r) && (
+                <span className="block text-[1.2vw] text-dim">
+                  {!r ? "no answer" : `line ${r.line ? "✓" : "✗"} · fix ${r.fix ? "✓" : "✗"}${r.early ? " · early" : ""}`}
+                </span>
+              )}
+            </span>
+            <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{r?.points ?? 0}</span>
+          </li>
+        )}
+      />
+    </div>
   );
 }
 
@@ -526,35 +590,110 @@ function Lobby({ live, code, joinUrl }: { live: Live; code: string; joinUrl: str
 
 const MEDAL = ["var(--color-gold)", "var(--color-silver)", "#d79a5b"];
 
-function Scoreboard({ live }: { live: Live }) {
-  const top = Math.max(1, ...live.teams.map((t) => t.score));
+type Standing = { _id: string; name: string; score: number; members: string[]; xp?: number };
+
+// Rows per column once there are too many for one: a 16:9 TV fits this many compact rows under the heading.
+const PER_COLUMN = 9;
+
+/** Standings in points. Once the night is over (`final`), with the place XP each team's players earned (a team whose
+ *  players earned different XP has none of its own; theirs shows by their names). Past what fits at full size (fewer at
+ *  the end of the night, when rows carry XP), rows go compact, down up to three columns. */
+function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[]; solo: boolean; practice: boolean; final?: boolean }) {
+  const top = Math.max(1, ...teams.map((t) => t.score));
+  const first = teams.filter((t) => t.score > 0 && t.score === teams[0].score);
+  const compact = teams.length > (final ? 3 : 5);
+  const shown = teams.slice(0, PER_COLUMN * 3);
+  const columns = Math.ceil(shown.length / PER_COLUMN);
   return (
-    <div className="mx-auto flex h-full max-w-[86vw] flex-col">
-      <h2 className="text-[4vw] leading-none tracking-[-0.04em]">tonight’s standings</h2>
-      {live.teams.length === 0 ? (
-        <p className="mt-[6vw] text-[2.2vw] text-dim">Teams show up here once officers make them.</p>
-      ) : (
-        <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
-          {live.teams.map((t) => {
-            const rank = 1 + live.teams.filter((o) => o.score > t.score).length;
-            return (
-              <li key={t._id} className="grid grid-cols-[3vw_6vw_1fr_10vw] items-center gap-[1.5vw]">
-                <span className="size-[2.6vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
-                <span className="narrow text-[3.2vw] leading-none font-extrabold">{ordinal(rank)}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-[2.5vw] leading-tight font-extrabold">
-                    {t.name} <span className="text-[1.3vw] font-normal text-dim">{t.members.join(", ")}</span>
-                  </p>
-                  <div className="mt-[0.6vw] h-[0.9vw] bg-mist">
-                    <div className="h-full bg-sky" style={{ width: `${Math.max(2, (t.score / top) * 100)}%` }} />
+    <div className="mx-auto grid h-full max-w-[86vw] grid-cols-[minmax(0,1fr)_auto] gap-[3vw]">
+      <div className="flex min-h-0 flex-col">
+        <h2 className="shrink-0 text-[4vw] leading-none tracking-[-0.04em]">{final ? "final standings" : "tonight’s standings"}</h2>
+        {final && first.length > 0 && (
+          <p className="mt-[1.2vw] shrink-0 truncate text-[2.4vw] font-bold">
+            {first.length > 2
+              ? `${first.length}-way tie for 1st`
+              : `${first.map((t) => t.name).join(" and ")} ${first.length === 1 ? "wins" : "tie for 1st"}`}
+            {first[0].xp !== undefined && (
+              <span className="text-meadow">
+                {" "}
+                · +{first[0].xp} XP{solo ? "" : " each"}
+              </span>
+            )}
+          </p>
+        )}
+        {teams.length === 0 ? (
+          <p className="mt-[6vw] text-[2.2vw] text-dim">{teamWords(solo).scoreboardEmpty}</p>
+        ) : !compact ? (
+          <ol className="mt-[3vw] flex flex-col gap-[1.4vw]">
+            {teams.map((t) => {
+              const rank = placeOf(
+                t.score,
+                teams.map((o) => o.score),
+              );
+              return (
+                <li key={t._id} className="grid grid-cols-[3vw_6vw_1fr_10vw] items-center gap-[1.5vw]">
+                  <span className="size-[2.6vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
+                  <span className="narrow text-[3.2vw] leading-none font-extrabold">{ordinal(rank)}</span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[2.5vw] leading-tight font-extrabold">
+                      {t.name}{" "}
+                      {t.members.join(", ") !== t.name && <span className="text-[1.3vw] font-normal text-dim">{t.members.join(", ")}</span>}
+                    </p>
+                    <div className="mt-[0.6vw] h-[0.9vw] bg-mist">
+                      <div className="h-full bg-sky" style={{ width: `${Math.max(2, (t.score / top) * 100)}%` }} />
+                    </div>
                   </div>
-                </div>
-                <span className="narrow text-right text-[5vw] leading-none font-extrabold">{t.score}</span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+                  <span className="text-right">
+                    <span className="narrow block text-[5vw] leading-none font-extrabold">{t.score}</span>
+                    {!!t.xp && <span className="block text-[1.5vw] font-bold text-meadow">+{t.xp} XP</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        ) : (
+          // Down each column, then across, so the order reads like standings.
+          <ol
+            className="mt-[2vw] grid grid-flow-col gap-x-[2.5vw] gap-y-[0.7vw]"
+            style={{
+              gridTemplateRows: `repeat(${Math.min(PER_COLUMN, shown.length)}, auto)`,
+              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            }}
+          >
+            {shown.map((t) => {
+              const rank = placeOf(
+                t.score,
+                teams.map((o) => o.score),
+              );
+              return (
+                <li key={t._id} className="grid grid-cols-[1.4vw_3.9vw_1fr_auto] items-center gap-[0.8vw]">
+                  <span className="size-[1.2vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
+                  <span className="narrow text-[1.8vw] leading-none font-extrabold">{ordinal(rank)}</span>
+                  <p className="truncate text-[1.6vw] leading-tight font-extrabold">
+                    {t.name}{" "}
+                    {t.members.join(", ") !== t.name && <span className="text-[1.1vw] font-normal text-dim">{t.members.join(", ")}</span>}
+                  </p>
+                  <span className="text-right whitespace-nowrap">
+                    <span className="narrow text-[2.4vw] leading-none font-extrabold">{t.score}</span>
+                    {!!t.xp && <span className="ml-[0.5vw] text-[1.1vw] font-bold text-meadow">+{t.xp}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {teams.length > shown.length && <p className="mt-[0.8vw] text-[1.4vw] font-bold">+ {teams.length - shown.length} more</p>}
+        {/* Points are tonight's game; XP is the season board. */}
+        <p className="mt-auto pt-[2vw] text-[1.5vw] text-dim">
+          {practice
+            ? "Practice night: nothing tonight counts toward XP."
+            : !final
+              ? "Points are for tonight. When the night ends, 1st, 2nd, and 3rd place earn +3, +2, and +1 XP each."
+              : `Points were for tonight. Season XP is 3 for coming, +3/2/1 for your place: ${CLUB.url}/hello-world/scores`}
+        </p>
+      </div>
+      {/* A break in the game, or the night's over: the one time the TV shows a second QR. */}
+      <InstagramQr className="self-end" />
     </div>
   );
 }

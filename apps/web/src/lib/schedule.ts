@@ -1,7 +1,7 @@
 // The season plan: the defaults in content.ts and season.ts, with officer edits from the planner laid on top.
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { GAMES, IDEAS, REMIX_MENU, WEEKS } from "./content";
 import { WEEK_STARTS } from "./season";
@@ -65,6 +65,20 @@ export function nextMeeting(plan: WeekPlan[], now = Date.now()): { i: number; li
 export function likelyWeek(plan: WeekPlan[], now = Date.now()) {
   const n = nextMeeting(plan, now - 12 * HOUR);
   return n ? n.i + 1 : plan.length;
+}
+
+/** The night that ended in the last 3 hours (final standings and place XP), else null; undefined while loading. */
+export function useJustEnded(skip = false) {
+  const last = useQuery(api.sessions.final, skip ? "skip" : {});
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  if (skip) return null;
+  if (last === undefined || now === null) return undefined;
+  return last && now - last.endedAt < 3 * HOUR ? last : null;
 }
 
 // How a lineup entry names each game. "Silent Relay" is Code Relay; "Bug Bounty" and "Fix it for real" are Bug Hunt

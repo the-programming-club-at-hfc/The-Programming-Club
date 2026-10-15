@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
+import { award, openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { PUZZLES, puzzleSeed } from "../src/lib/puzzles";
 import { LOCKOUT_MS, cardKey, firstStars, puzzleAwardsFor, submitAnswer } from "../src/lib/grading";
@@ -141,7 +141,7 @@ async function scorePuzzle(ctx: MutationCtx, s: Doc<"sessions">, index: number, 
     const team = await ctx.db.get(row.teamId);
     if (!team) continue;
     await ctx.db.patch(row._id, { result: { points, first1, first2 } });
-    if (points) await ctx.db.patch(team._id, { score: team.score + points });
+    await award(ctx, team._id, points);
   }
   await ctx.db.patch(s._id, { scored: r.scored });
   return r.scored;

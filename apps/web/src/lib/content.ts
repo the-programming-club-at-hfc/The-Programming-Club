@@ -29,6 +29,7 @@ export const WEEKS: Week[] = [
     title: "Spooky Bugs",
     pitch: "Halloween Bug Hunt. Every snippet hides exactly one bug, and your team has 90 seconds to find it.",
     games: ["Output? (warm-up)", "Bug Hunt: easy & spooky", "Bug Hunt: medium", "Final round, double points: Fix it for real, spooky"],
+    bonus: "Come in costume for +3 XP.",
     showXp: 3,
   },
   {
@@ -86,7 +87,7 @@ export const MATCH_AGENDA: Agenda[] = [
     len: 10,
     what: "Lobby",
     detail:
-      "Scan the QR to join and you land on a team of 2, warm-up game on screen, then a one-minute rules recap. Late joiners get a team automatically too.",
+      "Scan the QR to join and you’re in (everyone plays solo unless officers pick teams), warm-up game on screen, then a one-minute rules recap. Late joiners get in automatically too.",
   },
   {
     t: "5:10",
@@ -177,7 +178,8 @@ export const CUP_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone. Auto teams fill teams of 2; Teams of 3 in /host reshuffles into 3s if the room fills up.",
+    detail:
+      "Join on your phone. Everyone plays solo by default; Teams of 2 or 3 in /host reshuffles everyone into teams if the room fills up.",
   },
   {
     t: "5:06",
@@ -235,7 +237,8 @@ export const FINAL_AGENDA: Agenda[] = [
     t: "5:00",
     len: 6,
     what: "Check-in & squad up",
-    detail: "Join on your phone. Auto teams fill teams of 2; Teams of 3 in /host reshuffles into 3s if the room fills up.",
+    detail:
+      "Join on your phone. Everyone plays solo by default; Teams of 2 or 3 in /host reshuffles everyone into teams if the room fills up.",
   },
   {
     t: "5:06",
@@ -411,13 +414,18 @@ export const XP: Xp[] = [
   },
   {
     pts: "+3 / +2 / +1",
-    what: "Your team finishes 1st / 2nd / 3rd that night",
-    note: "The biggest gap between teams in one night is 3 XP.",
+    what: "You (or your team) finish 1st / 2nd / 3rd that night",
+    note: "Place goes by the points you earned that night. Ties share a place, and the next score is still the next place.",
   },
   {
     pts: "+2",
     what: "Bring someone new",
     note: "You and the classmate you bring each get +2.",
+  },
+  {
+    pts: "+3",
+    what: "Theme bonus",
+    note: "Costume at Spooky Bugs, and similar.",
   },
 ];
 export const COMEBACKS: string[] = [
@@ -425,7 +433,7 @@ export const COMEBACKS: string[] = [
   "Weekly results become XP by finishing place, not by margin. Winning by 1 point or by 20 is worth the same.",
   "Showing up (+3) is worth as much as winning (+3 to +1). Someone who never misses a week will outrank someone who wins twice and then stops coming.",
   "Championship nights reset everyone to 0. A first-timer can win the Golden Keycap.",
-  "Teams are reshuffled every week, so nobody is stuck on a losing team all season.",
+  "Nights are solo by default, and teams are reshuffled every team night, so nobody is stuck on a losing team all season.",
 ];
 export const AWARDS: Award[] = [
   {
@@ -477,14 +485,14 @@ export const PREP: string[] = [
   "Open programmingclub.dev/host on an officer laptop or phone and start tonight’s week.",
   "Put out markers, paper, and the prize stash.",
   "Code Relay or Cup nights: make sure every team computer has an editor or onecompiler.com open.",
-  "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay, the Final): open programmingclub.dev/hello-world/fix on every team computer. Once teams are made, each team types the team key from their phones (also on /host). Python loads by itself.",
+  "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay, the Final): open programmingclub.dev/hello-world/fix on every computer in use. Each player (or team, on team nights) types the key from their phone (also on /host). Python loads by itself.",
   "Puzzle nights: try the puzzle at /hello-world/test first, so you know the example and how part 2 twists part 1.",
 ];
 export const NEWCOMERS: string[] = [
   "Point them at the QR code on the TV. Joining takes about 20 seconds.",
-  "The app puts them on a team automatically. Move them in /host if needed.",
-  "One-sentence pitch: “Tonight’s game is ___. Your team scores points together. No experience needed.”",
-  "If they arrive mid-round, they watch with their team and play from the next round.",
+  "The app puts them in the game automatically (on a team, on team nights). Move them in /host if needed.",
+  "One-sentence pitch: “Tonight’s game is ___. You score points every round. No experience needed.”",
+  "If they arrive mid-round, they watch and play from the next round.",
   "Before they leave, make sure they’re in the club’s Teams group.",
 ];
 export const PROMO: { idea: string; how: string }[] = [
@@ -523,7 +531,7 @@ export const POSTER_LINES: string[] = [
   "No experience. No homework. Just show up.",
 ];
 export const ANNOUNCEMENT =
-  "Hi everyone, quick announcement from the Programming Club. We meet Wednesdays from 5 to 6 in Room E-178, and this semester we’re running a team game league called the Hello, World Cup: Wikipedia races, bug hunts, code relays. You don’t need any experience and there’s no homework. It’s free, and you can join any week. Come play. Details are at programmingclub.dev.";
+  "Hi everyone, quick announcement from the Programming Club. We meet Wednesdays from 5 to 6 in Room E-178, and this semester we’re running a coding game league called the Hello, World Cup: Wikipedia races, bug hunts, code relays. You don’t need any experience and there’s no homework. It’s free, and you can join any week. Come play. Details are at programmingclub.dev.";
 export const CAPTIONS: string[] = [
   "Week {n} high scores are up 🕹️ Come knock them off the board Wednesday, 5–6, Room E-178.",
   "Pizza → Moon in 4 clicks. Think you can beat it? Wednesdays 5–6, Room E-178.",
