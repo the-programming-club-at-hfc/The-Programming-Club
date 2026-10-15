@@ -34,7 +34,9 @@ export function InstagramQr({ className = "", compact = false }: { className?: s
     <div
       className={`${compact ? "w-[16vw]" : "w-[19vw]"} bg-[linear-gradient(135deg,#d62976,#962fbf_55%,#4f5bd5)] p-[1.2vw] text-white ${className}`}
     >
-      <p className={`flex items-center gap-[0.6vw] leading-tight font-extrabold ${compact ? "text-[1.3vw]" : "text-[1.6vw]"}`}>
+      <p
+        className={`flex items-center gap-[0.5vw] leading-tight font-extrabold whitespace-nowrap ${compact ? "text-[1.1vw]" : "text-[1.35vw]"}`}
+      >
         <InstagramGlyph className="size-[1.8vw]" />
         Follow @{CLUB.instagram}
       </p>

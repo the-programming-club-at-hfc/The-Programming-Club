@@ -549,15 +549,15 @@ const MEDAL = ["var(--color-gold)", "var(--color-silver)", "#d79a5b"];
 type Standing = { _id: string; name: string; score: number; members: string[]; xp?: number };
 
 // Rows per column once there are too many for one: a 16:9 TV fits this many compact rows under the heading.
-const PER_COLUMN = 7;
+const PER_COLUMN = 9;
 
 /** Standings in points. Once the night is over (`final`), with the place XP each team's players earned (a team whose
- *  players earned different XP has none of its own; theirs shows by their names). More than six rows go compact, down
- *  up to three columns, and the rest are on /scores. */
+ *  players earned different XP has none of its own; theirs shows by their names). Past what fits at full size (fewer at
+ *  the end of the night, when rows carry XP), rows go compact, down up to three columns. */
 function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[]; solo: boolean; practice: boolean; final?: boolean }) {
   const top = Math.max(1, ...teams.map((t) => t.score));
   const first = teams.filter((t) => t.score > 0 && t.score === teams[0].score);
-  const compact = teams.length > 6;
+  const compact = teams.length > (final ? 4 : 5);
   const shown = teams.slice(0, PER_COLUMN * 3);
   const columns = Math.ceil(shown.length / PER_COLUMN);
   return (
@@ -599,7 +599,7 @@ function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[
                   </div>
                   <span className="text-right">
                     <span className="narrow block text-[5vw] leading-none font-extrabold">{t.score}</span>
-                    {t.xp !== undefined && <span className="block text-[1.5vw] font-bold text-meadow">+{t.xp} XP</span>}
+                    {!!t.xp && <span className="block text-[1.5vw] font-bold text-meadow">+{t.xp} XP</span>}
                   </span>
                 </li>
               );
@@ -620,7 +620,7 @@ function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[
                 teams.map((o) => o.score),
               );
               return (
-                <li key={t._id} className="grid grid-cols-[1.4vw_3.4vw_1fr_auto] items-center gap-[0.8vw]">
+                <li key={t._id} className="grid grid-cols-[1.4vw_3.9vw_1fr_auto] items-center gap-[0.8vw]">
                   <span className="size-[1.2vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
                   <span className="narrow text-[1.8vw] leading-none font-extrabold">{ordinal(rank)}</span>
                   <p className="truncate text-[1.6vw] leading-tight font-extrabold">
@@ -629,18 +629,14 @@ function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[
                   </p>
                   <span className="text-right whitespace-nowrap">
                     <span className="narrow text-[2.4vw] leading-none font-extrabold">{t.score}</span>
-                    {t.xp !== undefined && <span className="ml-[0.5vw] text-[1.1vw] font-bold text-meadow">+{t.xp}</span>}
+                    {!!t.xp && <span className="ml-[0.5vw] text-[1.1vw] font-bold text-meadow">+{t.xp}</span>}
                   </span>
                 </li>
               );
             })}
           </ol>
         )}
-        {teams.length > shown.length && (
-          <p className="mt-[0.8vw] text-[1.4vw] font-bold">
-            + {teams.length - shown.length} more at {CLUB.url}/hello-world/scores
-          </p>
-        )}
+        {teams.length > shown.length && <p className="mt-[0.8vw] text-[1.4vw] font-bold">+ {teams.length - shown.length} more</p>}
         {/* Points are tonight's game; XP is the season board. */}
         <p className="mt-auto pt-[2vw] text-[1.5vw] text-dim">
           {practice

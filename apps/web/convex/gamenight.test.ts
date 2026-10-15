@@ -332,6 +332,31 @@ describe("teams", () => {
     expect((await teams()).map((tm) => tm.name)).toEqual(["Student 2"]);
   });
 
+  test("Auto teams back on: a player taken off their team gets a team starting from their own points", async () => {
+    const { officer, startNight, join, attendance, teams } = setup();
+    const code = await startNight();
+    const token = await join(code, student(1));
+    const row = async () => (await attendance()).find((a) => a.token === token)!;
+    await officer.mutation(api.teams.score, { teamId: (await row()).teamId!, delta: 5 });
+    await officer.mutation(api.teams.move, { attendanceId: (await row())._id, teamId: null });
+    await officer.mutation(api.teams.setAuto, { on: false });
+    await officer.mutation(api.teams.setAuto, { on: true });
+    expect((await teams()).map((tm) => [tm.name, tm.score])).toEqual([["Student 1", 5]]);
+  });
+
+  test("Remove team waits for the round: a team with answers in can't be removed until the reveal", async () => {
+    const { t, officer, startNight, join, teams, show } = setup();
+    const code = await startNight();
+    const token = await join(code, student(1));
+    await show({ mode: "card", game: "output", index: 0 });
+    await t.mutation(api.answers.pick, { token, card: "output:0", choice: OUTPUTS[0].answer });
+    const [team] = await teams();
+    await expect(officer.mutation(api.teams.remove, { teamId: team._id })).rejects.toThrow("Finish the round first");
+    await show({ mode: "card", game: "output", index: 0, revealed: true });
+    await officer.mutation(api.teams.remove, { teamId: team._id });
+    expect(await teams()).toHaveLength(0);
+  });
+
   test("Play tonight off on a team night leaves the partner's team as it is", async () => {
     const { t, officer, startNight, join, attendance, teams } = setup();
     const code = await startNight();

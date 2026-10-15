@@ -9,6 +9,7 @@ import {
   inTeamPool,
   newTeam,
   newTeamKey,
+  ROUND_OPEN,
   openSession,
   requireOpenSession,
   sessionAttendance,
@@ -17,6 +18,7 @@ import {
   soloName,
   teamByKey,
   teamFor,
+  hasUnscored,
   joinTeam,
   leaveTeam,
   unscoredCards,
@@ -90,11 +92,11 @@ export const setAuto = mutation({
     const s = await requireOpenSession(ctx);
     await ctx.db.patch(s._id, { autoTeams: on ? undefined : false });
     if (!on) return;
-    const session = { ...s, autoTeams: undefined };
+    const session = { ...(await upgradeOldNight(ctx, s)), autoTeams: undefined };
     for (const a of await sessionAttendance(ctx, s._id))
       if (inTeamPool(a) && !a.teamId) {
-        const name = (await ctx.db.get(a.playerId))?.name ?? "Player";
-        await ctx.db.patch(a._id, { teamId: await teamFor(ctx, session, name) });
+        const teamId = await teamFor(ctx, session, (await ctx.db.get(a.playerId))?.name ?? "Player");
+        if (teamId) await joinTeam(ctx, session, a, teamId);
       }
   },
 });
@@ -113,6 +115,7 @@ export const remove = mutation({
   handler: async (ctx, { teamId }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
+    if (await hasUnscored(ctx, s, teamId)) throw new ConvexError(ROUND_OPEN);
     for (const a of await sessionAttendance(ctx, s._id)) if (a.teamId === teamId) await ctx.db.patch(a._id, { teamId: undefined });
     await ctx.db.delete(teamId);
   },

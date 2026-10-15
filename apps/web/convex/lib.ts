@@ -197,8 +197,10 @@ export async function upgradeOldNight(ctx: MutationCtx, s: Doc<"sessions">) {
   return { ...s, ...up };
 }
 
+export const ROUND_OPEN = "Finish the round first: reveal the card they answered, then try again.";
+
 /** Whether a team has answers, fixes, stars, or a finish in on a card tonight that hasn't been scored yet. */
-async function hasUnscored(ctx: QueryCtx, s: Doc<"sessions">, teamId: Id<"teams">) {
+export async function hasUnscored(ctx: QueryCtx, s: Doc<"sessions">, teamId: Id<"teams">) {
   for (const table of ["answers", "fixes", "stars", "races"] as const)
     for (const row of await ctx.db
       .query(table)
@@ -214,7 +216,7 @@ export async function leaveTeam(ctx: MutationCtx, s: Doc<"sessions">, a: Doc<"at
   if (!a.teamId) return;
   const empty = !(await sessionAttendance(ctx, s._id)).some((o) => o.teamId === a.teamId && o._id !== a._id);
   // Their answers in on a card not yet revealed would score nobody.
-  if (empty && (await hasUnscored(ctx, s, a.teamId))) throw new ConvexError("Finish the round first: reveal it, then move them.");
+  if (empty && (await hasUnscored(ctx, s, a.teamId))) throw new ConvexError(ROUND_OPEN);
   await ctx.db.patch(a._id, { teamId: undefined });
   if (empty) await ctx.db.delete(a.teamId);
 }
