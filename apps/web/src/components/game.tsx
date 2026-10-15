@@ -263,7 +263,7 @@ export function CardView({
     return (
       <div>
         <p className="text-dim">
-          Any language. Only the driver types; swap at every chime.
+          {solo ? "Any language." : "Any language. Only the driver types; swap at every chime."}
           <LevelChip level={r.level} />
         </p>
         <h3 className={`mt-3 lowercase ${big ? "text-[clamp(2.4rem,4.5vw,5rem)]" : "text-3xl"}`}>{r.name}</h3>

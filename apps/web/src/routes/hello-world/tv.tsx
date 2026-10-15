@@ -311,13 +311,13 @@ function useCountSound(card: string | undefined, n: number | null) {
 }
 
 /** One row per team beside the card. Solo nights make that one per player, so past 7 they go to one tight line each,
- *  and past 14 the rest are counted instead of listed. */
+ *  and past 12 the rest are counted instead of listed. */
 function TeamRows<T>({ rows, row }: { rows: T[]; row: (r: T, tight: boolean) => ReactNode }) {
   const tight = rows.length > 7;
   return (
     <>
-      <ol className={`mt-[1vw] flex flex-col ${tight ? "gap-[0.3vw]" : "gap-[0.5vw]"}`}>{rows.slice(0, 14).map((r) => row(r, tight))}</ol>
-      {rows.length > 14 && <p className="mt-[0.6vw] text-[1.3vw] text-dim">+ {rows.length - 14} more</p>}
+      <ol className={`mt-[1vw] flex flex-col ${tight ? "gap-[0.3vw]" : "gap-[0.5vw]"}`}>{rows.slice(0, 12).map((r) => row(r, tight))}</ol>
+      {rows.length > 12 && <p className="mt-[0.6vw] text-[1.3vw] text-dim">+ {rows.length - 12} more</p>}
     </>
   );
 }
@@ -331,7 +331,7 @@ const END = (tight: boolean) => (tight ? "text-[1.8vw]" : "text-[2.6vw]");
 function FixList({ board, done, w }: { board: FixBoard; done: boolean; w: TeamWords }) {
   return (
     <div>
-      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your {w.computer}</p>}
+      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your {w.computer}</p>}
       {board.fixed.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
       ) : (
@@ -371,7 +371,7 @@ function StarBoard({ board, done, w }: { board: PuzzleBoard; done: boolean; w: T
   );
   return (
     <div>
-      {!done && <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your {w.computer}</p>}
+      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your {w.computer}</p>}
       {board.teams.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{w.noTeams}</p>
       ) : (
@@ -385,7 +385,7 @@ function StarBoard({ board, done, w }: { board: PuzzleBoard; done: boolean; w: T
               <span className={`min-w-0 truncate ${NAME(tight)} leading-tight font-extrabold`}>{t.name}</span>
               {tight ? (
                 // Just the stars: no room for times.
-                <span className="text-[1.4vw] text-gold">
+                <span className="text-[1.4vw] leading-none text-gold">
                   {t.part1Ms === null ? "☆" : "★"}
                   {t.part2Ms === null ? "☆" : "★"}
                 </span>
@@ -428,7 +428,7 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
   return (
     <div>
       {!done && (
-        <p className="text-[2.2vw] leading-tight font-extrabold tracking-[-0.03em]">
+        <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">
           {board.clicks ? "Fewest clicks so far" : "Finish order"}
         </p>
       )}
@@ -462,25 +462,29 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
 /** Who got what on the revealed card. Picks stay hidden until now. */
 function Results({ results, bug }: { results: NonNullable<Board["results"]>; bug: boolean }) {
   return (
-    <TeamRows
-      rows={results}
-      row={({ _id, name, result: r }, tight) => (
-        <li key={_id} className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}>
-          <span className={`${END(tight)} leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}>
-            {r?.correct || r?.points ? "✓" : "✗"}
-          </span>
-          <span className="min-w-0">
-            <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{name}</span>
-            {!tight && (bug || !r) && (
-              <span className="block text-[1.2vw] text-dim">
-                {!r ? "no answer" : `line ${r.line ? "✓" : "✗"} · fix ${r.fix ? "✓" : "✗"}${r.early ? " · early" : ""}`}
-              </span>
-            )}
-          </span>
-          <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{r?.points ?? 0}</span>
-        </li>
-      )}
-    />
+    <div>
+      <TeamRows
+        rows={results}
+        row={({ _id, name, result: r }, tight) => (
+          <li key={_id} className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}>
+            <span
+              className={`${END(tight)} leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}
+            >
+              {r?.correct || r?.points ? "✓" : "✗"}
+            </span>
+            <span className="min-w-0">
+              <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{name}</span>
+              {!tight && (bug || !r) && (
+                <span className="block text-[1.2vw] text-dim">
+                  {!r ? "no answer" : `line ${r.line ? "✓" : "✗"} · fix ${r.fix ? "✓" : "✗"}${r.early ? " · early" : ""}`}
+                </span>
+              )}
+            </span>
+            <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{r?.points ?? 0}</span>
+          </li>
+        )}
+      />
+    </div>
   );
 }
 
@@ -597,15 +601,15 @@ const PER_COLUMN = 9;
 function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[]; solo: boolean; practice: boolean; final?: boolean }) {
   const top = Math.max(1, ...teams.map((t) => t.score));
   const first = teams.filter((t) => t.score > 0 && t.score === teams[0].score);
-  const compact = teams.length > (final ? 4 : 5);
+  const compact = teams.length > (final ? 3 : 5);
   const shown = teams.slice(0, PER_COLUMN * 3);
   const columns = Math.ceil(shown.length / PER_COLUMN);
   return (
     <div className="mx-auto grid h-full max-w-[86vw] grid-cols-[minmax(0,1fr)_auto] gap-[3vw]">
       <div className="flex min-h-0 flex-col">
-        <h2 className="text-[4vw] leading-none tracking-[-0.04em]">{final ? "final standings" : "tonight’s standings"}</h2>
+        <h2 className="shrink-0 text-[4vw] leading-none tracking-[-0.04em]">{final ? "final standings" : "tonight’s standings"}</h2>
         {final && first.length > 0 && (
-          <p className="mt-[1.2vw] truncate text-[2.4vw] font-bold">
+          <p className="mt-[1.2vw] shrink-0 truncate text-[2.4vw] font-bold">
             {first.length > 2
               ? `${first.length}-way tie for 1st`
               : `${first.map((t) => t.name).join(" and ")} ${first.length === 1 ? "wins" : "tie for 1st"}`}

@@ -336,7 +336,7 @@ export function NextPanel({
         {r?.kind === "puzzle" && r.puzzle !== undefined && step === "show" && (
           <p>
             Next puzzle: {puzzleTitle(r.puzzle)}, {fmtClock(cardSeconds("puzzle", r.puzzle) * 1000)}
-            {PUZZLES[r.puzzle].relay ? " with relay chimes every 2 minutes" : ""}
+            {!w.solo && PUZZLES[r.puzzle].relay ? " with relay chimes every 2 minutes" : ""}
             {" · "}
             {w.computers} at /hello-world/fix
           </p>
