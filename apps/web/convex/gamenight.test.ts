@@ -882,6 +882,13 @@ describe("ending the night", () => {
     }
   });
 
+  test("a night from before player points that's still open: removing a team keeps its players' points", async () => {
+    const { officer, attendance, teams } = await oldNight(false);
+    await officer.mutation(api.teams.remove, { teamId: teams[0]._id });
+    const att = await attendance();
+    expect(teams[0].tokens.map((tk) => att.find((a) => a.token === tk)!.points)).toEqual([5, 5]);
+  });
+
   test("a night from before player points that's still open: scoring first doesn't lose the old points", async () => {
     const { officer, attendance, teams } = await oldNight(false);
     // The trailing team gets +4: 6 to the leaders' 5.

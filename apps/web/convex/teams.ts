@@ -114,7 +114,7 @@ export const remove = mutation({
   args: { teamId: v.id("teams") },
   handler: async (ctx, { teamId }) => {
     await requireOfficer(ctx);
-    const s = await requireOpenSession(ctx);
+    const s = await upgradeOldNight(ctx, await requireOpenSession(ctx));
     if (await hasUnscored(ctx, s, teamId)) throw new ConvexError(ROUND_OPEN);
     for (const a of await sessionAttendance(ctx, s._id)) if (a.teamId === teamId) await ctx.db.patch(a._id, { teamId: undefined });
     await ctx.db.delete(teamId);
@@ -183,8 +183,10 @@ export const removePlayer = mutation({
   args: { attendanceId: v.id("attendance") },
   handler: async (ctx, { attendanceId }) => {
     await requireOfficer(ctx);
+    const before = await ctx.db.get(attendanceId);
+    const session = before && (await ctx.db.get(before.sessionId));
+    const s = session && (await upgradeOldNight(ctx, session));
     const a = await ctx.db.get(attendanceId);
-    const s = a && (await ctx.db.get(a.sessionId));
     if (a && s) await leaveTeam(ctx, s, a);
     await ctx.db.delete(attendanceId);
   },

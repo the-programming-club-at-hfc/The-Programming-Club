@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
@@ -309,6 +310,23 @@ function useCountSound(card: string | undefined, n: number | null) {
   }, [card, n]);
 }
 
+/** One row per team beside the card. Solo nights make that one per player, so past 7 they go to one tight line each,
+ *  and past 14 the rest are counted instead of listed. */
+function TeamRows<T>({ rows, row }: { rows: T[]; row: (r: T, tight: boolean) => ReactNode }) {
+  const tight = rows.length > 7;
+  return (
+    <>
+      <ol className={`mt-[1vw] flex flex-col ${tight ? "gap-[0.3vw]" : "gap-[0.5vw]"}`}>{rows.slice(0, 14).map((r) => row(r, tight))}</ol>
+      {rows.length > 14 && <p className="mt-[0.6vw] text-[1.3vw] text-dim">+ {rows.length - 14} more</p>}
+    </>
+  );
+}
+
+// A row's padding, name, and end number at full size and tight.
+const ROW = (tight: boolean) => (tight ? "py-[0.35vw]" : "py-[0.8vw]");
+const NAME = (tight: boolean) => (tight ? "text-[1.4vw]" : "text-[1.8vw]");
+const END = (tight: boolean) => (tight ? "text-[1.8vw]" : "text-[2.6vw]");
+
 /** Fix it for real: the teams that fixed it, in order, with their times. Points join them once it's scored. No code. */
 function FixList({ board, done, w }: { board: FixBoard; done: boolean; w: TeamWords }) {
   return (
@@ -317,21 +335,27 @@ function FixList({ board, done, w }: { board: FixBoard; done: boolean; w: TeamWo
       {board.fixed.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
       ) : (
-        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
-          {board.fixed.map((f, i) => (
-            <li key={f.teamId} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
-              <span className="narrow text-[2.4vw] leading-none font-extrabold text-meadow">{i + 1}</span>
+        <TeamRows
+          rows={board.fixed.map((f, i) => ({ ...f, i }))}
+          row={(f, tight) => (
+            <li
+              key={f.teamId}
+              className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
+            >
+              <span className={`narrow ${END(tight)} leading-none font-extrabold text-meadow`}>{f.i + 1}</span>
               <span className="min-w-0">
-                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{f.name}</span>
-                <span className="block text-[1.2vw] text-dim">
-                  {f.ms === null ? "fixed" : `fixed at ${fmtElapsed(f.ms)}`}
-                  {f.result?.first ? " · first" : ""}
-                </span>
+                <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{f.name}</span>
+                {!tight && (
+                  <span className="block text-[1.2vw] text-dim">
+                    {f.ms === null ? "fixed" : `fixed at ${fmtElapsed(f.ms)}`}
+                    {f.result?.first ? " · first" : ""}
+                  </span>
+                )}
               </span>
-              <span className="narrow text-[2.6vw] leading-none font-extrabold">{f.result ? `+${f.result.points}` : "✓"}</span>
+              <span className={`narrow ${END(tight)} leading-none font-extrabold`}>{f.result ? `+${f.result.points}` : "✓"}</span>
             </li>
-          ))}
-        </ol>
+          )}
+        />
       )}
     </div>
   );
@@ -351,18 +375,30 @@ function StarBoard({ board, done, w }: { board: PuzzleBoard; done: boolean; w: T
       {board.teams.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{w.noTeams}</p>
       ) : (
-        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
-          {board.teams.map((t) => (
-            <li key={t.teamId} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.7vw]">
-              <span className="min-w-0 truncate text-[1.8vw] leading-tight font-extrabold">{t.name}</span>
-              <span>
-                {star(t.part1Ms, t.first1)}
-                {star(t.part2Ms, t.first2)}
-              </span>
-              {done && <span className="narrow text-[2.6vw] leading-none font-extrabold">+{t.result?.points ?? 0}</span>}
+        <TeamRows
+          rows={board.teams}
+          row={(t, tight) => (
+            <li
+              key={t.teamId}
+              className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
+            >
+              <span className={`min-w-0 truncate ${NAME(tight)} leading-tight font-extrabold`}>{t.name}</span>
+              {tight ? (
+                // Just the stars: no room for times.
+                <span className="text-[1.4vw] text-gold">
+                  {t.part1Ms === null ? "☆" : "★"}
+                  {t.part2Ms === null ? "☆" : "★"}
+                </span>
+              ) : (
+                <span>
+                  {star(t.part1Ms, t.first1)}
+                  {star(t.part2Ms, t.first2)}
+                </span>
+              )}
+              {done && <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{t.result?.points ?? 0}</span>}
             </li>
-          ))}
-        </ol>
+          )}
+        />
       )}
     </div>
   );
@@ -375,7 +411,7 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
         key: r.teamId,
         name: r.name,
         place: r.result?.place ?? null,
-        note: null,
+        note: null as string | null,
         end: `+${r.result?.points ?? 0}`,
       }))
     : board.finished
@@ -399,22 +435,25 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
       {rows.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">Nobody yet. Tap “{w.madeIt}” on a phone when you land.</p>
       ) : (
-        <ol className="mt-[1vw] flex flex-col gap-[0.5vw]">
-          {rows.map((r) => (
-            <li key={r.key} className="grid grid-cols-[3.4vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
-              <span className={`narrow text-[2.2vw] leading-none font-extrabold ${r.place !== null ? "text-meadow" : "text-dim"}`}>
+        <TeamRows
+          rows={rows}
+          row={(r, tight) => (
+            <li key={r.key} className={`grid grid-cols-[3.4vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}>
+              <span
+                className={`narrow ${tight ? "text-[1.6vw]" : "text-[2.2vw]"} leading-none font-extrabold ${r.place !== null ? "text-meadow" : "text-dim"}`}
+              >
                 {r.place !== null ? ordinal(r.place) : "–"}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{r.name}</span>
-                {(r.note || (board.results && r.place === null)) && (
+                <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{r.name}</span>
+                {!tight && (r.note || (board.results && r.place === null)) && (
                   <span className="block text-[1.2vw] text-dim">{r.note || "for playing"}</span>
                 )}
               </span>
-              <span className="narrow text-[2.6vw] leading-none font-extrabold">{r.end}</span>
+              <span className={`narrow ${END(tight)} leading-none font-extrabold`}>{r.end}</span>
             </li>
-          ))}
-        </ol>
+          )}
+        />
       )}
     </div>
   );
@@ -423,24 +462,25 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
 /** Who got what on the revealed card. Picks stay hidden until now. */
 function Results({ results, bug }: { results: NonNullable<Board["results"]>; bug: boolean }) {
   return (
-    <ol className="flex flex-col gap-[0.5vw]">
-      {results.map(({ _id, name, result: r }) => (
-        <li key={_id} className="grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] py-[0.8vw]">
-          <span className={`text-[2.4vw] leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}>
+    <TeamRows
+      rows={results}
+      row={({ _id, name, result: r }, tight) => (
+        <li key={_id} className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}>
+          <span className={`${END(tight)} leading-none font-extrabold ${r?.correct ? "text-meadow" : r?.points ? "text-sun" : "text-dim"}`}>
             {r?.correct || r?.points ? "✓" : "✗"}
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-[1.8vw] leading-tight font-extrabold">{name}</span>
-            {(bug || !r) && (
+            <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{name}</span>
+            {!tight && (bug || !r) && (
               <span className="block text-[1.2vw] text-dim">
                 {!r ? "no answer" : `line ${r.line ? "✓" : "✗"} · fix ${r.fix ? "✓" : "✗"}${r.early ? " · early" : ""}`}
               </span>
             )}
           </span>
-          <span className="narrow text-[2.6vw] leading-none font-extrabold">+{r?.points ?? 0}</span>
+          <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{r?.points ?? 0}</span>
         </li>
-      ))}
-    </ol>
+      )}
+    />
   );
 }
 
@@ -565,8 +605,10 @@ function Scoreboard({ teams, solo, practice, final = false }: { teams: Standing[
       <div className="flex min-h-0 flex-col">
         <h2 className="text-[4vw] leading-none tracking-[-0.04em]">{final ? "final standings" : "tonight’s standings"}</h2>
         {final && first.length > 0 && (
-          <p className="mt-[1.2vw] text-[2.4vw] font-bold">
-            {first.map((t) => t.name).join(" and ")} {first.length === 1 ? "wins" : "tie for 1st"}
+          <p className="mt-[1.2vw] truncate text-[2.4vw] font-bold">
+            {first.length > 2
+              ? `${first.length}-way tie for 1st`
+              : `${first.map((t) => t.name).join(" and ")} ${first.length === 1 ? "wins" : "tie for 1st"}`}
             {first[0].xp !== undefined && (
               <span className="text-meadow">
                 {" "}
