@@ -7,11 +7,12 @@ import type { ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { Blanks, Sketch } from "#/components/draw";
 import { InstagramQr } from "#/components/instagram";
 import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
-import { cardKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
+import { cardKey, drawKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
 import { nextMeeting, useJustEnded, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
@@ -251,6 +252,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
             {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} w={w} />}
           </div>
         )}
+        {s.mode === "draw" && s.drawing !== undefined && <DrawView n={s.drawing} live={live} remaining={remaining} w={w} />}
         {s.mode === "message" && (
           <div className="grid h-full place-items-center text-center">
             <p className="max-w-[18ch] text-[5.5vw] leading-[1] font-extrabold tracking-[-0.03em] text-balance">{s.message}</p>
@@ -459,6 +461,85 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
   );
 }
 
+/** Tech Pictionary: the live drawing, who's drawing, the word as blanks, the clock, and who has got it so far. On the
+ *  reveal, the word and every team's points. Wrong guesses never come here. */
+function DrawView({ n, live, remaining, w }: { n: number; live: Live; remaining: number; w: TeamWords }) {
+  const data = useQuery(api.drawings.board);
+  const b = data?.key === drawKey(n) ? data : null;
+  useCountSound(b?.key, b ? b.got.length : null);
+  if (!b) return null;
+  const done = !!live.screen.revealed || b.scored;
+  const running = !!live.timer.startedAt;
+  return (
+    <div className="grid h-full grid-cols-[minmax(0,1fr)_28vw] gap-[3vw]">
+      <Sketch drawingId={b._id} className="min-h-0" canvasClass="size-full" />
+      <div className="flex min-h-0 flex-col">
+        {done && b.word ? (
+          <>
+            <p className="text-[1.8vw] font-bold text-dim">The word was</p>
+            <p className="mt-[0.4vw] text-[4.6vw] leading-[0.95] font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
+          </>
+        ) : (
+          <>
+            <p className="truncate text-[2vw] font-extrabold">{b.drawer} is drawing</p>
+            <Blanks text={b.blanks} className="mt-[1.2vw] text-[3vw] font-extrabold" />
+            <p
+              className={`narrow mt-[1.5vw] text-[8vw] leading-[0.85] font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}
+            >
+              {remaining === 0 && running ? "time" : fmtClock(remaining)}
+            </p>
+          </>
+        )}
+        <div className="mt-[1.5vw] min-h-0">
+          {b.results ? (
+            <TeamRows
+              rows={b.results}
+              row={(r, tight) => (
+                <li
+                  key={r.teamId}
+                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
+                >
+                  <span className="min-w-0">
+                    <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{r.name}</span>
+                    {!tight && r.drawer && <span className="block text-[1.2vw] text-dim">drew it</span>}
+                  </span>
+                  <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{r.points}</span>
+                </li>
+              )}
+            />
+          ) : b.got.length === 0 ? (
+            <p className="text-[1.6vw] text-dim">Guess on your phone. Nobody has it yet.</p>
+          ) : (
+            <>
+              <p className="text-[1.6vw] font-bold">
+                {b.got.length} of {b.guessing} {w.teams} got it
+              </p>
+              <TeamRows
+                rows={b.got.map((g, i) => ({ ...g, i }))}
+                row={(g, tight) => (
+                  <li
+                    key={g.teamId}
+                    className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
+                  >
+                    <span className={`narrow ${END(tight)} leading-none font-extrabold text-meadow`}>{g.i + 1}</span>
+                    <span className="min-w-0">
+                      <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{g.name}</span>
+                      {!tight && !w.solo && <span className="block text-[1.2vw] text-dim">{g.by}</span>}
+                    </span>
+                    <span className={`narrow ${tight ? "text-[1.4vw]" : "text-[1.8vw]"} leading-none font-extrabold`}>
+                      {g.ms === null ? "✓" : fmtElapsed(g.ms)}
+                    </span>
+                  </li>
+                )}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Who got what on the revealed card. Picks stay hidden until now. */
 function Results({ results, bug }: { results: NonNullable<Board["results"]>; bug: boolean }) {
   return (
@@ -509,10 +590,11 @@ function useTvSound(live: Live, remaining: number, on: boolean) {
       s.index !== ps.index ||
       s.wikiFrom !== ps.wikiFrom ||
       s.wikiReady !== ps.wikiReady ||
+      s.drawing !== ps.drawing ||
       s.message !== ps.message
     ) {
       if (s.mode === "scoreboard") sfx.scoreboard();
-      else if (s.mode === "card" || s.mode === "wiki" || s.mode === "message") sfx.card();
+      else if (s.mode === "card" || s.mode === "wiki" || s.mode === "draw" || s.mode === "message") sfx.card();
     } else if (s.revealed && !ps.revealed) sfx.reveal();
 
     const before = new Map(p.teams.map((t) => [t._id, t.score]));

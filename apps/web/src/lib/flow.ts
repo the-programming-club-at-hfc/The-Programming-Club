@@ -72,7 +72,7 @@ export const roundTitle = (r: Round) => `Round ${r.index + 1}${r.double ? ", dou
 
 /** Cards with an answer to reveal (and score). Code Relay has none: the referee runs the tests. */
 export const revealable = (r: Round) =>
-  r.kind === "wiki" || r.kind === "puzzle" || (r.kind === "deck" && (isAnswerGame(r.game) || r.game === "fix"));
+  r.kind === "wiki" || r.kind === "puzzle" || r.kind === "pictionary" || (r.kind === "deck" && (isAnswerGame(r.game) || r.game === "fix"));
 
 /** A puzzle's name for the button, e.g. "Road to the Cup". */
 export const puzzleTitle = (i: number) =>
@@ -137,6 +137,7 @@ export interface ScreenState {
   hint?: boolean;
   wikiFrom?: string;
   wikiReady?: boolean;
+  drawing?: number;
 }
 
 /**
@@ -174,6 +175,11 @@ export function stepFor(o: {
     if (!s.revealed && revealable(r)) return "reveal";
     return s.mode === "scoreboard" ? "choose" : "scores";
   }
-  if (r.kind === "pictionary") return s.mode === "timer" ? "scores" : s.mode === "scoreboard" ? "choose" : "show";
+  if (r.kind === "pictionary") {
+    // Like a card, a drawing comes back for its reveal after the join screen, big timer, or scores went up.
+    if (s.drawing === undefined) return "show";
+    if (!s.revealed) return "reveal";
+    return s.mode === "scoreboard" ? "choose" : "scores";
+  }
   return s.mode === "scoreboard" || o.teams === 0 ? "next" : "scores";
 }

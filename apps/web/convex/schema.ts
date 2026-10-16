@@ -21,6 +21,8 @@ export const screenV = v.object({
     v.literal("message"),
     // The kickoff deck, at `slide`.
     v.literal("slides"),
+    // Tech Pictionary: drawing number `drawing` tonight, drawn live on phones and the officer tablet.
+    v.literal("draw"),
   ),
   game: v.optional(gameV),
   index: v.optional(v.number()),
@@ -37,6 +39,8 @@ export const screenV = v.object({
   message: v.optional(v.string()),
   // Kickoff deck position (from 0), kept apart from `index` so the challenge on the go survives the slides going up.
   slide: v.optional(v.number()),
+  // Tech Pictionary: tonight's drawing number (from 1), kept like a card's when the scoreboard or join screen goes up.
+  drawing: v.optional(v.number()),
 });
 
 // Running when startedAt is set: remaining = remainingMs - (now - startedAt).
@@ -231,6 +235,46 @@ export default defineSchema({
   })
     .index("by_session_card", ["sessionId", "card"])
     .index("by_team_card", ["teamId", "card"]),
+
+  // Tech Pictionary: one drawing tonight, keyed "draw:<n>" like a card. The word is secret until the reveal: only the
+  // drawer's phone and officers ever read it. See convex/drawings.ts.
+  drawings: defineTable({
+    sessionId: v.id("sessions"),
+    n: v.number(),
+    key: v.string(),
+    drawer: v.id("attendance"),
+    word: v.string(),
+    // Set when the drawing is scored, for every team that got points. `points` includes double points.
+    results: v.optional(v.array(v.object({ teamId: v.id("teams"), points: v.number() }))),
+  }).index("by_session_n", ["sessionId", "n"]),
+
+  // A drawing's ink: one row per ~100ms of a stroke, so no doc grows with the picture. Points are flat [x, y, x, y, …]
+  // ints on the 1000 × 750 canvas (src/lib/draw.ts). `seq` orders rows within the drawing.
+  strokes: defineTable({
+    drawingId: v.id("drawings"),
+    stroke: v.string(),
+    seq: v.number(),
+    color: v.string(),
+    size: v.number(),
+    points: v.array(v.number()),
+  })
+    .index("by_drawing", ["drawingId", "seq"])
+    .index("by_stroke", ["drawingId", "stroke"]),
+
+  // A player's guesses on one drawing: how many and when (for the rate limit), and when they got it right. Wrong guesses
+  // themselves are never kept.
+  guesses: defineTable({
+    sessionId: v.id("sessions"),
+    teamId: v.id("teams"),
+    attendanceId: v.id("attendance"),
+    card: v.string(),
+    tries: v.number(),
+    lastAt: v.number(),
+    at: v.optional(v.number()),
+  })
+    .index("by_session_card", ["sessionId", "card"])
+    .index("by_team_card", ["teamId", "card"])
+    .index("by_attendance_card", ["attendanceId", "card"]),
 
   // Anonymous "I'm interested" hearts on events, one per browser (a random id kept in localStorage).
   interest: defineTable({

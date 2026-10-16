@@ -7,12 +7,13 @@ import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
 import { CardView, Hint, PuzzleExample, Rich, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { PhoneDraw } from "#/components/draw";
 import { InstagramLink } from "#/components/instagram";
 import { AnswerBox, InputBox } from "#/components/puzzle";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { WikiPair, WikiRound } from "#/components/wiki";
 import { LiveFix, LivePuzzle, useLaptop, usePuzzleInput } from "#/components/workspace";
-import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
+import { answersOpen, cardKey, drawKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
 import { usePython } from "#/lib/python";
 import type { AnswerGame } from "#/lib/grading";
@@ -513,6 +514,11 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           ) : (
             <WikiPair from={s.wikiFrom} to={s.wikiTo} />
           )}
+        </div>
+      )}
+      {s.mode === "draw" && s.drawing !== undefined && (
+        <div className="mt-5">
+          <PhoneDraw key={s.drawing} token={token} live={live} open={phoneOpen(live, drawKey(s.drawing), remaining)} playing={!!me.team} />
         </div>
       )}
       {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}

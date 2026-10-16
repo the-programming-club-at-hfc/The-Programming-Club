@@ -18,9 +18,13 @@ import { scoreReveal } from "./answers";
 import { scoreFixReveal, timedCard } from "./fixes";
 import { scorePuzzleReveal, scoreUnrevealedPuzzles } from "./puzzles";
 import { scoreWikiReveal } from "./wiki";
+import { drawCard, scoreDrawReveal, scoreUnrevealedDrawings } from "./drawings";
 import type { Doc } from "./_generated/dataModel";
 import { clockLeft, isFreshStart, settle, showCard, wikiKey } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
+
+/** The card (or race, or drawing) on the TV that teams answer against the clock. */
+const upCard = (s: Doc<"sessions">) => timedCard(s) ?? drawCard(s);
 
 /** The card windows with the clock's run-out time recorded, before anything changes the clock or the screen. */
 function settled(s: Doc<"sessions">, now: number) {
@@ -144,13 +148,15 @@ export const start = mutation({
   },
 });
 
-/** Close the night: score any puzzle that was never revealed, then award place XP from the final standings. */
+/** Close the night: score any puzzle or drawing that was never revealed, then award place XP from the final standings. */
 export const end = mutation({
   args: {},
   handler: async (ctx) => {
     await requireOfficer(ctx);
     const s = await upgradeOldNight(ctx, await requireOpenSession(ctx));
     await scoreUnrevealedPuzzles(ctx, s);
+    // Read again: scoring puzzles added to `scored`.
+    await scoreUnrevealedDrawings(ctx, (await ctx.db.get(s._id))!);
     const att = await sessionAttendance(ctx, s._id);
     const xp = placeXpFor(att);
     for (const a of att) await ctx.db.patch(a._id, { placeXp: xp.get(a._id) ?? 0 });
@@ -182,14 +188,15 @@ async function putScreen(ctx: MutationCtx, s: Doc<"sessions">, screen: Doc<"sess
   const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
   // Each answerable card keeps its own window; anything else going up clears the current one.
   const now = Date.now();
-  const w = showCard({ ...settled(s, now), up: timedCard(next)?.key, now, double: s.double });
+  const w = showCard({ ...settled(s, now), up: upCard(next)?.key, now, double: s.double });
   Object.assign(next, { card: w.card, played: w.played });
   await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
-  // Revealing scores phone answers, Fix it for real fixes, puzzle stars, or a Wiki Race, once per card.
+  // Revealing scores phone answers, Fix it for real fixes, puzzle stars, a Wiki Race, or a drawing, once per card.
   await scoreReveal(ctx, next);
   await scoreFixReveal(ctx, next);
   await scorePuzzleReveal(ctx, next);
   await scoreWikiReveal(ctx, next);
+  await scoreDrawReveal(ctx, next);
 }
 
 export const setScreen = mutation({
@@ -248,7 +255,7 @@ export const timer = mutation({
     const now = Date.now();
     const t = { ...s.timer };
     const remaining = Math.max(0, clockLeft(t, now));
-    const card = timedCard(s)?.key;
+    const card = upCard(s)?.key;
     let { card: w, played } = settled(s, now);
     switch (action) {
       case "set": {
@@ -282,8 +289,9 @@ export const timer = mutation({
         t.relay = !t.relay;
         break;
     }
-    // A fresh clock on an answerable card restarts its window: early-bonus clock and closing time.
-    if (w && card === w.key && !(s.scored ?? []).includes(card) && isFreshStart(action, t, now)) w = { key: card, at: now };
+    // A fresh clock on an answerable card restarts its window: early-bonus clock and closing time. It keeps its double points.
+    if (w && card === w.key && !(s.scored ?? []).includes(card) && isFreshStart(action, t, now))
+      w = { key: card, at: now, double: w.double };
     await ctx.db.patch(s._id, { timer: t, card: w, played });
   },
 });
