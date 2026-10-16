@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { DECKS, fmtClock, useRemaining } from "./game";
 import type { Screen } from "./game";
+import { drawOpen } from "./draw";
 import { run } from "./officer";
 import { BUGS, GAMES, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
@@ -85,11 +86,12 @@ export function useNewDrawing() {
 }
 
 /** The drawing for officers: who's drawing, the word (press and hold), skip it or hand it to someone else, and who has drawn. */
-export function DrawHost() {
+export function DrawHost({ live }: { live: Live }) {
   const data = useQuery(api.drawings.host);
   const skip = useMutation(api.drawings.skip);
   const switchDrawer = useMutation(api.drawings.switchDrawer);
   const timer = useMutation(api.sessions.timer);
+  const remaining = useRemaining(live.timer);
   if (!data) return null;
   const d = data.current;
   // Someone new gets a new word and a fresh clock.
@@ -114,7 +116,7 @@ export function DrawHost() {
         <>
           <WordPeek word={d.word} />
           <div className="mt-2 flex flex-wrap gap-2">
-            <button className="btn btn-sm" onClick={() => run(skip({ drawingId: d._id }))}>
+            <button className="btn btn-sm" disabled={!drawOpen(live, d.key, remaining)} onClick={() => run(skip({ drawingId: d._id }))}>
               Skip this word
             </button>
             <select
@@ -384,7 +386,7 @@ export function NextPanel({
         </p>
       )}
       {teams === 0 && (step === "start" || step === "show") && <p className="mt-2 font-semibold text-signal">{w.nobodyPlaying}</p>}
-      {r?.kind === "pictionary" && <DrawHost />}
+      {r?.kind === "pictionary" && <DrawHost live={live} />}
       {manual && (
         <p className="mt-3 text-sm">
           <strong>Score this one by hand</strong> with the score buttons{rules ? `: ${rules.scoring}` : "."}

@@ -1286,21 +1286,35 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
 function PictionaryTool({ live }: { live: Live }) {
   const newDrawing = useNewDrawing();
   const setScreen = useMutation(api.sessions.setScreen);
+  const timer = useMutation(api.sessions.timer);
+  const remaining = useRemaining(live.timer);
+  const [busy, setBusy] = useState(false);
   const s = live.screen;
+  // One tap at a time, so a double tap never starts two drawings.
+  const act = async (go: () => Promise<unknown>) => {
+    setBusy(true);
+    await run(go());
+    setBusy(false);
+  };
+  // Like the big button: the reveal stops a running clock so the buzzer doesn't go off over the word.
+  const reveal = async () => {
+    await setScreen({ screen: { ...s, revealed: true } });
+    if (live.timer.startedAt && remaining > 0) await timer({ action: "pause" });
+  };
   const up = s.mode === "draw" && s.drawing !== undefined;
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-sm btn-neon" onClick={() => run(newDrawing())}>
+        <button className="btn btn-sm btn-neon" disabled={busy} onClick={() => act(newDrawing)}>
           New drawing, {fmtClock(DRAW_SECONDS * 1000)}
         </button>
         {up && !s.revealed && (
-          <button className="btn btn-sm btn-coin" onClick={() => run(setScreen({ screen: { ...s, revealed: true } }))}>
+          <button className="btn btn-sm btn-coin" disabled={busy} onClick={() => act(reveal)}>
             Reveal the word and score
           </button>
         )}
       </div>
-      <DrawHost />
+      <DrawHost live={live} />
       <p className="mt-3 text-sm text-dim">
         The drawer draws on their phone or the officer tablet, everyone else guesses on theirs, and revealing scores it once.
       </p>

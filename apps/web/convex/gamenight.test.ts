@@ -1225,12 +1225,21 @@ describe("Tech Pictionary", () => {
     ).rejects.toThrow("Pick a pen");
     const rows = async () => (await o.t.query(api.drawings.inkBlock, { drawingId: d.id, block: 0 })).map((r) => r.stroke);
     expect(await rows()).toEqual(["a", "a", "b", "c"]);
-    await o.t.mutation(api.drawings.undo, { drawingId: d.id, token: d.drawer.token });
-    expect(await rows()).toEqual(["a", "a", "b"]);
-    await o.officer.mutation(api.drawings.undo, { drawingId: d.id });
+    // Each device undoes its own stroke: the phone's "b" goes, the tablet's later "c" stays.
+    await o.t.mutation(api.drawings.undo, { drawingId: d.id, token: d.drawer.token, stroke: "b" });
+    expect(await rows()).toEqual(["a", "a", "c"]);
+    await o.officer.mutation(api.drawings.undo, { drawingId: d.id, stroke: "c" });
     expect(await rows()).toEqual(["a", "a"]);
-    await o.t.mutation(api.drawings.clear, { drawingId: d.id, token: d.drawer.token });
+    // Ink still on its way for an undone stroke never lands.
+    await ink("b", [510, 310]);
+    expect(await rows()).toEqual(["a", "a"]);
+    // Clear, with this device's newest stroke whose first ink hasn't landed yet: none of it comes back afterwards.
+    await o.t.mutation(api.drawings.clear, { drawingId: d.id, token: d.drawer.token, mine: ["a", "late"] });
+    await ink("a", [20, 20, 30, 30]);
+    await ink("late", [40, 40]);
     expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+    await ink("new", [50, 50]);
+    expect(await rows()).toEqual(["new"]);
 
     // Skip: a new word on a clean canvas, until someone gets it.
     await ink("e", [5, 5]);
@@ -1244,5 +1253,54 @@ describe("Tech Pictionary", () => {
 
     later(78);
     await expect(ink("f", [1, 1])).rejects.toThrow("Pens down");
+  });
+
+  test("time's up: no skipping the word", async () => {
+    const o = setup();
+    await soloNight(o, 3);
+    const d = await newDrawing(o);
+    later(78);
+    await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token })).rejects.toThrow("Time’s up");
+  });
+
+  test("officers see the word, so a playing officer can draw but not guess", async () => {
+    const o = setup();
+    await soloNight(o, 2);
+    const ada = await o.officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await o.t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    // If Ada drew the first one, start another so she's a guesser.
+    let d = await newDrawing(o, "laptop");
+    if (d.drawer.token === ada) d = await newDrawing(o, "laptop");
+    await expect(o.t.mutation(api.drawings.guess, { token: ada, card: d.key, text: "laptop" })).rejects.toThrow("draw but don’t guess");
+    // She's still in the drawing rotation.
+    const drawers = new Set([d.drawer._id]);
+    for (let i = 0; i < 3; i++) drawers.add((await newDrawing(o)).drawer._id);
+    expect(drawers.has((await o.attendance()).find((a) => a.token === ada)!._id)).toBe(true);
+  });
+
+  test("a drawing left behind scores when another drawing, card, or round goes up, so teams aren't stuck", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const first = await newDrawing(o, "robot");
+    const g1 = tokens.find((tk) => tk !== first.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: g1, card: first.key, text: "robot" });
+    // The scoreboard keeps it: still waiting for its reveal.
+    await o.show({ mode: "scoreboard", drawing: first.n });
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([first.key]);
+    // Another drawing going up scores it.
+    const second = await newDrawing(o, "drone");
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
+    const points = async (token: string) => (await o.t.query(api.players.me, { token }))!.team!.score;
+    expect([await points(g1), await points(first.drawer.token)]).toEqual([3, 3]);
+    // So does a card.
+    const g2 = tokens.find((tk) => tk !== second.drawer.token && tk !== g1) ?? g1;
+    await o.t.mutation(api.drawings.guess, { token: g2, card: second.key, text: "drone" });
+    await o.show({ mode: "card", game: "output", index: 0 });
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
+    await o.officer.mutation(api.teams.make, { size: 1 });
+    // And nothing scores twice at the end of the night.
+    const before = (await o.attendance()).map((a) => a.points);
+    await o.officer.mutation(api.sessions.end, {});
+    expect((await o.attendance()).map((a) => a.points)).toEqual(before);
   });
 });

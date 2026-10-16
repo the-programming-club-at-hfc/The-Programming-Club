@@ -87,12 +87,17 @@ async function newWord(ctx: MutationCtx, s: Doc<"sessions">) {
   return PICTIONARY[i];
 }
 
-async function clearInk(ctx: MutationCtx, drawingId: Id<"drawings">) {
-  for (const r of await ctx.db
+/** Take strokes off a drawing: these ids, or with none given, every stroke (plus `also`, ids that may still be on the way). */
+async function removeInk(ctx: MutationCtx, d: Doc<"drawings">, ids?: string[], also: string[] = []) {
+  const rows = await ctx.db
     .query("strokes")
-    .withIndex("by_drawing", (q) => q.eq("drawingId", drawingId))
-    .collect())
-    await ctx.db.delete(r._id);
+    .withIndex("by_drawing", (q) => q.eq("drawingId", d._id))
+    .collect();
+  const gone = rows.filter((r) => !ids || ids.includes(r.stroke));
+  for (const r of gone) await ctx.db.delete(r._id);
+  // Remembered (the last few hundred), so ink still on its way for them never lands.
+  const dead = [...new Set([...(d.gone ?? []), ...(ids ?? []), ...gone.map((r) => r.stroke), ...also.slice(0, 50)])];
+  await ctx.db.patch(d._id, { gone: dead.slice(-500) });
 }
 
 const lastInk = (ctx: QueryCtx, drawingId: Id<"drawings">) =>
@@ -163,7 +168,7 @@ export const switchDrawer = mutation({
     const a = await ctx.db.get(attendanceId);
     if (!a || a.sessionId !== s._id || !inTeamPool(a) || !a.teamId) throw new ConvexError("Pick someone who’s playing tonight.");
     await ctx.db.patch(d._id, { drawer: a._id, word: await newWord(ctx, s) });
-    await clearInk(ctx, d._id);
+    await removeInk(ctx, d);
     for (const g of await ctx.db
       .query("guesses")
       .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", d.key))
@@ -178,9 +183,10 @@ export const skip = mutation({
   handler: async (ctx, { drawingId, token }) => {
     const { d, s } = await myDrawing(ctx, drawingId, token);
     if (over(s, d.key)) throw new ConvexError("This drawing is over.");
+    if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so it stays.");
     await ctx.db.patch(d._id, { word: await newWord(ctx, s) });
-    await clearInk(ctx, d._id);
+    await removeInk(ctx, d);
   },
 });
 
@@ -205,34 +211,31 @@ export const ink = mutation({
       points.some((x, i) => !Number.isInteger(x) || x < 0 || x > (i % 2 ? H : W))
     )
       throw new ConvexError("That ink is off the canvas.");
+    // The rest of a stroke that was undone or cleared while it was on its way.
+    if (d.gone?.includes(stroke)) return;
     const seq = ((await lastInk(ctx, d._id))?.seq ?? -1) + 1;
     if (seq >= MAX_INK_ROWS) throw new ConvexError("The canvas is full. Undo or clear to keep drawing.");
     await ctx.db.insert("strokes", { drawingId: d._id, stroke, seq, color, size, points });
   },
 });
 
-/** Take back the last stroke on the drawing, whichever device drew it. */
+/** Take back a stroke: each device undoes its own, so the phone never undoes the tablet's. */
 export const undo = mutation({
-  args: { drawingId: v.id("drawings"), token: v.optional(v.string()) },
-  handler: async (ctx, { drawingId, token }) => {
+  args: { drawingId: v.id("drawings"), token: v.optional(v.string()), stroke: v.string() },
+  handler: async (ctx, { drawingId, token, stroke }) => {
     const { d, s } = await myDrawing(ctx, drawingId, token);
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
-    const last = await lastInk(ctx, d._id);
-    if (!last) return;
-    for (const r of await ctx.db
-      .query("strokes")
-      .withIndex("by_stroke", (q) => q.eq("drawingId", d._id).eq("stroke", last.stroke))
-      .collect())
-      await ctx.db.delete(r._id);
+    await removeInk(ctx, d, [stroke]);
   },
 });
 
+/** Wipe the drawing. `mine` are this device's latest strokes, which may still have ink on its way. */
 export const clear = mutation({
-  args: { drawingId: v.id("drawings"), token: v.optional(v.string()) },
-  handler: async (ctx, { drawingId, token }) => {
+  args: { drawingId: v.id("drawings"), token: v.optional(v.string()), mine: v.optional(v.array(v.string())) },
+  handler: async (ctx, { drawingId, token, mine }) => {
     const { d, s } = await myDrawing(ctx, drawingId, token);
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
-    await clearInk(ctx, d._id);
+    await removeInk(ctx, d, undefined, mine);
   },
 });
 
@@ -270,6 +273,7 @@ export const guess = mutation({
     const s = a && (await ctx.db.get(a.sessionId));
     if (!a || !s || s.status !== "open") throw new ConvexError("This night has ended.");
     if (!a.teamId) throw new ConvexError("You’re not playing this round.");
+    if (a.officer) throw new ConvexError("Officers see the word, so you draw but don’t guess.");
     const teamId = a.teamId;
     const c = drawCard(s);
     const d = c?.key === card ? await drawingAt(ctx, s._id, c.n) : null;

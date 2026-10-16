@@ -244,6 +244,8 @@ export default defineSchema({
     key: v.string(),
     drawer: v.id("attendance"),
     word: v.string(),
+    // Strokes undone or cleared, so ink still on its way for them is dropped instead of drawing fragments back.
+    gone: v.optional(v.array(v.string())),
     // Set when the drawing is scored, for every team that got points. `points` includes double points.
     results: v.optional(v.array(v.object({ teamId: v.id("teams"), points: v.number() }))),
   }).index("by_session_n", ["sessionId", "n"]),
@@ -257,9 +259,7 @@ export default defineSchema({
     color: v.string(),
     size: v.number(),
     points: v.array(v.number()),
-  })
-    .index("by_drawing", ["drawingId", "seq"])
-    .index("by_stroke", ["drawingId", "stroke"]),
+  }).index("by_drawing", ["drawingId", "seq"]),
 
   // A player's guesses on one drawing: how many and when (for the rate limit), and when they got it right. Wrong guesses
   // themselves are never kept.

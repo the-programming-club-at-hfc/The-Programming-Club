@@ -9,7 +9,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ordinal } from "./ui";
 import { COLORS, GUESS_MAX, H, MAX_INK_POINTS, SIZES, W, inkPath } from "#/lib/draw";
-import { drawKey } from "#/lib/grading";
+import { answersOpen, drawKey } from "#/lib/grading";
 import { teamWords } from "#/lib/words";
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
@@ -55,6 +55,10 @@ export function Sketch({
   const [error, setError] = useState("");
   // Finished strokes from this device, shown until the server has them all.
   const [mine, setMine] = useState<{ id: string; color: string; size: number; points: number[]; saved: boolean }[]>([]);
+  // Every stroke this device drew, oldest first: Undo takes back this device's own, never another's.
+  const [own, setOwn] = useState<string[]>([]);
+  // Strokes the server turned down (often at time-up): never shown here again, so this device matches the TV.
+  const failed = useRef(new Set<string>());
   const svg = useRef<SVGSVGElement>(null);
   const live = useRef<SVGPathElement>(null);
   const cur = useRef<Stroke | null>(null);
@@ -106,6 +110,7 @@ export function Sketch({
     c.sent = c.points.length;
     lastSend.current = send({ drawingId, ...who, stroke: c.id, color: c.color, size: c.size, points }).catch((e: unknown) => {
       setError(errorText(e));
+      failed.current.add(c.id);
       setMine((m) => m.filter((x) => x.id !== c.id));
     });
   };
@@ -141,14 +146,19 @@ export function Sketch({
     flush();
     cur.current = null;
     live.current?.setAttribute("d", "");
+    setOwn((o) => [...o, c.id]);
+    if (failed.current.has(c.id)) return;
     setMine((m) => [...m, { id: c.id, color: c.color, size: c.size, points: c.points, saved: false }]);
     void lastSend.current.then(() => setMine((m) => m.map((x) => (x.id === c.id ? { ...x, saved: true } : x))));
   };
 
-  const act = (p: Promise<unknown>) => {
+  // This device's last stroke still on the canvas (here or on the server), for Undo.
+  const last = own.filter((id) => saved.has(id) || mine.some((m) => m.id === id)).at(-1);
+  // Undo or clear: the strokes go from this device at once, saved or still on their way; the server drops any late ink.
+  const act = (p: Promise<unknown>, ids?: string[]) => {
     setError("");
-    // Saved strokes are on the server now, so undo and clear take them from there.
-    setMine((m) => m.filter((x) => !x.saved));
+    setMine((m) => (ids ? m.filter((x) => !ids.includes(x.id)) : []));
+    if (!ids) setOwn([]);
     p.catch((e: unknown) => setError(errorText(e)));
   };
 
@@ -197,10 +207,13 @@ export function Sketch({
               <span className="rounded-full bg-current" style={{ width: s / 2 + 2, height: s / 2 + 2 }} />
             </button>
           ))}
-          <button className="btn btn-sm" onClick={() => act(undo({ drawingId, ...who }))}>
+          <button className="btn btn-sm" disabled={!last} onClick={() => last && act(undo({ drawingId, ...who, stroke: last }), [last])}>
             Undo
           </button>
-          <button className="btn btn-sm" onClick={() => confirm("Clear the whole drawing?") && act(clear({ drawingId, ...who }))}>
+          <button
+            className="btn btn-sm"
+            onClick={() => confirm("Clear the whole drawing?") && act(clear({ drawingId, ...who, mine: own.slice(-50) }))}
+          >
             Clear
           </button>
           {error && <p className="w-full text-sm font-semibold text-signal">{error}</p>}
@@ -209,6 +222,19 @@ export function Sketch({
     </div>
   );
 }
+
+/** Whether a drawing on the TV still takes ink, skips, and guesses: the server's rule, with no grace. */
+export const drawOpen = (live: Live, key: string, remaining: number) =>
+  answersOpen({
+    revealed: !!live.screen.revealed,
+    scored: live.scored.includes(key),
+    endedAt: live.card?.key === key ? live.card.endedAt : undefined,
+    own: live.timer.card === key,
+    running: !!live.timer.startedAt,
+    remaining,
+    now: Date.now(),
+    grace: 0,
+  });
 
 /** The word as blanks: one underline per letter, with its spaces. Sized by the font size. */
 export function Blanks({ text, className = "" }: { text: string; className?: string }) {
@@ -228,7 +254,19 @@ export function Blanks({ text, className = "" }: { text: string; className?: str
 }
 
 /** The join screen while a drawing is up: the drawer gets the word and the canvas; everyone else watches and guesses. */
-export function PhoneDraw({ token, live, open, playing }: { token: string; live: Live; open: boolean; playing: boolean }) {
+export function PhoneDraw({
+  token,
+  live,
+  open,
+  playing,
+  officer,
+}: {
+  token: string;
+  live: Live;
+  open: boolean;
+  playing: boolean;
+  officer: boolean;
+}) {
   const board = useQuery(api.drawings.board);
   const me = useQuery(api.drawings.mine, { token });
   const skip = useMutation(api.drawings.skip);
@@ -248,7 +286,7 @@ export function PhoneDraw({ token, live, open, playing }: { token: string; live:
           <p className="font-semibold">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
           <p className="mt-1 text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{m.word}</p>
           {result && <p className="mt-2 text-2xl font-extrabold">{result}</p>}
-          {!done && b.got.length === 0 && (
+          {open && b.got.length === 0 && (
             <button
               className="btn btn-sm mt-3"
               onClick={() => skip({ drawingId: b._id, token }).catch((e: unknown) => setError(errorText(e)))}
@@ -288,12 +326,16 @@ export function PhoneDraw({ token, live, open, playing }: { token: string; live:
         </div>
       )}
       <Sketch key={b._id} drawingId={b._id} />
-      {playing &&
+      {officer && !done ? (
+        <p className="text-sm text-dim">Officers see the word, so you draw but don’t guess.</p>
+      ) : (
+        playing &&
         m &&
         !m.teammate &&
         !got &&
         !done &&
-        (open ? <GuessBox token={token} card={key} /> : <p className="font-semibold">Time’s up.</p>)}
+        (open ? <GuessBox token={token} card={key} /> : <p className="font-semibold">Time’s up.</p>)
+      )}
     </div>
   );
 }

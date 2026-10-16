@@ -177,7 +177,14 @@ export const reopen = mutation({
 });
 
 /** Put something on the TV, keeping each card's answer window, and score a reveal. */
-async function putScreen(ctx: MutationCtx, s: Doc<"sessions">, screen: Doc<"sessions">["screen"]) {
+async function putScreen(ctx: MutationCtx, before: Doc<"sessions">, screen: Doc<"sessions">["screen"]) {
+  let s = before;
+  // A drawing leaving for good (another drawing, a card, or a round goes up; not the scoreboard or join screen, which
+  // keep it) is scored now, so its guesses never hold teams in place.
+  if (s.screen.drawing !== undefined && screen.drawing !== s.screen.drawing) {
+    await scoreUnrevealedDrawings(ctx, s);
+    s = (await ctx.db.get(s._id))!;
+  }
   const card =
     screen.mode === "card" && screen.game && screen.index !== undefined
       ? `${screen.game}:${screen.index}`

@@ -518,7 +518,14 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       )}
       {s.mode === "draw" && s.drawing !== undefined && (
         <div className="mt-5">
-          <PhoneDraw key={s.drawing} token={token} live={live} open={phoneOpen(live, drawKey(s.drawing), remaining)} playing={!!me.team} />
+          <PhoneDraw
+            key={s.drawing}
+            token={token}
+            live={live}
+            open={phoneOpen(live, drawKey(s.drawing), remaining)}
+            playing={!!me.team}
+            officer={me.officer}
+          />
         </div>
       )}
       {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
