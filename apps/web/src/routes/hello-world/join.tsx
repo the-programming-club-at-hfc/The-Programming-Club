@@ -370,12 +370,18 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const w = teamWords(solo);
   // On a laptop, puzzles and Fix it for real get the full workspace right here; a phone or tablet can open it too.
   const laptop = useLaptop();
-  const [full, setFull] = useState(false);
-  const work = !!me.team && (laptop || full);
+  const card = s.mode === "card" && s.game && s.index !== undefined ? cardKey(s.game, s.index) : null;
+  // The card the workspace is open for. Opening is per card, and a laptop window shrunk mid-card keeps its workspace
+  // (and a check that's running).
+  const [fullFor, setFullFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (laptop && card) setFullFor(card);
+  }, [laptop, card]);
+  const work = !!me.team && (laptop || (!!card && fullFor === card));
   const py = usePython(work && teamComputer);
   const wide = work && s.mode === "card" && (s.game === "fix" || s.game === "puzzle");
   const phoneView = !laptop && (
-    <button className="link mb-3 text-sm text-dim" onClick={() => setFull(false)}>
+    <button className="link mb-3 text-sm text-dim" onClick={() => setFullFor(null)}>
       Back to the phone view
     </button>
   );
@@ -455,7 +461,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 />
               </>
             ) : (
-              <FixStatus live={live} index={s.index} teamId={me.team._id} onOpen={() => setFull(true)} />
+              <FixStatus live={live} index={s.index} teamId={me.team._id} onOpen={() => setFullFor(card)} />
             )
           ) : s.game === "puzzle" && me.team ? (
             work ? (
@@ -479,7 +485,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 index={s.index}
                 teamId={me.team._id}
                 remaining={remaining}
-                onOpen={() => setFull(true)}
+                onOpen={() => setFullFor(card)}
               />
             )
           ) : (

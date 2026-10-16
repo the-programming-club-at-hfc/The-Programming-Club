@@ -251,7 +251,7 @@ export function AnswerBox({
       <div className="mt-2 flex gap-2">
         <input
           id={`answer-${part}`}
-          className="field font-code"
+          className="field min-w-0 flex-1 font-code"
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           autoComplete="off"
@@ -260,7 +260,7 @@ export function AnswerBox({
           maxLength={200}
           disabled={!open}
         />
-        <button className="btn btn-primary" disabled={!open || busy || wait > 0 || !answer.trim()}>
+        <button className="btn btn-primary shrink-0" disabled={!open || busy || wait > 0 || !answer.trim()}>
           {busy ? "Checking…" : "Submit"}
         </button>
       </div>
