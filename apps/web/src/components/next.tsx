@@ -116,12 +116,17 @@ export function DrawHost({ live }: { live: Live }) {
         <>
           <WordPeek word={d.word} />
           <div className="mt-2 flex flex-wrap gap-2">
-            <button className="btn btn-sm" disabled={!drawOpen(live, d.key, remaining)} onClick={() => run(skip({ drawingId: d._id }))}>
+            <button
+              className="btn btn-sm"
+              disabled={!drawOpen(live, d.key, remaining) || d.got > 0}
+              onClick={() => run(skip({ drawingId: d._id }))}
+            >
               Skip this word
             </button>
             <select
               className="field w-auto py-1 text-sm"
               value=""
+              disabled={d.got > 0}
               onChange={(e) => e.target.value && handTo(e.target.value as Id<"attendance">)}
               aria-label="Switch drawer"
             >
@@ -135,6 +140,7 @@ export function DrawHost({ live }: { live: Live }) {
                 ))}
             </select>
           </div>
+          {d.got > 0 && <p className="mt-1 text-sm text-dim">Someone has it, so the word and the drawer stay.</p>}
         </>
       )}
       <p className="mt-2 text-xs text-dim">

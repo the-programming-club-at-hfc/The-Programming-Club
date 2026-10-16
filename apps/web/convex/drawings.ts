@@ -159,7 +159,8 @@ export const start = mutation({
   },
 });
 
-/** Hand the drawing to someone else, with a new word and a clean canvas (the old drawer saw the old word). */
+/** Hand the drawing to someone else, with a new word and a clean canvas (the old drawer saw the old word). Not once
+ *  someone has it: their points stay. */
 export const switchDrawer = mutation({
   args: { drawingId: v.id("drawings"), attendanceId: v.id("attendance") },
   handler: async (ctx, { drawingId, attendanceId }) => {
@@ -167,7 +168,8 @@ export const switchDrawer = mutation({
     if (over(s, d.key)) throw new ConvexError("This drawing is over.");
     const a = await ctx.db.get(attendanceId);
     if (!a || a.sessionId !== s._id || !inTeamPool(a) || !a.teamId) throw new ConvexError("Pick someone who’s playing tonight.");
-    await ctx.db.patch(d._id, { drawer: a._id, word: await newWord(ctx, s) });
+    if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so the drawer stays.");
+    await ctx.db.patch(d._id, { drawer: a._id, word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1 });
     await removeInk(ctx, d);
     for (const g of await ctx.db
       .query("guesses")
@@ -185,7 +187,7 @@ export const skip = mutation({
     if (over(s, d.key)) throw new ConvexError("This drawing is over.");
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so it stays.");
-    await ctx.db.patch(d._id, { word: await newWord(ctx, s) });
+    await ctx.db.patch(d._id, { word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1 });
     await removeInk(ctx, d);
   },
 });
@@ -195,12 +197,14 @@ export const ink = mutation({
   args: {
     drawingId: v.id("drawings"),
     token: v.optional(v.string()),
+    // The drawing's `rev` the stroke was drawn on.
+    rev: v.number(),
     stroke: v.string(),
     color: v.string(),
     size: v.number(),
     points: v.array(v.number()),
   },
-  handler: async (ctx, { drawingId, token, stroke, color, size, points }) => {
+  handler: async (ctx, { drawingId, token, rev, stroke, color, size, points }) => {
     const { d, s } = await myDrawing(ctx, drawingId, token);
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
     if (!COLORS.includes(color) || !SIZES.includes(size) || stroke.length > 40) throw new ConvexError("Pick a pen from the choices.");
@@ -211,8 +215,8 @@ export const ink = mutation({
       points.some((x, i) => !Number.isInteger(x) || x < 0 || x > (i % 2 ? H : W))
     )
       throw new ConvexError("That ink is off the canvas.");
-    // The rest of a stroke that was undone or cleared while it was on its way.
-    if (d.gone?.includes(stroke)) return;
+    // The rest of a stroke that was undone or cleared while it was on its way, or drawn for a word since skipped.
+    if (d.gone?.includes(stroke) || rev !== (d.rev ?? 0)) return;
     const seq = ((await lastInk(ctx, d._id))?.seq ?? -1) + 1;
     if (seq >= MAX_INK_ROWS) throw new ConvexError("The canvas is full. Undo or clear to keep drawing.");
     await ctx.db.insert("strokes", { drawingId: d._id, stroke, seq, color, size, points });
@@ -319,6 +323,7 @@ export const board = query({
     return {
       _id: d._id,
       key: d.key,
+      rev: d.rev ?? 0,
       drawer: await nameOf(ctx, d.drawer),
       drawerTeam,
       blanks: blanks(d.word),
@@ -389,7 +394,10 @@ export const host = query({
         word: d.word,
         drawer: d.drawer,
         drawerName: await nameOf(ctx, d.drawer),
+        rev: d.rev ?? 0,
         over: over(s, d.key),
+        // Someone has it, so the word and drawer stay.
+        got: (await gotIt(ctx, s, d)).got.length,
       },
     };
   },

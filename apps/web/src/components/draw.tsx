@@ -25,15 +25,17 @@ const InkRows = memo(function InkRows({ rows }: { rows: Ink[] }) {
 });
 
 /** A stroke being drawn on this device: its points, and how many of them have gone to the server. */
-type Stroke = { id: string; pointer: number; color: string; size: number; points: number[]; sent: number };
+type Stroke = { id: string; pointer: number; touch: boolean; color: string; size: number; points: number[]; sent: number };
 
 /**
  * The 4:3 canvas. With `edit`, it takes finger, mouse, and pen: this device's ink shows at once and goes to the server
  * about every 100ms, so the TV draws live. The drawer's phone passes its `token`; the officer tablet is signed in instead.
+ * `rev` is the drawing's word revision: give the canvas a key with it, so a new word starts a fresh canvas.
  */
 export function Sketch({
   drawingId,
   token,
+  rev = 0,
   edit = false,
   className = "",
   canvasClass = "aspect-[4/3] w-full border-[1.5px] border-line",
@@ -41,6 +43,7 @@ export function Sketch({
 }: {
   drawingId: Id<"drawings">;
   token?: string;
+  rev?: number;
   edit?: boolean;
   className?: string;
   canvasClass?: string;
@@ -108,19 +111,39 @@ export function Sketch({
     if (!c || c.points.length <= c.sent) return;
     const points = c.points.slice(Math.max(0, c.sent - 2));
     c.sent = c.points.length;
-    lastSend.current = send({ drawingId, ...who, stroke: c.id, color: c.color, size: c.size, points }).catch((e: unknown) => {
+    lastSend.current = send({ drawingId, ...who, rev, stroke: c.id, color: c.color, size: c.size, points }).catch((e: unknown) => {
       setError(errorText(e));
       failed.current.add(c.id);
       setMine((m) => m.filter((x) => x.id !== c.id));
     });
   };
 
+  // Stops the stroke being drawn without finishing it, and returns it.
+  const drop = () => {
+    const c = cur.current;
+    clearInterval(tick.current);
+    cur.current = null;
+    live.current?.setAttribute("d", "");
+    return c;
+  };
+  // Pens down: time's up or the drawing is over, so a stroke still being drawn goes no further.
+  useEffect(() => {
+    if (!edit) drop();
+  }, [edit]);
+
   const down = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!edit || cur.current || e.button > 0 || (e.pointerType === "touch" && pen.current)) return;
-    if (e.pointerType === "pen") pen.current = true;
+    if (!edit || e.button > 0 || (e.pointerType === "touch" && pen.current)) return;
+    if (e.pointerType === "pen") {
+      pen.current = true;
+      // A palm that landed before the pen gives way to it: its stroke goes, here and on the server.
+      const palm = cur.current?.touch ? drop() : null;
+      if (palm?.sent) undo({ drawingId, ...who, stroke: palm.id }).catch(() => undefined);
+    }
+    if (cur.current) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     setError("");
-    cur.current = { id: Math.random().toString(36).slice(2, 10), pointer: e.pointerId, color, size, points: point(e), sent: 0 };
+    const touch = e.pointerType === "touch";
+    cur.current = { id: Math.random().toString(36).slice(2, 10), pointer: e.pointerId, touch, color, size, points: point(e), sent: 0 };
     live.current?.setAttribute("d", inkPath(cur.current.points));
     tick.current = setInterval(flush, 100);
   };
@@ -236,19 +259,26 @@ export const drawOpen = (live: Live, key: string, remaining: number) =>
     grace: 0,
   });
 
-/** The word as blanks: one underline per letter, with its spaces. Sized by the font size. */
+/** The word as blanks: one underline per letter, word by word, so a line only ever breaks between words. Sized by the font size. */
 export function Blanks({ text, className = "" }: { text: string; className?: string }) {
   return (
-    <p className={`flex flex-wrap items-end gap-y-[0.3em] ${className}`} aria-label={`${text.replace(/[^_]/g, "").length} letters`}>
-      {text.split("").map((c, i) =>
-        c === "_" ? (
-          <span key={i} className="mx-[0.08em] inline-block h-[1em] w-[0.7em] border-b-[0.12em] border-current" />
-        ) : (
-          <span key={i} className="inline-block w-[0.5em] text-center leading-none">
-            {c}
-          </span>
-        ),
-      )}
+    <p
+      className={`flex flex-wrap items-end gap-x-[0.5em] gap-y-[0.3em] ${className}`}
+      aria-label={`${text.replace(/[^_]/g, "").length} letters`}
+    >
+      {text.split(" ").map((word, i) => (
+        <span key={i} className="inline-flex items-end whitespace-nowrap">
+          {word.split("").map((c, j) =>
+            c === "_" ? (
+              <span key={j} className="mx-[0.06em] inline-block h-[1em] w-[0.6em] border-b-[0.12em] border-current" />
+            ) : (
+              <span key={j} className="inline-block w-[0.45em] text-center leading-none">
+                {c}
+              </span>
+            ),
+          )}
+        </span>
+      ))}
     </p>
   );
 }
@@ -296,7 +326,7 @@ export function PhoneDraw({
           )}
           {error && <p className="mt-2 text-sm font-semibold">{error}</p>}
         </div>
-        <Sketch key={b._id} drawingId={b._id} token={token} edit={open} />
+        <Sketch key={`${b._id}:${b.rev}`} drawingId={b._id} token={token} rev={b.rev} edit={open} />
         {!done && (
           <p className="text-sm text-dim">
             Draw here, or walk up to the officer tablet: it draws on this same picture. No letters, numbers, or symbols.
@@ -351,8 +381,10 @@ function GuessBox({ token, card }: { token: string; card: string }) {
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      const r = await guess({ token, card, text });
-      if (r !== "right") setText("");
+      const sent = text;
+      const r = await guess({ token, card, text: sent });
+      // Keep anything typed while the answer was on its way.
+      if (r !== "right") setText((t) => (t === sent ? "" : t));
       setNote(
         r === "close"
           ? { text: `So close! “${text.trim()}” isn’t quite it.`, tone: "bg-sun text-[#12332b]" }

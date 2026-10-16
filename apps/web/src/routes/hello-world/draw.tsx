@@ -2,11 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { Sketch } from "#/components/draw";
+import { Sketch, drawOpen } from "#/components/draw";
 import { fmtClock, useRemaining } from "#/components/game";
 import { OfficerGate, run } from "#/components/officer";
 import { Picto } from "#/components/ui";
-import { GRACE_MS, answersOpen } from "#/lib/grading";
 import { CLUB } from "#/lib/season";
 
 // The officer tablet for Tech Pictionary: a shared drawing pad for anyone who'd rather not draw on their phone. It draws
@@ -49,16 +48,8 @@ function Pad() {
         </div>
       </div>
     );
-  const open = answersOpen({
-    revealed: d.over,
-    scored: d.over,
-    endedAt: live.card?.key === d.key ? live.card.endedAt : undefined,
-    own: live.timer.card === d.key,
-    running: !!live.timer.startedAt,
-    remaining,
-    now: Date.now(),
-    grace: GRACE_MS,
-  });
+  // No grace here: the clock on this screen stops at 0:00, and so does the pen.
+  const open = !d.over && drawOpen(live, d.key, remaining);
   const show = shown === d.word;
   return (
     <>
@@ -73,7 +64,7 @@ function Pad() {
         >
           {show || d.over ? d.word : "Tap to show the word"}
         </button>
-        {open && (
+        {open && d.got === 0 && (
           <button className="btn btn-sm" onClick={() => run(skip({ drawingId: d._id }).then(() => setShown(null)))}>
             Skip word
           </button>
@@ -83,8 +74,9 @@ function Pad() {
         </p>
       </header>
       <Sketch
-        key={d._id}
+        key={`${d._id}:${d.rev}`}
         drawingId={d._id}
+        rev={d.rev}
         edit={open}
         className="flex min-h-0 flex-1 gap-3 bg-mist p-3"
         canvasClass="h-full min-w-0 flex-1"

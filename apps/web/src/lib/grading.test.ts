@@ -538,11 +538,17 @@ describe("Wiki Race", () => {
 });
 
 describe("Tech Pictionary", () => {
-  test("guesses ignore case, spaces, punctuation, and a trailing plural s", () => {
+  test("guesses ignore case, spaces, and punctuation, and plurals count but cut-short words don't", () => {
     expect(checkGuess("Wifi", "Wi-Fi")).toBe("right");
     expect(checkGuess("  usb-STICKS!", "USB stick")).toBe("right");
     expect(checkGuess("rubber ducks", "rubber duck")).toBe("right");
     expect(checkGuess("headphone", "headphones")).toBe("right");
+    expect(checkGuess("Viruses", "virus")).toBe("right");
+    expect(checkGuess("viru", "virus")).toBe("close");
+    expect(checkGuess("magnifying glasses", "magnifying glass")).toBe("right");
+    expect(checkGuess("magnifying glas", "magnifying glass")).toBe("close");
+    expect(checkGuess("bugs", "bug")).toBe("right");
+    expect(checkGuess("3-D printers", "3D printer")).toBe("right");
     expect(checkGuess("", "bug")).toBe("wrong");
     expect(checkGuess("?!", "bug")).toBe("wrong");
   });

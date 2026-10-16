@@ -244,6 +244,8 @@ export default defineSchema({
     key: v.string(),
     drawer: v.id("attendance"),
     word: v.string(),
+    // Goes up each time the word changes (skip, switch drawer), so ink from before never lands on the new canvas.
+    rev: v.optional(v.number()),
     // Strokes undone or cleared, so ink still on its way for them is dropped instead of drawing fragments back.
     gone: v.optional(v.array(v.string())),
     // Set when the drawing is scored, for every team that got points. `points` includes double points.

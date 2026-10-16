@@ -422,12 +422,8 @@ export const DRAW_SECONDS = 75;
 /** A drawing's key, like a card's: "draw:3" is tonight's third drawing. */
 export const drawKey = (n: number) => `draw:${n}`;
 
-/** A guess (or the word) as it's compared: case, spaces, punctuation, and a trailing plural "s" don't matter. */
-export const guessKey = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .replace(/(.)s$/, "$1");
+/** A guess (or the word) as it's compared: case, spaces, and punctuation don't matter. */
+export const guessKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /** Letters to add, drop, or change to turn one string into the other. */
 export function editDistance(a: string, b: string) {
@@ -441,14 +437,16 @@ export function editDistance(a: string, b: string) {
 }
 
 /**
- * Checks a guess against the word. One or two letters off is "close" (it doesn't count, and only the guesser sees it);
- * short words only get one, so "So close!" never gives a three-letter word away.
+ * Checks a guess against the word. Plurals count ("bugs", "viruses", "glasses"), and so does the singular of a plural
+ * word ("headphone"), but never a word cut short ("viru", "glas"). One or two letters off is "close" (it doesn't count,
+ * and only the guesser sees it); short words only get one, so "So close!" never gives a three-letter word away.
  */
 export function checkGuess(guess: string, word: string): "right" | "close" | "wrong" {
   const g = guessKey(guess);
   const w = guessKey(word);
   if (!g) return "wrong";
-  if (g === w) return "right";
+  const plural = /s$/.test(w) && !/(ss|us)$/.test(w);
+  if ([w, `${w}s`, `${w}es`].includes(g) || (plural && g === w.slice(0, -1))) return "right";
   return editDistance(g, w) <= (w.length >= 5 ? 2 : 1) ? "close" : "wrong";
 }
 

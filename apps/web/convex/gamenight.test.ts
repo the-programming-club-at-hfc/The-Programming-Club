@@ -1057,7 +1057,7 @@ describe("Tech Pictionary", () => {
     expect((await o.t.query(api.drawings.mine, { token: d.drawer.token }))!).toEqual({ key: d.key, drawer: true, word: d.word });
     await expect(o.signedInStudent.query(api.drawings.host, {})).rejects.toThrow("Only club officers");
     // Nobody else can draw on it or skip its word.
-    const ink = { drawingId: d.id, stroke: "s", color: COLORS[0], size: SIZES[0], points: [10, 10] };
+    const ink = { drawingId: d.id, rev: 0, stroke: "s", color: COLORS[0], size: SIZES[0], points: [10, 10] };
     await expect(o.t.mutation(api.drawings.ink, { ...ink, token: guesser })).rejects.toThrow("someone else’s turn");
     await expect(o.t.mutation(api.drawings.ink, ink)).rejects.toThrow("Only club officers");
     await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: guesser })).rejects.toThrow("someone else’s turn");
@@ -1174,6 +1174,7 @@ describe("Tech Pictionary", () => {
     const d = drawn[3];
     await o.t.mutation(api.drawings.ink, {
       drawingId: d.id,
+      rev: 0,
       token: d.drawer.token,
       stroke: "s",
       color: COLORS[1],
@@ -1186,6 +1187,19 @@ describe("Tech Pictionary", () => {
     expect(after.drawer).toBe(to._id);
     expect(drawn.map((x) => x.word)).not.toContain(after.word);
     expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+    // Ink drawn for the old word, still on its way, never lands on the new canvas.
+    const tablet = { drawingId: d.id, stroke: "t", color: COLORS[1], size: SIZES[1], points: [3, 4] };
+    await o.officer.mutation(api.drawings.ink, { ...tablet, rev: 0 });
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+    await o.officer.mutation(api.drawings.ink, { ...tablet, rev: after.rev });
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(1);
+    // Once someone has it, the drawer stays, and so do their points.
+    const guesser = (await o.attendance()).find((a) => a._id !== to._id)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser.token, card: d.key, text: after.word });
+    await expect(o.officer.mutation(api.drawings.switchDrawer, { drawingId: d.id, attendanceId: guesser._id })).rejects.toThrow(
+      "drawer stays",
+    );
+    expect((await o.t.query(api.drawings.board, {}))!.got).toHaveLength(1);
 
     // Team nights go team by team.
     const p = setup();
@@ -1203,10 +1217,10 @@ describe("Tech Pictionary", () => {
     const tokens = await soloNight(o, 3);
     const d = await newDrawing(o, "mouse");
     // From the drawer's phone, or the officer tablet (signed in, no token).
-    const ink = (stroke: string, points: number[], tablet = false) =>
+    const ink = (stroke: string, points: number[], tablet = false, rev = 0) =>
       tablet
-        ? o.officer.mutation(api.drawings.ink, { drawingId: d.id, stroke, color: COLORS[0], size: SIZES[0], points })
-        : o.t.mutation(api.drawings.ink, { drawingId: d.id, token: d.drawer.token, stroke, color: COLORS[0], size: SIZES[0], points });
+        ? o.officer.mutation(api.drawings.ink, { drawingId: d.id, rev, stroke, color: COLORS[0], size: SIZES[0], points })
+        : o.t.mutation(api.drawings.ink, { drawingId: d.id, rev, token: d.drawer.token, stroke, color: COLORS[0], size: SIZES[0], points });
     await ink("a", [0, 0, 10, 10]);
     await ink("a", [10, 10, 20, 20]);
     await ink("b", [500, 300]);
@@ -1216,6 +1230,7 @@ describe("Tech Pictionary", () => {
     await expect(
       o.t.mutation(api.drawings.ink, {
         drawingId: d.id,
+        rev: 0,
         token: d.drawer.token,
         stroke: "d",
         color: "#00ff00",
@@ -1247,6 +1262,10 @@ describe("Tech Pictionary", () => {
     const word = (await o.t.query(api.drawings.mine, { token: d.drawer.token }))!;
     expect(word.drawer && word.word !== "mouse").toBe(true);
     expect(await rows()).toEqual([]);
+    // A stroke still on its way from before the skip is dropped; the new word's ink lands.
+    await ink("e", [6, 6], true);
+    await ink("f", [7, 7], true, 1);
+    expect(await rows()).toEqual(["f"]);
     const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
     await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: word.drawer ? word.word : "" });
     await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token })).rejects.toThrow("already got this one");

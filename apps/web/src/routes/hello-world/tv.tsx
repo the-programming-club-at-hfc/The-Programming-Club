@@ -475,69 +475,71 @@ function DrawView({ n, live, remaining, w }: { n: number; live: Live; remaining:
   return (
     <div className="grid h-full grid-cols-[minmax(0,1fr)_28vw] gap-[3vw]">
       <Sketch drawingId={b._id} className="min-h-0" canvasClass="size-full" />
-      <div className="flex min-h-0 flex-col">
+      <div className="flex min-h-0 flex-col overflow-hidden">
         {done && b.word ? (
           <>
             <p className="text-[1.8vw] font-bold text-dim">The word was</p>
-            <p className="mt-[0.4vw] text-[4.6vw] leading-[0.95] font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
+            <p className="mt-[0.4vw] text-[3.6vw] leading-[0.95] font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
           </>
         ) : (
           <>
             <p className="truncate text-[2vw] font-extrabold">{b.drawer} is drawing</p>
-            <Blanks text={b.blanks} className="mt-[1.2vw] text-[3vw] font-extrabold" />
+            <Blanks text={b.blanks} className="mt-[1vw] text-[2.4vw] font-extrabold" />
             <p
-              className={`narrow mt-[1.5vw] text-[8vw] leading-[0.85] font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}
+              className={`narrow mt-[1vw] text-[6vw] leading-[0.85] font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}
             >
               {remaining === 0 && running ? "time" : fmtClock(remaining)}
             </p>
           </>
         )}
-        <div className="mt-[1.5vw] min-h-0">
-          {b.results ? (
-            <TeamRows
-              rows={b.results}
-              row={(r, tight) => (
-                <li
-                  key={r.teamId}
-                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
-                >
-                  <span className="min-w-0">
-                    <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{r.name}</span>
-                    {!tight && r.drawer && <span className="block text-[1.2vw] text-dim">drew it</span>}
-                  </span>
-                  <span className={`narrow ${END(tight)} leading-none font-extrabold`}>+{r.points}</span>
-                </li>
-              )}
-            />
-          ) : b.got.length === 0 ? (
-            <p className="text-[1.6vw] text-dim">Guess on your phone. Nobody has it yet.</p>
-          ) : (
-            <>
-              <p className="text-[1.6vw] font-bold">
-                {b.got.length} of {b.guessing} {w.teams} got it
-              </p>
-              <TeamRows
-                rows={b.got.map((g, i) => ({ ...g, i }))}
-                row={(g, tight) => (
-                  <li
-                    key={g.teamId}
-                    className={`grid grid-cols-[2.6vw_minmax(0,1fr)_auto] items-center gap-[1vw] bg-mist px-[1.2vw] ${ROW(tight)}`}
-                  >
-                    <span className={`narrow ${END(tight)} leading-none font-extrabold text-meadow`}>{g.i + 1}</span>
-                    <span className="min-w-0">
-                      <span className={`block truncate ${NAME(tight)} leading-tight font-extrabold`}>{g.name}</span>
-                      {!tight && !w.solo && <span className="block text-[1.2vw] text-dim">{g.by}</span>}
-                    </span>
-                    <span className={`narrow ${tight ? "text-[1.4vw]" : "text-[1.8vw]"} leading-none font-extrabold`}>
-                      {g.ms === null ? "✓" : fmtElapsed(g.ms)}
-                    </span>
-                  </li>
-                )}
-              />
-            </>
-          )}
-        </div>
+        <p className="mt-[1.2vw] text-[1.6vw] font-bold">
+          {b.results
+            ? "Points"
+            : b.got.length
+              ? `${b.got.length} of ${b.guessing} ${w.teams} got it`
+              : "Guess on your phone. Nobody has it yet."}
+        </p>
+        <DrawRows
+          rows={
+            b.results
+              ? b.results.map((r) => ({ key: r.teamId, lead: "", name: r.name, note: r.drawer ? "drew it" : "", end: `+${r.points}` }))
+              : b.got.map((g, i) => ({
+                  key: g.teamId,
+                  lead: String(i + 1),
+                  name: g.name,
+                  note: w.solo ? "" : g.by,
+                  end: g.ms === null ? "✓" : fmtElapsed(g.ms),
+                }))
+          }
+        />
       </div>
+    </div>
+  );
+}
+
+/** The drawing's sidebar list, sized to fit under the clock on any 16:9 TV: full rows for a few, two compact columns for
+ *  more, and past 16 the rest counted. */
+function DrawRows({ rows }: { rows: { key: string; lead: string; name: string; note: string; end: string }[] }) {
+  const compact = rows.length > 6;
+  const shown = rows.slice(0, compact ? 16 : 6);
+  return (
+    <div className="mt-[0.6vw] min-h-0 flex-1 overflow-hidden">
+      <ol className={`grid gap-[0.4vw] ${compact ? "grid-cols-2" : ""}`}>
+        {shown.map((r) => (
+          <li
+            key={r.key}
+            className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[0.6vw] bg-mist ${compact ? "px-[0.6vw] py-[0.3vw]" : "px-[1.2vw] py-[0.6vw]"}`}
+          >
+            <span className={`narrow ${compact ? "text-[1.2vw]" : "text-[1.8vw]"} leading-none font-extrabold text-meadow`}>{r.lead}</span>
+            <span className="min-w-0">
+              <span className={`block truncate ${compact ? "text-[1.2vw]" : "text-[1.6vw]"} leading-tight font-extrabold`}>{r.name}</span>
+              {!compact && r.note && <span className="block truncate text-[1.1vw] text-dim">{r.note}</span>}
+            </span>
+            <span className={`narrow ${compact ? "text-[1.2vw]" : "text-[1.8vw]"} leading-none font-extrabold`}>{r.end}</span>
+          </li>
+        ))}
+      </ol>
+      {rows.length > shown.length && <p className="mt-[0.4vw] text-[1.2vw] text-dim">+ {rows.length - shown.length} more</p>}
     </div>
   );
 }
