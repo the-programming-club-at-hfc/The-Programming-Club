@@ -6,12 +6,15 @@ import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
-import { CardView, Hint, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { CardView, Hint, PuzzleExample, Rich, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { InstagramLink } from "#/components/instagram";
+import { AnswerBox, InputBox } from "#/components/puzzle";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { WikiPair, WikiRound } from "#/components/wiki";
+import { LiveFix, LivePuzzle, useLaptop, usePuzzleInput } from "#/components/workspace";
 import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
+import { usePython } from "#/lib/python";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
 import { gamesIn, useJustEnded, useSchedule, usesTeamComputer } from "#/lib/schedule";
@@ -364,8 +367,19 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const teamComputer = gamesIn(round).some(usesTeamComputer) || (s.mode === "card" && !!s.game && usesTeamComputer(s.game));
   const solo = live.teamSize === 1;
   const w = teamWords(solo);
+  // On a laptop, puzzles and Fix it for real get the full workspace right here; a phone or tablet can open it too.
+  const laptop = useLaptop();
+  const [full, setFull] = useState(false);
+  const work = !!me.team && (laptop || full);
+  const py = usePython(work && teamComputer);
+  const wide = work && s.mode === "card" && (s.game === "fix" || s.game === "puzzle");
+  const phoneView = !laptop && (
+    <button className="link mb-3 text-sm text-dim" onClick={() => setFull(false)}>
+      Back to the phone view
+    </button>
+  );
   return (
-    <Wrap className="flex min-h-dvh max-w-2xl flex-col py-5">
+    <Wrap className={`flex min-h-dvh flex-col py-5 ${wide ? "" : "max-w-2xl"}`}>
       <p className="text-sm text-dim">
         Week {live.week}: {wk.title}
       </p>
@@ -399,9 +413,10 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
               </div>
               {!solo && <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>}
+              {/* Only for a lab computer at /hello-world/fix: this page does it all, on a phone or a laptop. */}
               {me.team.key && teamComputer && (
-                <p className="mt-1 text-sm text-dim">
-                  {w.key}: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
+                <p className="mt-1 text-xs text-dim">
+                  {w.key} <strong className="narrow tracking-[0.15em]">{me.team.key}</strong>
                 </p>
               )}
             </>
@@ -425,9 +440,47 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           {isAnswerGame(s.game) && me.team ? (
             <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
           ) : s.game === "fix" && me.team ? (
-            <FixStatus live={live} index={s.index} teamId={me.team._id} />
+            work ? (
+              <>
+                {phoneView}
+                <LiveFix
+                  key={cardKey("fix", s.index)}
+                  live={live}
+                  teamId={me.team._id}
+                  by={{ token }}
+                  index={s.index}
+                  remaining={remaining}
+                  py={py}
+                />
+              </>
+            ) : (
+              <FixStatus live={live} index={s.index} teamId={me.team._id} onOpen={() => setFull(true)} />
+            )
           ) : s.game === "puzzle" && me.team ? (
-            <PuzzleStatus live={live} index={s.index} teamId={me.team._id} />
+            work ? (
+              <>
+                {phoneView}
+                <LivePuzzle
+                  key={cardKey("puzzle", s.index)}
+                  live={live}
+                  teamId={me.team._id}
+                  by={{ token }}
+                  index={s.index}
+                  remaining={remaining}
+                  py={py}
+                />
+              </>
+            ) : (
+              <PuzzleStatus
+                key={cardKey("puzzle", s.index)}
+                token={token}
+                live={live}
+                index={s.index}
+                teamId={me.team._id}
+                remaining={remaining}
+                onOpen={() => setFull(true)}
+              />
+            )
           ) : (
             <div className="card p-5">
               <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} solo={solo} />
@@ -436,9 +489,14 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         </div>
       )}
       {s.mode === "wiki" && s.wikiReady && (
-        <p className="card mt-5 p-6 text-xl font-bold">
-          Wiki Race next! Open {CLUB.url}/wiki on your {w.computer}. It jumps to the start article when the race starts.
-        </p>
+        <div className="card mt-5 p-6">
+          <p className="text-xl font-bold">Wiki Race next! Open the race here. It jumps to the start article when the race starts.</p>
+          {/* A new tab, so this page stays open for the finish. */}
+          <Link to="/hello-world/wiki" target="_blank" className="btn btn-primary mt-4 w-full text-lg">
+            Open the race
+          </Link>
+          <p className="mt-2 text-sm text-dim">On a lab computer? Open {CLUB.url}/wiki there.</p>
+        </div>
       )}
       {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
         <div className="mt-5">
@@ -598,8 +656,9 @@ function TeamAnswer({
   );
 }
 
-/** Fix it for real happens on the team computer; the phone shows the card and whether the team has fixed it. */
-function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId: Id<"teams"> }) {
+/** Fix it for real needs a laptop (this page, joined with the same HawkMail); the phone shows the card and whether the team
+ *  has fixed it. */
+function FixStatus({ live, index, teamId, onOpen }: { live: Live; index: number; teamId: Id<"teams">; onOpen: () => void }) {
   const board = useQuery(api.fixes.board);
   const key = cardKey("fix", index);
   const mine = board?.card === key ? board.fixed.find((f) => f.teamId === teamId) : undefined;
@@ -616,9 +675,18 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
     <div className="space-y-3">
       <div className={`rounded-[10px] p-5 ${mine ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
         <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">{status}</p>
-        {!done && <p className="mt-2 font-semibold">Fix it on your {w.computer}. This phone keeps you posted.</p>}
+        {!done && (
+          <p className="mt-2 font-semibold">
+            Fix it on a laptop: open this page there and join with the same HawkMail. This phone keeps you posted.
+          </p>
+        )}
         {mine?.result?.first && <p className="mt-2 font-semibold">{w.first} to fix it.</p>}
       </div>
+      {!done && (
+        <button className="link text-sm text-dim" onClick={onOpen}>
+          On a tablet? Open the full fix here
+        </button>
+      )}
       <div className="card p-5">
         <CardView game="fix" index={index} answer={done} hint={!!live.screen.hint} />
       </div>
@@ -626,12 +694,30 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
   );
 }
 
-/** Puzzles are answered on the team computer; the phone shows the story and the team's stars. */
-function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; teamId: Id<"teams"> }) {
+/** A puzzle on a phone: the team's stars, an answer box for the current part, the team's own input, and the story. */
+function PuzzleStatus({
+  token,
+  live,
+  index,
+  teamId,
+  remaining,
+  onOpen,
+}: {
+  token: string;
+  live: Live;
+  index: number;
+  teamId: Id<"teams">;
+  remaining: number;
+  onOpen: () => void;
+}) {
   const board = useQuery(api.puzzles.board);
+  const submit = useMutation(api.puzzles.submitByToken);
+  const input = usePuzzleInput(live, teamId, index);
   const key = cardKey("puzzle", index);
   const mine = board?.card === key ? board.teams.find((t) => t.teamId === teamId) : undefined;
   const done = !!live.screen.revealed || live.scored.includes(key);
+  const open = phoneOpen(live, key, remaining);
+  const p = PUZZLES[index];
   const w = teamWords(live.teamSize === 1);
   const times = [mine?.part1Ms ?? null, mine?.part2Ms ?? null];
   const n = times.filter((ms) => ms !== null).length;
@@ -653,12 +739,45 @@ function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; team
             {w.first} to the {firsts.join(" and ")} star.
           </p>
         )}
-        {!done && <p className="mt-1">Answers go in on your {w.computer}. This phone keeps you posted.</p>}
       </div>
-      {!done && live.screen.hint && <Hint text={`Part ${n ? 2 : 1}: ${PUZZLES[index].hint[n ? 1 : 0]}`} />}
       <div className="card p-5">
         <CardView game="puzzle" index={index} answer={done} solo={w.solo} />
       </div>
+      {!done && n < 2 && (
+        <>
+          <p className="text-lg">
+            <strong className="font-extrabold">Part {n + 1}.</strong> <Rich text={n ? p.part2 : p.part1} />
+          </p>
+          <AnswerBox
+            key={n}
+            part={n ? 2 : 1}
+            done={false}
+            open={open}
+            lockedUntil={mine?.lockedUntil ?? null}
+            onSubmit={(part, answer) => submit({ token, card: key, part, answer })}
+          />
+        </>
+      )}
+      {!done && live.screen.hint && <Hint text={`Part ${n ? 2 : 1}: ${p.hint[n ? 1 : 0]}`} />}
+      {!done && (
+        <>
+          <details>
+            <summary className="cursor-pointer font-bold">The example</summary>
+            <div className="mt-2">
+              <PuzzleExample p={p} part2={n > 0} />
+            </div>
+          </details>
+          <details>
+            <summary className="cursor-pointer font-bold">My puzzle input</summary>
+            <div className="mt-2">
+              <InputBox input={input} solo={w.solo} />
+            </div>
+          </details>
+          <button className="link text-sm text-dim" onClick={onOpen}>
+            Open the full puzzle here, with a Python editor
+          </button>
+        </>
+      )}
     </div>
   );
 }
