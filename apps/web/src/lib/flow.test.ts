@@ -149,11 +149,18 @@ describe("the big button", () => {
     expect(step(wiki, { mode: "scoreboard", wikiFrom: "Pizza", revealed: true })).toBe("choose");
   });
 
-  test("Tech Pictionary: a drawing on the big timer, then scores", () => {
-    const p = round("Tech Pictionary (warm-up)");
+  test("Tech Pictionary: a new drawing, reveal and score, scores, then another", () => {
+    const p = round("Tech Pictionary: round 1");
+    expect(revealable(p)).toBe(true);
     expect(step(p, { mode: "message" })).toBe("show");
-    expect(step(p, { mode: "timer" })).toBe("scores");
-    expect(step(p, { mode: "scoreboard" })).toBe("choose");
+    expect(step(p, { mode: "draw", drawing: 1 })).toBe("reveal");
+    expect(step(p, { mode: "draw", drawing: 1, revealed: true })).toBe("scores");
+    expect(step(p, { mode: "scoreboard", drawing: 1, revealed: true })).toBe("choose");
+    // The scoreboard or join screen mid-drawing still leads back to its reveal, so nothing goes unscored.
+    expect(step(p, { mode: "scoreboard", drawing: 1 })).toBe("reveal");
+    expect(step(p, { mode: "lobby", drawing: 1 })).toBe("reveal");
+    // The warm-up's last card isn't a drawing.
+    expect(step(p, { mode: "card", game: "lang", index: 0, revealed: true })).toBe("show");
   });
 
   test("a puzzle: show it, the hint once it unlocks, reveal and score, scores, then the next round", () => {

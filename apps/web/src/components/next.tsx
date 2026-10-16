@@ -7,28 +7,22 @@ import { api } from "../../convex/_generated/api";
 import { DECKS, fmtClock, useRemaining } from "./game";
 import type { Screen } from "./game";
 import { run } from "./officer";
-import { BUGS, GAMES, PICTIONARY, RELAYS } from "#/lib/content";
+import { BUGS, GAMES, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
 import { freshLeft, nextCard, nextRace, puzzleTitle, roundOf, roundTitle, stepFor } from "#/lib/flow";
 import type { Round } from "#/lib/flow";
-import { cardKey, cardSeconds, isAnswerGame, wikiSeconds } from "#/lib/grading";
+import { DRAW_SECONDS, cardKey, cardSeconds, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
 import type { GameId } from "#/lib/grading";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB } from "#/lib/season";
 import { teamWords } from "#/lib/words";
+import type { Id } from "../../convex/_generated/dataModel";
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type Action = { label: string; go: () => Promise<unknown> | undefined; keys?: false };
 
-// Words left to draw on this device. Kept outside components so switching tabs doesn't reshuffle.
-let pictionaryLeft: string[] = [];
-export const nextWord = () => {
-  if (!pictionaryLeft.length) pictionaryLeft = [...PICTIONARY].sort(() => Math.random() - 0.5);
-  return pictionaryLeft.pop()!;
-};
-
-/** A Pictionary word the officer shows the drawer by pressing and holding. It never goes on the TV. */
+/** The Pictionary word, shown to officers only while they press and hold. It never goes on the TV. */
 export function WordPeek({ word }: { word: string }) {
   const [peek, setPeek] = useState(false);
   return (
@@ -44,7 +38,7 @@ export function WordPeek({ word }: { word: string }) {
       {peek ? (
         <span className="font-bold text-5xl text-ink">{word}</span>
       ) : (
-        <span className="text-dim">Press and hold to show the drawer</span>
+        <span className="text-dim">Press and hold to see the word</span>
       )}
     </button>
   );
@@ -78,6 +72,76 @@ export function useStartRace() {
   };
 }
 
+/** A new Tech Pictionary drawing: the server picks the next drawer and a secret word, then it goes up with its clock. */
+export function useNewDrawing() {
+  const start = useMutation(api.drawings.start);
+  const setScreen = useMutation(api.sessions.setScreen);
+  const timer = useMutation(api.sessions.timer);
+  return async () => {
+    const drawing = await start();
+    await setScreen({ screen: { mode: "draw", drawing, revealed: false } });
+    await timer({ action: "set", seconds: DRAW_SECONDS, relay: false, autostart: true });
+  };
+}
+
+/** The drawing for officers: who's drawing, the word (press and hold), skip it or hand it to someone else, and who has drawn. */
+export function DrawHost() {
+  const data = useQuery(api.drawings.host);
+  const skip = useMutation(api.drawings.skip);
+  const switchDrawer = useMutation(api.drawings.switchDrawer);
+  const timer = useMutation(api.sessions.timer);
+  if (!data) return null;
+  const d = data.current;
+  // Someone new gets a new word and a fresh clock.
+  const handTo = (id: Id<"attendance">) =>
+    d &&
+    run(
+      switchDrawer({ drawingId: d._id, attendanceId: id }).then(() =>
+        timer({ action: "set", seconds: DRAW_SECONDS, relay: false, autostart: true }),
+      ),
+    );
+  return (
+    <div className="mt-4 border-4 border-line p-3">
+      <div className="flex flex-wrap items-baseline gap-x-3">
+        <p className="font-bold">
+          {d ? `Drawing ${d.n}: ${d.drawerName} ${d.over ? "drew it" : "is drawing"}` : `Next to draw: ${data.next?.name ?? "nobody yet"}`}
+        </p>
+        <p className="ml-auto text-sm text-dim">
+          Drawn tonight: {data.drawn} of {data.players.length}
+        </p>
+      </div>
+      {d && !d.over && (
+        <>
+          <WordPeek word={d.word} />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button className="btn btn-sm" onClick={() => run(skip({ drawingId: d._id }))}>
+              Skip this word
+            </button>
+            <select
+              className="field w-auto py-1 text-sm"
+              value=""
+              onChange={(e) => e.target.value && handTo(e.target.value as Id<"attendance">)}
+              aria-label="Switch drawer"
+            >
+              <option value="">Switch drawer…</option>
+              {data.players
+                .filter((p) => p._id !== d.drawer)
+                .map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </>
+      )}
+      <p className="mt-2 text-xs text-dim">
+        The drawer gets the word on their phone. The officer tablet draws on the same picture: {CLUB.url}/hello-world/draw
+      </p>
+    </div>
+  );
+}
+
 export function NextPanel({
   live,
   lineup,
@@ -98,9 +162,9 @@ export function NextPanel({
   const end = useMutation(api.sessions.end);
   const readyRace = useReadyRace();
   const startRace = useStartRace();
+  const newDrawing = useNewDrawing();
   const remaining = useRemaining(live.timer);
   const [busy, setBusy] = useState(false);
-  const [word, setWord] = useState<string | null>(null);
 
   const rounds = lineup.map(roundOf);
   const at = live.round === null || !rounds.length ? null : Math.min(live.round, rounds.length - 1);
@@ -134,6 +198,9 @@ export function NextPanel({
   const answers = useQuery(api.answers.board, waiting && s.mode === "card" && isAnswerGame(s.game) ? {} : "skip");
   const fixes = useQuery(api.fixes.board, waiting && s.mode === "card" && s.game === "fix" ? {} : "skip");
   const wiki = useQuery(api.wiki.board, waiting && s.mode === "wiki" ? {} : "skip");
+  const drawing = useQuery(api.drawings.board, waiting && s.mode === "draw" ? {} : "skip");
+  // Who draws next, for the button.
+  const draws = useQuery(api.drawings.host, r?.kind === "pictionary" && step === "show" ? {} : "skip");
   const allIn =
     allStars ||
     (teams > 0 &&
@@ -143,13 +210,14 @@ export function NextPanel({
           ? fixes.fixed.length === teams
           : wiki
             ? wiki.finished.filter((f) => f.ok !== false).length === teams
-            : false));
+            : drawing
+              ? drawing.guessing > 0 && drawing.got.length === drawing.guessing
+              : false));
   const ready = waiting && (allIn || timeUp);
 
   // A clock that ran out stays at "time"; one still running stops so the buzzer doesn't go off over the answer.
   const pause = () => (live.timer.startedAt && remaining > 0 ? timer({ action: "pause" }) : undefined);
   const startRound = async (x: Round) => {
-    setWord(null);
     await setRound({ round: x.index, double: x.double, title: roundTitle(x) });
   };
   const show = async () => {
@@ -169,9 +237,7 @@ export function NextPanel({
       // The get-ready screen: Start (the "go" step) shows the race and starts the clock.
       await readyRace(race);
     } else if (r?.kind === "pictionary") {
-      setWord(nextWord());
-      await setScreen({ screen: { mode: "timer" } });
-      await timer({ action: "set", seconds: 60, relay: false, autostart: true });
+      await newDrawing();
     }
   };
   const onward: Action = after
@@ -193,9 +259,16 @@ export function NextPanel({
             ? "problem"
             : "card";
   const reveal: Action = {
-    label: r?.kind === "wiki" ? "End race and score" : r?.kind === "puzzle" ? "Reveal and score" : "Reveal answer",
+    label:
+      r?.kind === "wiki"
+        ? "End race and score"
+        : r?.kind === "puzzle"
+          ? "Reveal and score"
+          : r?.kind === "pictionary"
+            ? "Reveal the word and score"
+            : "Reveal answer",
     go: async () => {
-      await setScreen({ screen: { ...s, mode: r?.kind === "wiki" ? "wiki" : "card", revealed: true } });
+      await setScreen({ screen: { ...s, mode: r?.kind === "wiki" ? "wiki" : r?.kind === "pictionary" ? "draw" : "card", revealed: true } });
       await pause();
     },
   };
@@ -210,7 +283,7 @@ export function NextPanel({
         : r.kind === "puzzle" && r.puzzle !== undefined
           ? `Show the puzzle: ${puzzleTitle(r.puzzle)}`
           : r.kind === "pictionary"
-            ? "New drawing: start 1:00"
+            ? `New drawing: ${draws?.next?.name ?? "next in turn"}`
             : `Show ${s.mode === "message" ? "the first" : "next"} ${thing}`;
     primary = { label, go: show };
   } else if (step === "go") {
@@ -270,7 +343,7 @@ export function NextPanel({
   const manual =
     r &&
     (step === "scores" || step === "choose" || step === "next") &&
-    !(r.kind === "wiki" || r.kind === "puzzle" || (r.kind === "deck" && r.game !== "relay"));
+    !(r.kind === "wiki" || r.kind === "puzzle" || r.kind === "pictionary" || (r.kind === "deck" && r.game !== "relay"));
   const rules = r && GAMES.find((g) => g.id === (r.game ?? r.kind));
   return (
     <section className={`card p-5 ring-2 ring-gold ${className}`}>
@@ -306,17 +379,12 @@ export function NextPanel({
         </div>
       )}
       {ready && (
-        <p className="mt-2 font-bold text-pine">{allIn ? `Every ${w.team} ${allStars ? "has both stars" : "is in"}.` : "Time’s up."}</p>
+        <p className="mt-2 font-bold text-pine">
+          {allIn ? (drawing ? "Everyone guessing got it." : `Every ${w.team} ${allStars ? "has both stars" : "is in"}.`) : "Time’s up."}
+        </p>
       )}
       {teams === 0 && (step === "start" || step === "show") && <p className="mt-2 font-semibold text-signal">{w.nobodyPlaying}</p>}
-      {r?.kind === "pictionary" && word && step !== "show" && (
-        <>
-          <WordPeek word={word} />
-          <button className="btn btn-sm mt-2" onClick={() => setWord(nextWord())}>
-            Skip this word
-          </button>
-        </>
-      )}
+      {r?.kind === "pictionary" && <DrawHost />}
       {manual && (
         <p className="mt-3 text-sm">
           <strong>Score this one by hand</strong> with the score buttons{rules ? `: ${rules.scoring}` : "."}

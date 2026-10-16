@@ -165,7 +165,7 @@ export async function addToSession(
   return token;
 }
 
-/** Tonight's cards that teams have answered, raced, fixed, or starred but that haven't been scored yet. Their rows
+/** Tonight's cards that teams have answered, raced, fixed, starred, or guessed but that haven't been scored yet. Their rows
  *  belong to tonight's teams, so teams can't be remade until these are revealed. */
 export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
   const keys = [...new Set([...(s.played ?? []), ...(s.card ? [s.card] : [])].map((w) => w.key))].filter(
@@ -173,7 +173,7 @@ export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
   );
   const open = [];
   for (const card of keys)
-    for (const table of ["answers", "fixes", "stars", "races"] as const)
+    for (const table of ["answers", "fixes", "stars", "races", "guesses"] as const)
       if (
         await ctx.db
           .query(table)
@@ -199,9 +199,9 @@ export async function upgradeOldNight(ctx: MutationCtx, s: Doc<"sessions">) {
 
 export const ROUND_OPEN = "Finish the round first: reveal the card they answered, then try again.";
 
-/** Whether a team has answers, fixes, stars, or a finish in on a card tonight that hasn't been scored yet. */
+/** Whether a team has answers, fixes, stars, a finish, or guesses in on a card tonight that hasn't been scored yet. */
 export async function hasUnscored(ctx: QueryCtx, s: Doc<"sessions">, teamId: Id<"teams">) {
-  for (const table of ["answers", "fixes", "stars", "races"] as const)
+  for (const table of ["answers", "fixes", "stars", "races", "guesses"] as const)
     for (const row of await ctx.db
       .query(table)
       .withIndex("by_team_card", (q) => q.eq("teamId", teamId))

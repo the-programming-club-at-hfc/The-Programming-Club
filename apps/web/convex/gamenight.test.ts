@@ -9,10 +9,12 @@ import { placeXpFor } from "./lib";
 import { answersFor } from "./puzzles";
 import { BUGS, LANGS, OUTPUTS } from "../src/lib/content";
 import { LANGUAGES, choices } from "../src/lib/grading";
+import { COLORS, SIZES } from "../src/lib/draw";
 
 const modules = {
   "./_generated/api.js": () => import("./_generated/api.js"),
   "./answers.ts": () => import("./answers"),
+  "./drawings.ts": () => import("./drawings"),
   "./fixes.ts": () => import("./fixes"),
   "./officers.ts": () => import("./officers"),
   "./players.ts": () => import("./players"),
@@ -931,5 +933,231 @@ describe("ending the night", () => {
     // Each night's breakdown, for /scores. Names only: no emails on this public query.
     expect(row.nights).toEqual([1, 2].map((week) => ({ week, show: 3, place: 3, bonus: 0 })));
     expect(JSON.stringify(await t.query(api.stats.leaderboard, {}))).not.toContain("@");
+  });
+});
+
+describe("Tech Pictionary", () => {
+  /** A solo night with `n` students. Returns their tokens. */
+  async function soloNight(o: ReturnType<typeof setup>, n: number) {
+    const code = await o.startNight(2);
+    const tokens = [];
+    for (let i = 1; i <= n; i++) tokens.push(await o.join(code, student(i)));
+    return tokens;
+  }
+
+  /** What /host's New drawing does: pick the drawer and word, put it on the TV, start its clock. `word` sets the word. */
+  async function newDrawing(o: ReturnType<typeof setup>, word?: string) {
+    const n = await o.officer.mutation(api.drawings.start, {});
+    await o.show({ mode: "draw", drawing: n });
+    await o.officer.mutation(api.sessions.timer, { action: "set", seconds: 75, autostart: true });
+    const d = (await o.officer.query(api.drawings.host, {}))!.current!;
+    if (word) await o.t.run((ctx) => ctx.db.patch(d._id, { word }));
+    const drawer = (await o.attendance()).find((a) => a._id === d.drawer)!;
+    return { n, key: d.key, id: d._id, word: word ?? d.word, drawer };
+  }
+
+  const reveal = (o: ReturnType<typeof setup>, n: number) => o.show({ mode: "draw", drawing: n, revealed: true });
+
+  test("the word never reaches the TV or a guesser: only the drawer's phone and officers", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 4);
+    const d = await newDrawing(o);
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    const word = JSON.stringify(d.word);
+    expect(JSON.stringify(await o.t.query(api.sessions.live, {}))).not.toContain(word);
+    const board = (await o.t.query(api.drawings.board, {}))!;
+    expect([board.word, board.blanks.length]).toEqual([null, d.word.length]);
+    expect(JSON.stringify(board)).not.toContain(word);
+    expect(JSON.stringify(await o.t.query(api.drawings.mine, { token: guesser }))).not.toContain(word);
+    expect((await o.t.query(api.drawings.mine, { token: d.drawer.token }))!).toEqual({ key: d.key, drawer: true, word: d.word });
+    await expect(o.signedInStudent.query(api.drawings.host, {})).rejects.toThrow("Only club officers");
+    // Nobody else can draw on it or skip its word.
+    const ink = { drawingId: d.id, stroke: "s", color: COLORS[0], size: SIZES[0], points: [10, 10] };
+    await expect(o.t.mutation(api.drawings.ink, { ...ink, token: guesser })).rejects.toThrow("someone else’s turn");
+    await expect(o.t.mutation(api.drawings.ink, ink)).rejects.toThrow("Only club officers");
+    await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: guesser })).rejects.toThrow("someone else’s turn");
+    // The reveal puts it up for everyone.
+    await reveal(o, d.n);
+    expect((await o.t.query(api.drawings.board, {}))!.word).toBe(d.word);
+  });
+
+  test("guesses: wrong, close, and right, one a second, then 3 and 2 for the first two and 3 for the drawer", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 4);
+    const d = await newDrawing(o, "keyboard");
+    const [a, b, c] = tokens.filter((tk) => tk !== d.drawer.token);
+    const guess = (token: string, text: string) => o.t.mutation(api.drawings.guess, { token, card: d.key, text });
+    later(5);
+    expect(await guess(a, "printer")).toBe("wrong");
+    later(1);
+    expect(await guess(a, "keybord")).toBe("close");
+    await expect(guess(a, "keyboard")).rejects.toThrow("one guess a second");
+    await expect(guess(a, "x".repeat(61))).rejects.toThrow("too long");
+    later(1);
+    expect(await guess(a, " Key-Boards ")).toBe("right");
+    await expect(guess(a, "keyboard")).rejects.toThrow("Already got it");
+    await expect(guess(d.drawer.token, "keyboard")).rejects.toThrow("the one drawing");
+    later(5);
+    expect(await guess(b, "KEYBOARD")).toBe("right");
+    // Guesses in hold the teams until the reveal.
+    await expect(o.officer.mutation(api.teams.make, { size: 2 })).rejects.toThrow("Finish the round first");
+
+    const board = (await o.t.query(api.drawings.board, {}))!;
+    expect(board.got.map((g) => [g.by, g.ms])).toEqual([
+      ["Student " + (tokens.indexOf(a) + 1), 7_000],
+      ["Student " + (tokens.indexOf(b) + 1), 12_000],
+    ]);
+    expect([board.guessing, board.results]).toEqual([3, null]);
+    expect((await o.t.query(api.drawings.mine, { token: b }))!).toEqual({
+      key: d.key,
+      drawer: false,
+      teammate: false,
+      place: 2,
+      by: null,
+      points: null,
+    });
+
+    // 2 of 3 guessing players got it, so the drawer gets 3. Revealing again, or going away and back, never scores twice.
+    await reveal(o, d.n);
+    await o.show({ mode: "scoreboard", drawing: d.n, revealed: true });
+    await reveal(o, d.n);
+    const points = async (token: string) => (await o.t.query(api.players.me, { token }))!.team!.score;
+    expect(await Promise.all([a, b, c, d.drawer.token].map(points))).toEqual([3, 2, 0, 3]);
+    expect((await o.t.query(api.drawings.mine, { token: a }))!.points).toBe(3);
+    await expect(guess(c, "keyboard")).rejects.toThrow("Time’s up");
+  });
+
+  test("team nights: the drawer's team sits it out, and each team's first right guess counts", async () => {
+    const o = setup();
+    const { teams } = await o.nightWithTeams(6, 2);
+    const d = await newDrawing(o, "cloud");
+    const mine = teams.find((tm) => tm._id === d.drawer.teamId)!;
+    const [x, y] = teams.filter((tm) => tm !== mine);
+    const guess = (token: string, text: string) => o.t.mutation(api.drawings.guess, { token, card: d.key, text });
+    const mate = mine.tokens.find((tk) => tk !== d.drawer.token)!;
+    await expect(guess(mate, "cloud")).rejects.toThrow("Your team is drawing");
+    expect((await o.t.query(api.drawings.mine, { token: mate }))!.teammate).toBe(true);
+    expect(await guess(x.tokens[0], "clouds")).toBe("right");
+    await expect(guess(x.tokens[1], "cloud")).rejects.toThrow("Already got it");
+    expect((await o.t.query(api.drawings.mine, { token: x.tokens[1] }))!.place).toBe(1);
+    // 1 of 2 guessing teams is half, so the drawer's team gets 3.
+    await reveal(o, d.n);
+    expect([await o.score(x._id), await o.score(y._id), await o.score(mine._id)]).toEqual([3, 0, 3]);
+  });
+
+  test("a drawing never revealed scores when the night ends, with the double points it went up with, and only once", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const first = await newDrawing(o, "robot");
+    const guesser = tokens.find((tk) => tk !== first.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser, card: first.key, text: "robot" });
+    await reveal(o, first.n);
+    await o.officer.mutation(api.sessions.setDouble, { on: true });
+    const second = await newDrawing(o, "drone");
+    const other = tokens.find((tk) => tk !== second.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: other, card: second.key, text: "drone" });
+    await o.officer.mutation(api.sessions.setDouble, { on: false });
+    await o.show({ mode: "scoreboard", drawing: second.n });
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([second.key]);
+    await o.officer.mutation(api.sessions.end, {});
+    // First: 3 + 3 (1 of 2 is half). Second, doubled: 6 + 6.
+    const att = await o.attendance();
+    const pts = (tk: string) => att.find((x) => x.token === tk)!.points ?? 0;
+    const want = new Map<string, number>();
+    for (const [tk, p] of [
+      [guesser, 3],
+      [first.drawer.token, 3],
+      [other, 6],
+      [second.drawer.token, 6],
+    ] as const)
+      want.set(tk, (want.get(tk) ?? 0) + p);
+    expect(tokens.map(pts)).toEqual(tokens.map((tk) => want.get(tk) ?? 0));
+  });
+
+  test("drawers take turns, fewest drawings first and across teams; words never repeat; the host can switch drawers", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const drawn = [];
+    for (let i = 0; i < 4; i++) drawn.push(await newDrawing(o));
+    expect(new Set(drawn.slice(0, 3).map((d) => d.drawer._id)).size).toBe(3);
+    expect(new Set(drawn.map((d) => d.word)).size).toBe(4);
+    const host = (await o.officer.query(api.drawings.host, {}))!;
+    expect([host.drawn, host.players.length]).toEqual([3, 3]);
+    expect(tokens).toHaveLength(3);
+
+    // Switching hands it over with a new word and a clean canvas.
+    const d = drawn[3];
+    await o.t.mutation(api.drawings.ink, {
+      drawingId: d.id,
+      token: d.drawer.token,
+      stroke: "s",
+      color: COLORS[1],
+      size: SIZES[1],
+      points: [1, 2],
+    });
+    const to = (await o.attendance()).find((a) => a._id !== d.drawer._id)!;
+    await o.officer.mutation(api.drawings.switchDrawer, { drawingId: d.id, attendanceId: to._id });
+    const after = (await o.officer.query(api.drawings.host, {}))!.current!;
+    expect(after.drawer).toBe(to._id);
+    expect(drawn.map((x) => x.word)).not.toContain(after.word);
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+
+    // Team nights go team by team.
+    const p = setup();
+    await p.nightWithTeams(4, 2);
+    const one = await newDrawing(p);
+    const two = await newDrawing(p);
+    const three = await newDrawing(p);
+    const four = await newDrawing(p);
+    expect([one.drawer.teamId === two.drawer.teamId, three.drawer.teamId === four.drawer.teamId]).toEqual([false, false]);
+    expect(new Set([one, two, three, four].map((x) => x.drawer._id)).size).toBe(4);
+  });
+
+  test("ink: rows from the drawer's phone and the officer tablet, undo, clear, skip, and pens down at time", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const d = await newDrawing(o, "mouse");
+    // From the drawer's phone, or the officer tablet (signed in, no token).
+    const ink = (stroke: string, points: number[], tablet = false) =>
+      tablet
+        ? o.officer.mutation(api.drawings.ink, { drawingId: d.id, stroke, color: COLORS[0], size: SIZES[0], points })
+        : o.t.mutation(api.drawings.ink, { drawingId: d.id, token: d.drawer.token, stroke, color: COLORS[0], size: SIZES[0], points });
+    await ink("a", [0, 0, 10, 10]);
+    await ink("a", [10, 10, 20, 20]);
+    await ink("b", [500, 300]);
+    await ink("c", [1000, 750], true);
+    await expect(ink("d", [1001, 0])).rejects.toThrow("off the canvas");
+    await expect(ink("d", [1, 2, 3])).rejects.toThrow("off the canvas");
+    await expect(
+      o.t.mutation(api.drawings.ink, {
+        drawingId: d.id,
+        token: d.drawer.token,
+        stroke: "d",
+        color: "#00ff00",
+        size: SIZES[0],
+        points: [1, 1],
+      }),
+    ).rejects.toThrow("Pick a pen");
+    const rows = async () => (await o.t.query(api.drawings.inkBlock, { drawingId: d.id, block: 0 })).map((r) => r.stroke);
+    expect(await rows()).toEqual(["a", "a", "b", "c"]);
+    await o.t.mutation(api.drawings.undo, { drawingId: d.id, token: d.drawer.token });
+    expect(await rows()).toEqual(["a", "a", "b"]);
+    await o.officer.mutation(api.drawings.undo, { drawingId: d.id });
+    expect(await rows()).toEqual(["a", "a"]);
+    await o.t.mutation(api.drawings.clear, { drawingId: d.id, token: d.drawer.token });
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+
+    // Skip: a new word on a clean canvas, until someone gets it.
+    await ink("e", [5, 5]);
+    await o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token });
+    const word = (await o.t.query(api.drawings.mine, { token: d.drawer.token }))!;
+    expect(word.drawer && word.word !== "mouse").toBe(true);
+    expect(await rows()).toEqual([]);
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: word.drawer ? word.word : "" });
+    await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token })).rejects.toThrow("already got this one");
+
+    later(78);
+    await expect(ink("f", [1, 1])).rejects.toThrow("Pens down");
   });
 });

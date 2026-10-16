@@ -8,13 +8,13 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
-import { NextPanel, WordPeek, nextWord, useReadyRace, useStartRace } from "#/components/next";
+import { DrawHost, NextPanel, useNewDrawing, useReadyRace, useStartRace } from "#/components/next";
 import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { WIKI_RACES, wikiUrl } from "#/lib/content";
 import { deckFor, filtersFor } from "#/lib/flow";
 import type { Filter } from "#/lib/flow";
-import { isAnswerGame, wikiSeconds } from "#/lib/grading";
+import { DRAW_SECONDS, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
@@ -255,7 +255,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   );
 }
 
-const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", message: "Message" };
+const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", draw: "Drawing", message: "Message" };
 
 // The kickoff deck on the TV: always here on Week 1, and on any other night once the slides go up from "On the TV".
 function SlidesPanel({ live }: { live: Live }) {
@@ -675,12 +675,14 @@ function LineupPanel({
   );
 }
 
-/** "output:2" as "Output? #3", and a race key as "Wiki Race: From → To", for officers. */
+/** "output:2" as "Output? #3", a race key as "Wiki Race: From → To", and "draw:4" as "Drawing 4", for officers. */
 const cardName = (key: string) => {
   const [game, rest] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
   return game === "wiki"
     ? `Wiki Race: ${rest.replace(">", " → ")}`
-    : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
+    : game === "draw"
+      ? `Drawing ${rest}`
+      : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
 };
 
 type Tab = GameId | "wiki" | "pictionary";
@@ -734,7 +736,7 @@ function DeckPanel({
         {tab === "wiki" ? (
           <WikiTool live={live} used={used} />
         ) : tab === "pictionary" ? (
-          <PictionaryTool />
+          <PictionaryTool live={live} />
         ) : (
           <CardTool key={`${tab}:${filter}:${pick}`} game={tab} live={live} used={used} initial={filter} pick={pick} />
         )}
@@ -1279,23 +1281,27 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
   );
 }
 
-function PictionaryTool() {
-  const timer = useMutation(api.sessions.timer);
-  const [word, setWord] = useState<string | null>(null);
+/** Tech Pictionary outside the big button: a new drawing (the next drawer in turn), the reveal, and the drawing's controls. */
+function PictionaryTool({ live }: { live: Live }) {
+  const newDrawing = useNewDrawing();
+  const setScreen = useMutation(api.sessions.setScreen);
+  const s = live.screen;
+  const up = s.mode === "draw" && s.drawing !== undefined;
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-sm btn-coin" onClick={() => setWord(nextWord())}>
-          Next word
+        <button className="btn btn-sm btn-neon" onClick={() => run(newDrawing())}>
+          New drawing, {fmtClock(DRAW_SECONDS * 1000)}
         </button>
-        <button className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: 60, relay: false, autostart: true }))}>
-          Start 1:00
-        </button>
+        {up && !s.revealed && (
+          <button className="btn btn-sm btn-coin" onClick={() => run(setScreen({ screen: { ...s, revealed: true } }))}>
+            Reveal the word and score
+          </button>
+        )}
       </div>
-      {word && <WordPeek word={word} />}
+      <DrawHost />
       <p className="mt-3 text-sm text-dim">
-        The word stays on this device and never goes on the TV. Hold your phone up for the drawer instead of handing it over: it has the
-        score buttons.
+        The drawer draws on their phone or the officer tablet, everyone else guesses on theirs, and revealing scores it once.
       </p>
     </div>
   );
