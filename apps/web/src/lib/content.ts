@@ -210,7 +210,7 @@ export const CUP_AGENDA: Agenda[] = [
     len: 9,
     what: "Final round, double points: Fix it for real",
     detail:
-      "One buggy Python program and 4 minutes. Teams fix it and run it on their team computer, and the first fix earns extra. Every point counts double, so any team can still win.",
+      "One buggy Python program and 4 minutes. Teams fix it and run it on a laptop, right on the join page, and the first fix earns extra. Every point counts double, so any team can still win.",
   },
   {
     t: "5:52",

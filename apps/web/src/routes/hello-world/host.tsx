@@ -956,7 +956,8 @@ function FixStatus({ live }: { live: Live }) {
     <div className="mt-3 border-4 border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-bold">
-          {data.scored ? "Scored" : `Fixed: ${fixedCount} of ${data.teams.length} ${w.teams}`} · {w.computers} at /hello-world/fix
+          {data.scored ? "Scored" : `Fixed: ${fixedCount} of ${data.teams.length} ${w.teams}`} · laptops on the join page, lab computers at
+          /hello-world/fix
         </p>
         {!s.revealed && !data.scored && (
           <button
@@ -995,7 +996,7 @@ function FixStatus({ live }: { live: Live }) {
       <p className="mt-2 text-xs text-dim">
         {data.scored
           ? "Points went on the board when you revealed. Use the score buttons to fix anything."
-          : `${w.Computers} mark a ${w.team} fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points.`}
+          : `Laptops (and lab computers) mark a ${w.team} fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points.`}
       </p>
     </div>
   );
@@ -1031,8 +1032,8 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
     <div className="mt-3 border-4 border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-bold">
-          {board.scored ? "Scored" : `Part 1: ${count("part1Ms")} of ${board.teams.length} · Part 2: ${count("part2Ms")}`} · {w.computers}{" "}
-          at /hello-world/fix
+          {board.scored ? "Scored" : `Part 1: ${count("part1Ms")} of ${board.teams.length} · Part 2: ${count("part2Ms")}`} · join pages, or
+          lab computers at /hello-world/fix
         </p>
         {!s.revealed && !board.scored && (
           <button

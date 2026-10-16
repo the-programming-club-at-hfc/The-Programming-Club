@@ -213,7 +213,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
             <div className={board?.results || fixBoard || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
               <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" solo={w.solo} />
               {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
-              {fixBoard && <FixList board={fixBoard} done={done} w={w} />}
+              {fixBoard && <FixList board={fixBoard} done={done} />}
               {puzzleBoard && <StarBoard board={puzzleBoard} done={done} w={w} />}
             </div>
           </div>
@@ -330,10 +330,12 @@ const NAME = (tight: boolean) => (tight ? "text-[1.4vw]" : "text-[1.8vw]");
 const END = (tight: boolean) => (tight ? "text-[1.8vw]" : "text-[2.6vw]");
 
 /** Fix it for real: the teams that fixed it, in order, with their times. Points join them once it's scored. No code. */
-function FixList({ board, done, w }: { board: FixBoard; done: boolean; w: TeamWords }) {
+function FixList({ board, done }: { board: FixBoard; done: boolean }) {
   return (
     <div>
-      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your {w.computer}</p>}
+      {!done && (
+        <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on a laptop, on the join page</p>
+      )}
       {board.fixed.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
       ) : (
@@ -373,7 +375,7 @@ function StarBoard({ board, done, w }: { board: PuzzleBoard; done: boolean; w: T
   );
   return (
     <div>
-      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your {w.computer}</p>}
+      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your phone or laptop</p>}
       {board.teams.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{w.noTeams}</p>
       ) : (
