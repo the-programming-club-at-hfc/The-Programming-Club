@@ -22,7 +22,8 @@ const TEAMS = {
   // Phones.
   /** Over the team name. */
   yourTeam: "Your team",
-  key: "Team computer key",
+  /** The team key, only for a lab computer at /hello-world/fix: the join page does it all, phone or laptop. */
+  key: "On a lab computer at /hello-world/fix? Team key:",
   waiting: "You’re in. Teams get picked in a minute.",
   teamUp: "Want to team up with a friend? Ask an officer to switch your team.",
   officerPlays: "when a team is short",
@@ -81,7 +82,7 @@ const SOLO: typeof TEAMS = {
   who: () => "You",
 
   yourTeam: "Playing solo",
-  key: "Your computer key",
+  key: "On a lab computer at /hello-world/fix? Your key:",
   waiting: "You’re in. The game starts in a minute.",
   teamUp: "",
   officerPlays: "when the room is small",

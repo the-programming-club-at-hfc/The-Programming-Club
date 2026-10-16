@@ -644,6 +644,91 @@ describe("points", () => {
     expect(await score(teams[0]._id)).toBe((3 + 2) * 2);
   });
 
+  test("puzzles from the join page: a token answers for the whole team, with the same lockout as the team key", async () => {
+    const { t, nightWithTeams, show, score, join } = setup();
+    const { code, teams } = await nightWithTeams(4);
+    const sessionId = (await t.query(api.sessions.live, {}))!._id;
+    // A laptop joined with the same HawkMail gets the phone's spot, so it answers for the same team.
+    const laptop = await join(code, student(1));
+    const a = teams.find((tm) => tm.tokens.includes(laptop))!;
+    const b = teams.find((tm) => tm !== a)!;
+    const mate = a.tokens.find((tk) => tk !== laptop)!;
+    const right = (team: (typeof teams)[number]) => answersFor(sessionId, team._id, 0);
+    const card = "puzzle:0";
+    const submit = (token: string, part: 1 | 2, answer: string) => t.mutation(api.puzzles.submitByToken, { token, card, part, answer });
+
+    await expect(submit(laptop, 1, right(a).part1)).rejects.toThrow("isn’t up anymore");
+    await show({ mode: "card", game: "puzzle", index: 0 });
+    await expect(submit("nope", 1, "1")).rejects.toThrow("This night has ended");
+    later(30);
+    expect(await submit(laptop, 1, right(b).part1)).toEqual({ right: false, waitMs: 30_000 });
+    // The lockout is the team's: a teammate's phone and a lab computer with the team key wait too.
+    await expect(submit(mate, 1, right(a).part1)).rejects.toThrow("Wait 30s");
+    await expect(t.mutation(api.puzzles.submit, { teamKey: a.key!, card, part: 1, answer: right(a).part1 })).rejects.toThrow("Wait 30s");
+    later(30);
+    expect(await submit(mate, 1, right(a).part1)).toEqual({ right: true, waitMs: 0 });
+    later(10);
+    expect(await submit(laptop, 2, right(a).part2)).toEqual({ right: true, waitMs: 0 });
+
+    const board = (await t.query(api.puzzles.board, {}))!;
+    expect(board.teams.map((x) => [x.name, x.part1Ms, x.part2Ms])).toEqual([
+      [a.name, 60_000, 70_000],
+      [b.name, null, null],
+    ]);
+    await show({ mode: "card", game: "puzzle", index: 0, revealed: true });
+    expect([await score(a._id), await score(b._id)]).toEqual([3 + 5 + 2 + 2, 0]);
+    await expect(submit(mate, 2, right(a).part2)).rejects.toThrow("Time’s up");
+  });
+
+  test("puzzles from the join page on a solo night: each player answers for themselves, from their own input", async () => {
+    const { t, officer, startNight, join, show, score } = setup();
+    const code = await startNight();
+    const [ann, ben] = [await join(code, student(1)), await join(code, student(2))];
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const live = (await t.query(api.sessions.live, {}))!;
+    const teamOf = async (token: string) => (await t.query(api.players.me, { token }))!.team!._id;
+    const [annTeam, benTeam] = [await teamOf(ann), await teamOf(ben)];
+    const right = (teamId: Id<"teams">) => answersFor(live._id, teamId, 0);
+    const card = "puzzle:0";
+    const submit = (token: string, answer: string) => t.mutation(api.puzzles.submitByToken, { token, card, part: 1, answer });
+
+    await show({ mode: "card", game: "puzzle", index: 0 });
+    expect(right(annTeam).part1).not.toBe(right(benTeam).part1);
+    later(20);
+    expect(await submit(ann, right(benTeam).part1)).toEqual({ right: false, waitMs: 30_000 });
+    expect(await submit(ben, right(benTeam).part1)).toEqual({ right: true, waitMs: 0 });
+    await expect(submit(ann, right(annTeam).part1)).rejects.toThrow("Wait 30s");
+    // An officer running the night has no team to answer for.
+    await expect(submit(ada, right(annTeam).part1)).rejects.toThrow("not on a team");
+    later(30);
+    expect(await submit(ann, right(annTeam).part1)).toEqual({ right: true, waitMs: 0 });
+    await show({ mode: "card", game: "puzzle", index: 0, revealed: true });
+    expect([await score(annTeam), await score(benTeam)]).toEqual([3, 3 + 2]);
+  });
+
+  test("Fix it for real from the join page on a laptop: reported by token, alongside lab computers with the team key", async () => {
+    const { t, officer, nightWithTeams, show, score } = setup();
+    const { teams } = await nightWithTeams(4);
+    const [a, b] = teams;
+    const card = "fix:0";
+    const report = (token: string, code: string) => t.mutation(api.fixes.reportByToken, { token, card, code });
+    await show({ mode: "card", game: "fix", index: 0 });
+    await expect(report("nope", "x")).rejects.toThrow("This night has ended");
+    later(20);
+    await report(b.tokens[1], "print(1)");
+    later(20);
+    await t.mutation(api.fixes.report, { teamKey: a.key!, card, code: "print(2)" });
+    await report(b.tokens[0], "print(3)"); // later reports from the team are ignored
+    expect((await t.query(api.fixes.board, {}))!.fixed.map((f) => [f.name, f.ms])).toEqual([
+      [b.name, 20_000],
+      [a.name, 40_000],
+    ]);
+    await show({ mode: "card", game: "fix", index: 0, revealed: true });
+    expect([await score(a._id), await score(b._id)]).toEqual([3, 5]);
+    expect((await officer.query(api.fixes.host, {}))!.teams.find((x) => x._id === b._id)!.code).toBe("print(1)");
+    await expect(report(a.tokens[0], "print(4)")).rejects.toThrow("Time’s up");
+  });
+
   test("Wiki Race: 5, 4, 3 by place, 1 for playing, and the referee can turn a finish down", async () => {
     const { t, officer, nightWithTeams, show, score } = setup();
     const { teams } = await nightWithTeams(8);

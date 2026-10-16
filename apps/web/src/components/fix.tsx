@@ -1,5 +1,5 @@
-// Fix it for real on a team computer: the task, the examples, an editor with the buggy program, Run, and Check.
-// Presentational: the /fix page wires it to Convex, and the officer test page drives it with local state.
+// Fix it for real on a laptop: the task, the examples, an editor with the buggy program, Run, and Check.
+// Presentational: components/workspace.tsx wires it to Convex, and the officer test page drives it with local state.
 import { ConvexError } from "convex/values";
 import { useEffect, useRef, useState } from "react";
 import { FIXES } from "#/lib/fixes";

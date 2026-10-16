@@ -47,6 +47,18 @@ export async function teamByKey(ctx: QueryCtx, sessionId: Id<"sessions">, key: s
   return (await sessionTeams(ctx, sessionId)).find((t) => t.key === k) ?? null;
 }
 
+/** The night and team a join page speaks for (a phone, or a laptop joined with the same HawkMail), from its token. */
+export async function teamByToken(ctx: QueryCtx, token: string) {
+  const a = await ctx.db
+    .query("attendance")
+    .withIndex("by_token", (q) => q.eq("token", token))
+    .unique();
+  const s = a && (await ctx.db.get(a.sessionId));
+  if (!a || !s || s.status !== "open") throw new ConvexError("This night has ended.");
+  if (!a.teamId) throw new ConvexError("You’re not on a team yet.");
+  return { s, teamId: a.teamId };
+}
+
 /** Whether this check-in goes into teams and season XP: everyone except officers who are running the night. */
 export const inTeamPool = (a: Doc<"attendance">) => !a.officer || !!a.playing;
 
