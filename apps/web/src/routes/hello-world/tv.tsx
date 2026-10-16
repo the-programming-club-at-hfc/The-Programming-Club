@@ -126,7 +126,7 @@ function Attract() {
           </p>
         )}
         <p className="mt-[0.8vw] text-[1.5vw] text-dim">Grab a seat. The game starts soon.</p>
-        <InstagramQr compact className="mt-[2.5vw]" />
+        <InstagramQr row className="mt-[2.5vw]" />
       </div>
     </div>
   );
