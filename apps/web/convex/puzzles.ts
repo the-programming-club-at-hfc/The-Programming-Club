@@ -3,12 +3,13 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { award, openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
+import { award, openSession, requireOpenSession, sessionTeams, teamByKey, teamByToken } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { PUZZLES, puzzleSeed } from "../src/lib/puzzles";
 import { LOCKOUT_MS, cardKey, firstStars, puzzleAwardsFor, submitAnswer } from "../src/lib/grading";
 
-// Puzzles: each team gets its own input (from a seed), solves it on its team computer, and types the answers in.
+// Puzzles: each team gets its own input (from a seed), solves it, and types the answers in on a join page (phone or
+// laptop) or a lab computer signed in with the team key.
 // Answers are checked here by generating the team's input again and running the shared solver.
 // The scoring rules live in src/lib/grading.ts so the officer test page scores the same way.
 
@@ -40,33 +41,53 @@ async function cardStars(ctx: QueryCtx, s: Doc<"sessions">, card: string) {
   return { teams, rows: rows.filter((r) => names.has(r.teamId)).map((r) => ({ ...r, name: names.get(r.teamId)! })) };
 }
 
-/** A team computer sends an answer. Wrong answers lock the team out for 30 seconds. */
+/** Checks a team's answer to the puzzle on the TV. Wrong answers lock the team out for 30 seconds. */
+async function answerPuzzle(
+  ctx: MutationCtx,
+  s: Doc<"sessions">,
+  teamId: Id<"teams">,
+  { card, part, answer }: { card: string; part: 1 | 2; answer: string },
+) {
+  const c = puzzleCard(s);
+  if (!c || c.key !== card) throw new ConvexError("That puzzle isn’t up anymore.");
+  if (!isOpen(s, c.key)) throw new ConvexError("Time’s up. Answers are closed for this puzzle.");
+  if (!answer.trim()) throw new ConvexError("Type your answer first.");
+  if (answer.length > 200) throw new ConvexError("That answer is too long.");
+  const row = await ctx.db
+    .query("stars")
+    .withIndex("by_team_card", (q) => q.eq("teamId", teamId).eq("card", card))
+    .unique();
+  const now = Date.now();
+  const stars = { part1At: row?.part1At, part2At: row?.part2At, lockedUntil: row?.lockedUntil, wrong: row?.wrong ?? 0 };
+  const r = submitAnswer(stars, part, answer, () => answersFor(s._id, teamId, c.index)[`part${part}`], now);
+  if (r.kind === "early") throw new ConvexError("Solve part 1 first.");
+  if (r.kind === "locked") throw new ConvexError(`Wait ${Math.ceil(r.waitMs / 1000)}s, then try again.`);
+  if (r.kind === "done") return { right: true, waitMs: 0 };
+  const patch = { ...r.stars, lastWrong: r.kind === "wrong" ? answer.trim() : row?.lastWrong };
+  if (row) await ctx.db.patch(row._id, patch);
+  else await ctx.db.insert("stars", { sessionId: s._id, teamId, card, ...patch });
+  return { right: r.kind === "right", waitMs: r.kind === "wrong" ? LOCKOUT_MS : 0 };
+}
+
+const answerArgs = { card: v.string(), part: v.union(v.literal(1), v.literal(2)), answer: v.string() };
+
+/** A lab computer sends an answer, signed in with the team key from the team's phones. */
 export const submit = mutation({
-  args: { teamKey: v.string(), card: v.string(), part: v.union(v.literal(1), v.literal(2)), answer: v.string() },
-  handler: async (ctx, { teamKey, card, part, answer }) => {
+  args: { teamKey: v.string(), ...answerArgs },
+  handler: async (ctx, { teamKey, ...a }) => {
     const s = await requireOpenSession(ctx);
     const team = await teamByKey(ctx, s._id, teamKey);
     if (!team) throw new ConvexError("That team key isn’t playing tonight. Enter the key from your phones again.");
-    const teamId = team._id;
-    const c = puzzleCard(s);
-    if (!c || c.key !== card) throw new ConvexError("That puzzle isn’t up anymore.");
-    if (!isOpen(s, c.key)) throw new ConvexError("Time’s up. Answers are closed for this puzzle.");
-    if (!answer.trim()) throw new ConvexError("Type your answer first.");
-    if (answer.length > 200) throw new ConvexError("That answer is too long.");
-    const row = await ctx.db
-      .query("stars")
-      .withIndex("by_team_card", (q) => q.eq("teamId", teamId).eq("card", card))
-      .unique();
-    const now = Date.now();
-    const stars = { part1At: row?.part1At, part2At: row?.part2At, lockedUntil: row?.lockedUntil, wrong: row?.wrong ?? 0 };
-    const r = submitAnswer(stars, part, answer, () => answersFor(s._id, teamId, c.index)[`part${part}`], now);
-    if (r.kind === "early") throw new ConvexError("Solve part 1 first.");
-    if (r.kind === "locked") throw new ConvexError(`Wait ${Math.ceil(r.waitMs / 1000)}s, then try again.`);
-    if (r.kind === "done") return { right: true, waitMs: 0 };
-    const patch = { ...r.stars, lastWrong: r.kind === "wrong" ? answer.trim() : row?.lastWrong };
-    if (row) await ctx.db.patch(row._id, patch);
-    else await ctx.db.insert("stars", { sessionId: s._id, teamId, card, ...patch });
-    return { right: r.kind === "right", waitMs: r.kind === "wrong" ? LOCKOUT_MS : 0 };
+    return answerPuzzle(ctx, s, team._id, a);
+  },
+});
+
+/** A player's join page sends an answer, from a phone or a laptop. */
+export const submitByToken = mutation({
+  args: { token: v.string(), ...answerArgs },
+  handler: async (ctx, { token, ...a }) => {
+    const { s, teamId } = await teamByToken(ctx, token);
+    return answerPuzzle(ctx, s, teamId, a);
   },
 });
 
