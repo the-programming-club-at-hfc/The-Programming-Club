@@ -3,7 +3,7 @@
 import { useMutation, useQueries, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -72,9 +72,12 @@ export function Sketch({
 
   // Every ink row, block by block: a new row only resends the last block.
   const count = useQuery(api.drawings.inkBlocks, { drawingId }) ?? 0;
-  const res = useQueries(
-    Object.fromEntries(Array.from({ length: count }, (_, b) => [b, { query: api.drawings.inkBlock, args: { drawingId, block: b } }])),
+  // Memoized: useQueries resubscribes whenever this object changes, and a new one every render loops forever.
+  const queries = useMemo(
+    () => Object.fromEntries(Array.from({ length: count }, (_, b) => [b, { query: api.drawings.inkBlock, args: { drawingId, block: b } }])),
+    [count, drawingId],
   );
+  const res = useQueries(queries);
   const blocks = Array.from({ length: count }, (_, b): unknown => res[b]).map((r) => (Array.isArray(r) ? (r as Ink[]) : null));
   const saved = new Set(blocks.flatMap((b) => b?.map((r) => r.stroke) ?? []));
   const pending = mine.filter((m) => !(m.saved && saved.has(m.id)));
