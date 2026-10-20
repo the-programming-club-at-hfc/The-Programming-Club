@@ -392,6 +392,23 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       Back to the phone view
     </button>
   );
+  const footer = (className: string) => (
+    <div className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-dim ${className}`}>
+      {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
+      {me.officer ? (
+        <PlayTonight token={token} playing={me.playing} when={w.officerPlays} />
+      ) : (
+        <p>
+          Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
+          {me.weeks === 1 ? "" : "s"}
+        </p>
+      )}
+      <button onClick={onSwitch} className="link py-2.5 wrap-anywhere">
+        Not {me.name}? Switch player
+      </button>
+      <InstagramLink className="w-full justify-center border-t border-line pt-3 pb-2" />
+    </div>
+  );
   return (
     <Wrap className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}>
       <div className={split ? "lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-10" : ""}>
@@ -406,12 +423,12 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             <div className={`tile ${t.tile} w-16 sm:w-32 ${split ? "lg:w-20" : ""}`}>
               <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
             </div>
-            <div className="theme-pine min-w-0 p-4 sm:p-6">
+            <div className={`theme-pine min-w-0 p-4 sm:p-6 ${split ? "lg:p-4" : ""}`}>
               {me.officer && !me.playing ? (
                 <>
                   <p className="text-dim">Officer</p>
-                  <h2 className="mt-1 text-2xl sm:text-3xl">You’re running tonight</h2>
-                  <p className="mt-2 text-dim">Checked in and off the teams.</p>
+                  <h2 className={`mt-1 text-2xl sm:text-3xl ${split ? "lg:text-2xl" : ""}`}>You’re running tonight</h2>
+                  <p className={`mt-2 text-dim ${split ? "lg:hidden" : ""}`}>Checked in and off the teams.</p>
                   <Link to="/hello-world/host" className="btn btn-primary mt-4 w-full">
                     Open host controls
                   </Link>
@@ -446,10 +463,13 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           </div>
 
           {(live.timer.startedAt || s.mode === "timer") && (
-            <p className={`narrow mt-5 text-center text-7xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>
+            <p
+              className={`narrow mt-5 text-center text-7xl leading-none font-extrabold ${split ? "lg:mt-3" : ""} ${hot ? "text-signal" : ""}`}
+            >
               {remaining === 0 && live.timer.startedAt ? "time" : fmtClock(remaining)}
             </p>
           )}
+          {split && footer("mt-4 hidden lg:flex")}
         </div>
 
         <div className={`min-w-0 ${split ? "lg:[&>:first-child]:mt-0" : ""}`}>
@@ -550,21 +570,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
         </div>
       </div>
 
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
-        {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
-        {me.officer ? (
-          <PlayTonight token={token} playing={me.playing} when={w.officerPlays} />
-        ) : (
-          <p>
-            Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
-            {me.weeks === 1 ? "" : "s"}
-          </p>
-        )}
-        <button onClick={onSwitch} className="link py-2.5 wrap-anywhere">
-          Not {me.name}? Switch player
-        </button>
-        <InstagramLink className="w-full justify-center border-t border-line pt-3 pb-2" />
-      </div>
+      {/* Below the game, or in the left column beside it on a wide screen, so a tablet needs no scrolling. */}
+      {footer(`mt-auto pt-8 ${split ? "lg:hidden" : ""}`)}
     </Wrap>
   );
 }

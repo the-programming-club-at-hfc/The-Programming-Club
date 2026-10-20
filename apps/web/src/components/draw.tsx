@@ -356,7 +356,7 @@ export function PhoneDraw({
           token={token}
           rev={b.rev}
           edit={open}
-          canvasClass={canvas("max-w-[calc((100dvh-15rem)*4/3)]")}
+          canvasClass={canvas("max-w-[calc((100dvh-21rem)*4/3)]")}
         />
         {!done && (
           <p className="text-sm text-dim">
@@ -387,7 +387,7 @@ export function PhoneDraw({
           {m?.teammate && !done && <p className="mt-2 font-semibold">Sit this one out and cheer them on.</p>}
         </div>
       )}
-      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[calc((100dvh-13rem)*4/3)]")} />
+      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[calc((100dvh-16rem)*4/3)]")} />
       {officer && !done ? (
         <p className="text-sm text-dim">Officers see the word, so you draw but don’t guess.</p>
       ) : (
