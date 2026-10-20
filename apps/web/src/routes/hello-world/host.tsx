@@ -8,13 +8,13 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
-import { NextPanel, WordPeek, nextWord, useReadyRace, useStartRace } from "#/components/next";
+import { DrawHost, NextPanel, useNewDrawing, useReadyRace, useStartRace } from "#/components/next";
 import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { WIKI_RACES, wikiUrl } from "#/lib/content";
 import { deckFor, filtersFor } from "#/lib/flow";
 import type { Filter } from "#/lib/flow";
-import { isAnswerGame, wikiSeconds } from "#/lib/grading";
+import { DRAW_SECONDS, drawKey, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
@@ -41,9 +41,10 @@ const Panel = ({
   children: React.ReactNode;
   className?: string;
 }) => (
-  <section className={`card p-5 ${className}`}>
+  // On a phone a pane is already the frame, so panels lose their card and their headings shrink.
+  <section className={`card p-5 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none ${className}`}>
     <div className="mb-3 flex items-center justify-between gap-3">
-      <h2 className="text-2xl">{title}</h2>
+      <h2 className="text-2xl max-lg:text-lg">{title}</h2>
       {action}
     </div>
     {children}
@@ -52,7 +53,7 @@ const Panel = ({
 
 function Host() {
   return (
-    <Wrap className="py-8">
+    <Wrap className="py-8 max-lg:pt-0">
       <OfficerGate redirect="/hello-world/host" purpose="run tonight’s game">
         <Console />
       </OfficerGate>
@@ -87,17 +88,22 @@ function Running({
   // e.g. spooky cards for "Fix it for real, spooky".
   const playing = live.round !== null && live.round < lineup.length ? live.round : null;
   const label = playing === null ? null : lineup[playing].label;
-  const [tab, setTab] = useState<Tab>(() => tabFor(label) ?? "bug");
+  // Before the first round, the Games pane opens on tonight's first game.
+  const [tab, setTab] = useState<Tab>(() => tabFor(label) ?? tabFor(lineup[0]?.label ?? null) ?? "bug");
   useEffect(() => {
     const t = tabFor(label);
     if (t) setTab(t);
   }, [label, playing]);
   const deck = useRef<HTMLDivElement>(null);
   const setRound = useMutation(api.sessions.setRound);
+  // On a phone, one pane at a time, picked in the bar at the top; on a big screen, everything at once.
+  const [pane, setPane] = useState<Pane>("run");
+  const on = (p: Pane) => (pane === p ? "" : "max-lg:hidden");
   return (
     <>
+      <PhoneBar live={live} pane={pane} setPane={setPane} />
       <Header live={live} />
-      <NextPanel live={live} lineup={lineup} used={used} shown={shown} className="mt-6" />
+      <NextPanel live={live} lineup={lineup} used={used} shown={shown} className={`mt-6 ${on("run")}`} />
       <LineupPanel
         week={live.week}
         playing={playing}
@@ -107,20 +113,33 @@ function Running({
           const t = tabFor(item.label);
           if (!t) return;
           setTab(t);
-          // The game's controls are further down the page, so bring them into view.
-          deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
+          setPane("games");
+          // After the pane shows, so there's something to scroll to.
+          setTimeout(() => deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
         }}
-        className="mt-6"
+        className={`mt-6 ${on("run")}`}
       />
+      {/* On a phone the two columns step aside (display: contents), so only the pane's own panels take up room. */}
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        <div className="space-y-6">
-          {(week.kind === "kickoff" || live.screen.mode === "slides") && <SlidesPanel live={live} />}
-          <ScreenPanel live={live} />
-          <TimerPanel live={live} />
-          <TeamsPanel live={live} keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}} />
+        <div className="space-y-6 max-lg:contents">
+          {(week.kind === "kickoff" || live.screen.mode === "slides") && (
+            <div className={on("tv")}>
+              <SlidesPanel live={live} />
+            </div>
+          )}
+          <div className={on("tv")}>
+            <ScreenPanel live={live} />
+          </div>
+          <div className={on("tv")}>
+            <TimerPanel live={live} />
+          </div>
+          <div className={on("scores")}>
+            <TeamsPanel live={live} keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}} />
+          </div>
         </div>
-        <div className="space-y-6">
-          <div ref={deck} className="scroll-mt-6">
+        <div className="space-y-6 max-lg:contents">
+          <div ref={deck} className={`scroll-mt-6 max-lg:scroll-mt-32 ${on("games")}`}>
             <DeckPanel
               live={live}
               tab={tab}
@@ -130,10 +149,117 @@ function Running({
               pick={label && tabFor(label) === tab && tab === "puzzle" ? puzzleForLabel(label) : undefined}
             />
           </div>
-          <PlayersPanel live={live} rows={rows} sessionId={live._id} />
+          <div className={on("players")}>
+            <PlayersPanel live={live} rows={rows} sessionId={live._id} />
+          </div>
         </div>
       </div>
     </>
+  );
+}
+
+type Pane = "run" | "scores" | "games" | "tv" | "players";
+const PANES: [Pane, string][] = [
+  ["run", "Run"],
+  ["scores", "Scores"],
+  ["games", "Games"],
+  ["tv", "TV"],
+  ["players", "Players"],
+];
+
+/** On a phone, pinned to the top: the night, the join code, the clock (tap to start or pause), the rest under ⋯, and the
+ *  panes. The big screen's header does all this with room to spare. */
+function PhoneBar({ live, pane, setPane }: { live: Live; pane: Pane; setPane: (p: Pane) => void }) {
+  const end = useMutation(api.sessions.end);
+  const timer = useMutation(api.sessions.timer);
+  const remaining = useRemaining(live.timer);
+  const code = useJoinCode();
+  const plan = useSchedule();
+  const running = !!live.timer.startedAt;
+  // The ⋯ menu closes on a tap outside it or Escape, so it never sits over a pane.
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: Event) => {
+      const m = menu.current;
+      if (m?.open && (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target instanceof Node && m.contains(e.target))))
+        m.open = false;
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
+  const links = [
+    ["/hello-world/kickoff", "Kickoff slides"],
+    ["/hello-world/schedule", "Plan the season"],
+    ["/hello-world/kit", "Game plan"],
+    ["/hello-world/test", "Test the decks"],
+  ] as const;
+  return (
+    <div className="sticky top-0 z-40 -mx-5 border-b border-line bg-paper/95 px-5 pt-3 backdrop-blur-md lg:hidden">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-xs font-bold text-pine">
+            Week {live.week}
+            {live.practice ? " · practice" : ""}
+          </p>
+          <p className="truncate font-extrabold">{plan[live.week - 1]?.title}</p>
+        </div>
+        <p className="narrow text-2xl font-extrabold tracking-[0.15em]" title="Join code">
+          {code}
+        </p>
+        <button
+          className={`btn btn-sm narrow min-w-24 text-lg tabular-nums ${running && remaining <= 10_000 ? "text-signal" : ""}`}
+          onClick={() => run(timer({ action: "toggle" }))}
+          aria-label={running ? "Pause the timer" : "Start the timer"}
+        >
+          {running ? "❚❚" : "▶"} {running && remaining === 0 ? "TIME" : fmtClock(remaining)}
+        </button>
+        <details ref={menu} className="relative">
+          <summary className="btn btn-sm list-none [&::-webkit-details-marker]:hidden" aria-label="More">
+            ⋯
+          </summary>
+          <div className="card absolute right-0 z-50 mt-2 grid w-60 gap-1 p-2 shadow-lg">
+            <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="btn btn-sm justify-start">
+              Open TV view
+            </a>
+            {links.map(([to, label]) => (
+              <Link key={to} to={to} className="btn btn-sm justify-start">
+                {label}
+              </Link>
+            ))}
+            <button
+              className="btn btn-sm btn-neon justify-start"
+              onClick={() => confirm("End the night? Place XP goes out from the current standings.") && run(end())}
+            >
+              End night
+            </button>
+            <span className="px-2 pt-1">
+              <UserButton />
+            </span>
+          </div>
+        </details>
+      </div>
+      <nav className="mt-1 grid grid-cols-5" role="tablist" aria-label="Host controls">
+        {PANES.map(([p, label]) => (
+          <button
+            key={p}
+            role="tab"
+            aria-selected={pane === p}
+            className={`border-b-[3px] py-2.5 text-sm font-bold ${pane === p ? "border-ink text-ink" : "border-transparent text-dim"}`}
+            onClick={() => {
+              setPane(p);
+              menu.current?.removeAttribute("open");
+              scrollTo({ top: 0 });
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+    </div>
   );
 }
 
@@ -142,7 +268,7 @@ function Header({ live }: { live: Live }) {
   const plan = useSchedule();
   const code = useJoinCode();
   return (
-    <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
+    <header className="flex flex-wrap items-center gap-x-6 gap-y-3 max-lg:hidden">
       <div className="min-w-0">
         <p className="font-bold text-pine">
           Week {live.week}
@@ -192,7 +318,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   const [week, setWeek] = useState(() => likelyWeek(plan));
   const [practice, setPractice] = useState(false);
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 max-lg:pt-6 lg:grid-cols-2">
       <Panel title="Start tonight" className="ring-2 ring-gold">
         <p className="text-dim">Starting opens joining and puts the QR code on the TV.</p>
         <label className="mt-4 block font-bold">
@@ -235,7 +361,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
         {recent.length === 0 ? (
           <p className="text-dim">Nothing yet. Attendance exports show up here after each night.</p>
         ) : (
-          <ul className="divide-y-2 divide-grid/60">
+          <ul className="divide-y divide-line">
             {recent.map((s) => (
               <li key={s._id} className="flex flex-wrap items-center gap-2 py-2">
                 <span className="font-bold">Week {s.week}</span>
@@ -255,7 +381,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   );
 }
 
-const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", message: "Message" };
+const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", draw: "Drawing", message: "Message" };
 
 // The kickoff deck on the TV: always here on Week 1, and on any other night once the slides go up from "On the TV".
 function SlidesPanel({ live }: { live: Live }) {
@@ -410,9 +536,6 @@ const MODES = [
 function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | null> }) {
   const make = useMutation(api.teams.make);
   const add = useMutation(api.teams.add);
-  const score = useMutation(api.teams.score);
-  const rename = useMutation(api.teams.rename);
-  const remove = useMutation(api.teams.remove);
   const setDouble = useMutation(api.sessions.setDouble);
   const resetScores = useMutation(api.teams.resetScores);
   const setAuto = useMutation(api.teams.setAuto);
@@ -429,36 +552,41 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
 
   return (
     <Panel title="Teams & scores">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="How tonight is played">
-        {MODES.map(([size, label]) => (
-          <button
-            key={size}
-            className={`btn btn-sm ${live.teamSize === size ? "btn-on" : ""}`}
-            onClick={() => setMode(size)}
-            disabled={live.unrevealed.length > 0}
-            aria-pressed={live.teamSize === size}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="How tonight is played" className="inline-flex rounded-[6px] bg-mist p-1">
+          {MODES.map(([size, label]) => (
+            <button
+              key={size}
+              className={`min-h-10 rounded-[4px] px-3 text-sm font-semibold disabled:opacity-50 ${live.teamSize === size ? "bg-ink text-paper" : "text-ink"}`}
+              onClick={() => setMode(size)}
+              disabled={live.unrevealed.length > 0}
+              aria-pressed={live.teamSize === size}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          className={`btn btn-sm ${live.double ? "btn-on" : ""}`}
+          onClick={() => run(setDouble({ on: !live.double }))}
+          aria-pressed={live.double}
+        >
+          Double points
+        </button>
+        <button
+          className={`btn btn-sm ${live.autoTeams ? "btn-on" : ""}`}
+          onClick={() => run(setAuto({ on: !live.autoTeams }))}
+          aria-pressed={live.autoTeams}
+        >
+          Auto teams
+        </button>
         {!w.solo && (
           <button className="btn btn-sm" onClick={() => run(add())}>
             Add team
           </button>
         )}
-        <button className={`btn btn-sm ${live.double ? "btn-on" : ""}`} onClick={() => run(setDouble({ on: !live.double }))}>
-          {live.double ? "Double points: on" : "Double points"}
-        </button>
-        <button className={`btn btn-sm ${live.autoTeams ? "btn-on" : ""}`} onClick={() => run(setAuto({ on: !live.autoTeams }))}>
-          {live.autoTeams ? "Auto teams: on" : "Auto teams: off"}
-        </button>
       </div>
-      <p className="mt-2 text-sm text-dim">
-        <strong className="text-ink">Tonight: {MODES[live.teamSize - 1][1].toLowerCase()}.</strong>{" "}
-        {live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff} Pressing a mode, even tonight’s, remakes every team. Nobody loses points.
-      </p>
+      <p className="mt-2 text-sm text-dim">{live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff}</p>
       {live.unrevealed.length > 0 && (
         <p className="mt-1 text-sm font-semibold">
           Finish the round first: reveal {live.unrevealed.map(cardName).join(", ")} (put it back on the TV if it’s gone), then you can
@@ -468,55 +596,9 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
       {live.teams.length === 0 ? (
         <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>
       ) : (
-        <ol className="mt-3 divide-y-2 divide-grid/60">
+        <ol className="mt-3 divide-y divide-line">
           {live.teams.map((t) => (
-            <li key={t._id} className="py-3">
-              <div className="flex items-baseline gap-3">
-                <button
-                  className="text-left font-bold text-xl font-bold hover:text-pine"
-                  title="Rename"
-                  onClick={() => {
-                    const name = prompt("Team name", t.name);
-                    if (name) void run(rename({ teamId: t._id, name }));
-                  }}
-                >
-                  {t.name}
-                </button>
-                {t.members.join(", ") !== t.name && <span className="text-sm text-dim">{t.members.join(", ") || "empty"}</span>}
-                {keys[t._id] && (
-                  <span className="chip text-sm" title={w.keyTitle}>
-                    {keys[t._id]}
-                  </span>
-                )}
-                <span className="ml-auto narrow font-extrabold text-3xl text-ink tabular-nums">{t.score}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {[1, 2, 3, 5].map((n) => (
-                  <button key={n} className="btn btn-sm" onClick={() => run(score({ teamId: t._id, delta: n }))}>
-                    +{live.double ? n * 2 : n}
-                  </button>
-                ))}
-                <button className="btn btn-sm" onClick={() => run(score({ teamId: t._id, delta: -1 }))} aria-label="Minus one">
-                  −1
-                </button>
-                <button
-                  className="btn btn-sm"
-                  title="Any amount, e.g. −2 to undo a mistake"
-                  onClick={() => {
-                    const n = Number(prompt(`Points for ${t.name} (use a minus sign to take away)`)?.replace("−", "-"));
-                    if (Number.isInteger(n) && n !== 0) void run(score({ teamId: t._id, delta: n }));
-                  }}
-                >
-                  ±…
-                </button>
-                <button
-                  className="btn btn-sm ml-auto text-dim"
-                  onClick={() => confirm(`Remove ${t.name}? Its players go back to no team.`) && run(remove({ teamId: t._id }))}
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
+            <TeamRow key={t._id} t={t} double={live.double} teamKey={keys[t._id]} keyTitle={w.keyTitle} />
           ))}
         </ol>
       )}
@@ -526,6 +608,93 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         </button>
       )}
     </Panel>
+  );
+}
+
+/** A team: its name (tap to rename) and score, +1 +2 +3 at hand, and the rest under ⋯. One line on a big screen; on a
+ *  phone, the buttons get their own row with room for thumbs. */
+function TeamRow({
+  t,
+  double,
+  teamKey,
+  keyTitle,
+}: {
+  t: Live["teams"][number];
+  double: boolean;
+  teamKey?: string | null;
+  keyTitle: string;
+}) {
+  const score = useMutation(api.teams.score);
+  const rename = useMutation(api.teams.rename);
+  const remove = useMutation(api.teams.remove);
+  const [more, setMore] = useState(false);
+  const add = (n: number) => run(score({ teamId: t._id, delta: n }));
+  const members = t.members.join(", ");
+  return (
+    <li className="py-2.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-lg font-bold">{t.name}</p>
+          {members !== t.name && <p className="truncate text-xs text-dim">{members || "empty"}</p>}
+        </div>
+        {teamKey && (
+          <span className="chip text-sm" title={keyTitle}>
+            {teamKey}
+          </span>
+        )}
+        <span className="narrow w-12 text-right text-3xl font-extrabold text-ink tabular-nums">{t.score}</span>
+        <div className="flex w-full gap-1.5 sm:w-auto">
+          {[1, 2, 3].map((n) => (
+            <button key={n} className="btn btn-sm min-h-11 flex-1 sm:flex-none" onClick={() => add(n)}>
+              +{double ? n * 2 : n}
+            </button>
+          ))}
+          <button
+            className={`btn btn-sm min-h-11 flex-1 sm:flex-none ${more ? "btn-on" : ""}`}
+            onClick={() => setMore(!more)}
+            aria-expanded={more}
+            aria-label={`More for ${t.name}`}
+          >
+            ⋯
+          </button>
+        </div>
+      </div>
+      {more && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button className="btn btn-sm" onClick={() => add(5)}>
+            +{double ? 10 : 5}
+          </button>
+          <button className="btn btn-sm" onClick={() => add(-1)} aria-label="Minus one">
+            −1
+          </button>
+          <button
+            className="btn btn-sm"
+            title="Any amount, e.g. −2 to undo a mistake"
+            onClick={() => {
+              const n = Number(prompt(`Points for ${t.name} (use a minus sign to take away)`)?.replace("−", "-"));
+              if (Number.isInteger(n) && n !== 0) void add(n);
+            }}
+          >
+            Other amount…
+          </button>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              const name = prompt("Team name", t.name);
+              if (name) void run(rename({ teamId: t._id, name }));
+            }}
+          >
+            Rename
+          </button>
+          <button
+            className="btn btn-sm ml-auto text-dim"
+            onClick={() => confirm(`Remove ${t.name}? Its players go back to no team.`) && run(remove({ teamId: t._id }))}
+          >
+            Remove
+          </button>
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -675,12 +844,14 @@ function LineupPanel({
   );
 }
 
-/** "output:2" as "Output? #3", and a race key as "Wiki Race: From → To", for officers. */
+/** "output:2" as "Output? #3", a race key as "Wiki Race: From → To", and "draw:4" as "Drawing 4", for officers. */
 const cardName = (key: string) => {
   const [game, rest] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
   return game === "wiki"
     ? `Wiki Race: ${rest.replace(">", " → ")}`
-    : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
+    : game === "draw"
+      ? `Drawing ${rest}`
+      : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
 };
 
 type Tab = GameId | "wiki" | "pictionary";
@@ -719,12 +890,12 @@ function DeckPanel({
 }) {
   return (
     <Panel title="Games" className="">
-      <div className="flex flex-wrap gap-1 border-b-4 border-line pb-2">
+      <div className="-mx-4 flex gap-1 overflow-x-auto border-b-4 border-line px-4 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {TABS.map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`px-3 py-1.5 font-bold ${tab === id ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
+            className={`shrink-0 px-3 py-2 font-bold whitespace-nowrap ${tab === id ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
           >
             {label}
           </button>
@@ -734,7 +905,7 @@ function DeckPanel({
         {tab === "wiki" ? (
           <WikiTool live={live} used={used} />
         ) : tab === "pictionary" ? (
-          <PictionaryTool />
+          <PictionaryTool live={live} />
         ) : (
           <CardTool key={`${tab}:${filter}:${pick}`} game={tab} live={live} used={used} initial={filter} pick={pick} />
         )}
@@ -896,7 +1067,7 @@ function AnswerStatus({ live }: { live: Live }) {
       {data.teams.length === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {data.teams.map((t) => {
             const p = t.pick;
             const status = p?.locked
@@ -954,7 +1125,8 @@ function FixStatus({ live }: { live: Live }) {
     <div className="mt-3 border-4 border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-bold">
-          {data.scored ? "Scored" : `Fixed: ${fixedCount} of ${data.teams.length} ${w.teams}`} · {w.computers} at /hello-world/fix
+          {data.scored ? "Scored" : `Fixed: ${fixedCount} of ${data.teams.length} ${w.teams}`} · laptops on the join page, lab computers at
+          /hello-world/fix
         </p>
         {!s.revealed && !data.scored && (
           <button
@@ -969,7 +1141,7 @@ function FixStatus({ live }: { live: Live }) {
       {data.teams.length === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {data.teams.map((t) => (
             <li key={t._id} className="py-1.5">
               <div className="flex flex-wrap items-center gap-2">
@@ -993,7 +1165,7 @@ function FixStatus({ live }: { live: Live }) {
       <p className="mt-2 text-xs text-dim">
         {data.scored
           ? "Points went on the board when you revealed. Use the score buttons to fix anything."
-          : `${w.Computers} mark a ${w.team} fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points.`}
+          : `Laptops (and lab computers) mark a ${w.team} fixed when every test passes. Revealing adds +3 per fix and +2 more for the first, doubled on double points.`}
       </p>
     </div>
   );
@@ -1029,8 +1201,8 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
     <div className="mt-3 border-4 border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-bold">
-          {board.scored ? "Scored" : `Part 1: ${count("part1Ms")} of ${board.teams.length} · Part 2: ${count("part2Ms")}`} · {w.computers}{" "}
-          at /hello-world/fix
+          {board.scored ? "Scored" : `Part 1: ${count("part1Ms")} of ${board.teams.length} · Part 2: ${count("part2Ms")}`} · join pages, or
+          lab computers at /hello-world/fix
         </p>
         {!s.revealed && !board.scored && (
           <button
@@ -1045,7 +1217,7 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
       {board.teams.length === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {board.teams.map((t) => {
             const x = extra?.wrong.find((r) => r.teamId === t.teamId);
             const wait = t.lockedUntil === null ? 0 : Math.ceil((t.lockedUntil - now) / 1000);
@@ -1106,7 +1278,7 @@ function WikiStatus({ live }: { live: Live }) {
       {data.teams === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {data.finished.map((f) => (
             <li key={f.teamId} className="flex flex-wrap items-center gap-2 py-1.5">
               <span className="narrow w-9 text-xl font-extrabold">{f.place !== null ? ordinal(f.place) : "–"}</span>
@@ -1279,23 +1451,47 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
   );
 }
 
-function PictionaryTool() {
+/** Tech Pictionary outside the big button: a new drawing (the next drawer in turn), the reveal, and the drawing's controls. */
+function PictionaryTool({ live }: { live: Live }) {
+  const newDrawing = useNewDrawing();
+  const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
-  const [word, setWord] = useState<string | null>(null);
+  const remaining = useRemaining(live.timer);
+  const [busy, setBusy] = useState(false);
+  const s = live.screen;
+  // One tap at a time, so a double tap never starts two drawings.
+  const act = async (go: () => Promise<unknown>) => {
+    setBusy(true);
+    await run(go());
+    setBusy(false);
+  };
+  // Like the big button: the reveal stops a running clock so the buzzer doesn't go off over the word.
+  // The drawing comes back on the TV for its reveal, even after the scoreboard or join screen went up meanwhile.
+  const reveal = async () => {
+    await setScreen({ screen: { ...s, mode: "draw", revealed: true } });
+    if (live.timer.startedAt && remaining > 0) await timer({ action: "pause" });
+  };
+  // A drawing up and still open: not revealed, and not scored by the TV moving on.
+  const up = s.drawing !== undefined && !s.revealed && !live.scored.includes(drawKey(s.drawing));
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-sm btn-coin" onClick={() => setWord(nextWord())}>
-          Next word
+        <button
+          className="btn btn-sm btn-neon"
+          disabled={busy}
+          onClick={() => (!up || confirm("A drawing is still up. Score it as it stands and start a new one?")) && act(newDrawing)}
+        >
+          New drawing, {fmtClock(DRAW_SECONDS * 1000)}
         </button>
-        <button className="btn btn-sm" onClick={() => run(timer({ action: "set", seconds: 60, relay: false, autostart: true }))}>
-          Start 1:00
-        </button>
+        {up && (
+          <button className="btn btn-sm btn-coin" disabled={busy} onClick={() => act(reveal)}>
+            Reveal the word and score
+          </button>
+        )}
       </div>
-      {word && <WordPeek word={word} />}
+      <DrawHost live={live} />
       <p className="mt-3 text-sm text-dim">
-        The word stays on this device and never goes on the TV. Hold your phone up for the drawer instead of handing it over: it has the
-        score buttons.
+        The drawer draws on their phone or the officer tablet, everyone else guesses on theirs, and revealing scores it once.
       </p>
     </div>
   );
@@ -1318,7 +1514,7 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
       {rows.length === 0 ? (
         <p className="text-dim">Nobody yet. Put the join screen on the TV.</p>
       ) : (
-        <ul className="divide-y-2 divide-grid/60">
+        <ul className="divide-y divide-line">
           {rows.map((r) => (
             <li key={r._id} className="flex flex-wrap items-center gap-2 py-2">
               <div className="min-w-40 flex-1">

@@ -27,6 +27,7 @@ import { Route as DesktopSiteRouteImport } from './routes/_desktop/site'
 import { Route as DesktopWorldCupRouteImport } from './routes/_desktop/world-cup'
 import { Route as HelloWorldIndexRouteImport } from './routes/hello-world/index'
 import { Route as HelloWorldCupRouteImport } from './routes/hello-world/cup'
+import { Route as HelloWorldDrawRouteImport } from './routes/hello-world/draw'
 import { Route as HelloWorldFixRouteImport } from './routes/hello-world/fix'
 import { Route as HelloWorldHostRouteImport } from './routes/hello-world/host'
 import { Route as HelloWorldJoinRouteImport } from './routes/hello-world/join'
@@ -132,6 +133,11 @@ const HelloWorldCupRoute = HelloWorldCupRouteImport.update({
   path: '/cup',
   getParentRoute: () => HelloWorldRouteRoute,
 } as any)
+const HelloWorldDrawRoute = HelloWorldDrawRouteImport.update({
+  id: '/draw',
+  path: '/draw',
+  getParentRoute: () => HelloWorldRouteRoute,
+} as any)
 const HelloWorldFixRoute = HelloWorldFixRouteImport.update({
   id: '/fix',
   path: '/fix',
@@ -220,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/site': typeof DesktopSiteRoute
   '/world-cup': typeof DesktopWorldCupRoute
   '/hello-world/cup': typeof HelloWorldCupRoute
+  '/hello-world/draw': typeof HelloWorldDrawRoute
   '/hello-world/fix': typeof HelloWorldFixRoute
   '/hello-world/host': typeof HelloWorldHostRoute
   '/hello-world/join': typeof HelloWorldJoinRoute
@@ -251,6 +258,7 @@ export interface FileRoutesByTo {
   '/site': typeof DesktopSiteRoute
   '/world-cup': typeof DesktopWorldCupRoute
   '/hello-world/cup': typeof HelloWorldCupRoute
+  '/hello-world/draw': typeof HelloWorldDrawRoute
   '/hello-world/fix': typeof HelloWorldFixRoute
   '/hello-world/host': typeof HelloWorldHostRoute
   '/hello-world/join': typeof HelloWorldJoinRoute
@@ -286,6 +294,7 @@ export interface FileRoutesById {
   '/_desktop/site': typeof DesktopSiteRoute
   '/_desktop/world-cup': typeof DesktopWorldCupRoute
   '/hello-world/cup': typeof HelloWorldCupRoute
+  '/hello-world/draw': typeof HelloWorldDrawRoute
   '/hello-world/fix': typeof HelloWorldFixRoute
   '/hello-world/host': typeof HelloWorldHostRoute
   '/hello-world/join': typeof HelloWorldJoinRoute
@@ -322,6 +331,7 @@ export interface FileRouteTypes {
     | '/site'
     | '/world-cup'
     | '/hello-world/cup'
+    | '/hello-world/draw'
     | '/hello-world/fix'
     | '/hello-world/host'
     | '/hello-world/join'
@@ -353,6 +363,7 @@ export interface FileRouteTypes {
     | '/site'
     | '/world-cup'
     | '/hello-world/cup'
+    | '/hello-world/draw'
     | '/hello-world/fix'
     | '/hello-world/host'
     | '/hello-world/join'
@@ -387,6 +398,7 @@ export interface FileRouteTypes {
     | '/_desktop/site'
     | '/_desktop/world-cup'
     | '/hello-world/cup'
+    | '/hello-world/draw'
     | '/hello-world/fix'
     | '/hello-world/host'
     | '/hello-world/join'
@@ -543,6 +555,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelloWorldCupRouteImport
       parentRoute: typeof HelloWorldRouteRoute
     }
+    '/hello-world/draw': {
+      id: '/hello-world/draw'
+      path: '/draw'
+      fullPath: '/hello-world/draw'
+      preLoaderRoute: typeof HelloWorldDrawRouteImport
+      parentRoute: typeof HelloWorldRouteRoute
+    }
     '/hello-world/fix': {
       id: '/hello-world/fix'
       path: '/fix'
@@ -646,6 +665,7 @@ declare module '@tanstack/react-router' {
 
 interface HelloWorldRouteRouteChildren {
   HelloWorldCupRoute: typeof HelloWorldCupRoute
+  HelloWorldDrawRoute: typeof HelloWorldDrawRoute
   HelloWorldFixRoute: typeof HelloWorldFixRoute
   HelloWorldHostRoute: typeof HelloWorldHostRoute
   HelloWorldJoinRoute: typeof HelloWorldJoinRoute
@@ -664,6 +684,7 @@ interface HelloWorldRouteRouteChildren {
 
 const HelloWorldRouteRouteChildren: HelloWorldRouteRouteChildren = {
   HelloWorldCupRoute: HelloWorldCupRoute,
+  HelloWorldDrawRoute: HelloWorldDrawRoute,
   HelloWorldFixRoute: HelloWorldFixRoute,
   HelloWorldHostRoute: HelloWorldHostRoute,
   HelloWorldJoinRoute: HelloWorldJoinRoute,
@@ -725,13 +746,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

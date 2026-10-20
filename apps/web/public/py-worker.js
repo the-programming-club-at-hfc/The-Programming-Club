@@ -1,8 +1,8 @@
 // Runs Python for Fix it for real and puzzles, off the page's main thread. src/lib/python.ts starts this worker, sends
 // it one program at a time with its stdin (and any files, like a puzzle's input.txt), and terminates it (then starts a
 // fresh one) if a program runs too long.
-// Pyodide loads from its official CDN, pinned here. Nothing is bundled.
-/* global importScripts, loadPyodide */
+// Pyodide loads from its official CDN, pinned here. Nothing is bundled. Since Pyodide 314 this has to be a module worker:
+// in a classic one, Pyodide refuses to start (and the browser reports it as a network error).
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 
 // Runs a program as main.py with the test's input as stdin, and returns [stdout, traceback or None] as JSON.
@@ -45,7 +45,7 @@ let run = null;
 
 (async () => {
   try {
-    importScripts(PYODIDE + "pyodide.js");
+    const { loadPyodide } = await import(PYODIDE + "pyodide.mjs");
     const py = await loadPyodide({ indexURL: PYODIDE });
     py.runPython(HARNESS);
     run = py.globals.get("_run");

@@ -54,7 +54,7 @@ function Cup() {
           <div>
             <ol className="steps text-xl">
               <li>Each puzzle tells a short story and works through a small example.</li>
-              <li>Every team gets its own puzzle input on its team computer. Solve it any way you like, then type in the answer.</li>
+              <li>Every team gets its own input on the join page. Solve it any way you like, then answer on a phone or laptop.</li>
               <li>A right answer to part 1 earns a star (3 points) and unlocks part 2, which twists it. Part 2’s star is worth 5.</li>
               <li>The first team to each star gets 2 more. A wrong answer locks you out for 30 seconds.</li>
               <li>Puzzle 1 is a relay. Puzzle 2 counts double, and the whole team helps.</li>

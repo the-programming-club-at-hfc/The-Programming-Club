@@ -47,6 +47,18 @@ export async function teamByKey(ctx: QueryCtx, sessionId: Id<"sessions">, key: s
   return (await sessionTeams(ctx, sessionId)).find((t) => t.key === k) ?? null;
 }
 
+/** The night and team a join page speaks for (a phone, or a laptop joined with the same HawkMail), from its token. */
+export async function teamByToken(ctx: QueryCtx, token: string) {
+  const a = await ctx.db
+    .query("attendance")
+    .withIndex("by_token", (q) => q.eq("token", token))
+    .unique();
+  const s = a && (await ctx.db.get(a.sessionId));
+  if (!a || !s || s.status !== "open") throw new ConvexError("This night has ended.");
+  if (!a.teamId) throw new ConvexError("You’re not on a team yet.");
+  return { s, teamId: a.teamId };
+}
+
 /** Whether this check-in goes into teams and season XP: everyone except officers who are running the night. */
 export const inTeamPool = (a: Doc<"attendance">) => !a.officer || !!a.playing;
 
@@ -110,7 +122,8 @@ export async function teamFor(ctx: MutationCtx, session: Doc<"sessions">, name: 
 }
 
 /** Add a player to the session (or return their existing spot), on a team as teamFor decides.
- *  Officers (signed in, or by an email on OFFICER_EMAILS) check in to run the night, off the teams. */
+ *  Officers (signed in, or by an email on OFFICER_EMAILS) check in playing, like everyone else; "Just hosting" on their
+ *  join page takes them off the teams. */
 export async function addToSession(
   ctx: MutationCtx,
   session: Doc<"sessions">,
@@ -147,7 +160,7 @@ export async function addToSession(
     .collect();
   const prior = (await Promise.all(history.map((h) => ctx.db.get(h.sessionId)))).some((s) => s && !s.practice);
 
-  const teamId = officer ? undefined : await teamFor(ctx, session, player.name);
+  const teamId = await teamFor(ctx, session, player.name);
 
   const token = randomToken();
   await ctx.db.insert("attendance", {
@@ -160,12 +173,12 @@ export async function addToSession(
     broughtBy: broughtBy?.trim().slice(0, 40) || undefined,
     showXp: WEEKS[session.week - 1]?.showXp ?? 3,
     bonusXp: 0,
-    ...(officer && { officer: true, playing: false }),
+    ...(officer && { officer: true, playing: true }),
   });
   return token;
 }
 
-/** Tonight's cards that teams have answered, raced, fixed, or starred but that haven't been scored yet. Their rows
+/** Tonight's cards that teams have answered, raced, fixed, starred, or guessed but that haven't been scored yet. Their rows
  *  belong to tonight's teams, so teams can't be remade until these are revealed. */
 export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
   const keys = [...new Set([...(s.played ?? []), ...(s.card ? [s.card] : [])].map((w) => w.key))].filter(
@@ -173,7 +186,7 @@ export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
   );
   const open = [];
   for (const card of keys)
-    for (const table of ["answers", "fixes", "stars", "races"] as const)
+    for (const table of ["answers", "fixes", "stars", "races", "guesses"] as const)
       if (
         await ctx.db
           .query(table)
@@ -199,9 +212,9 @@ export async function upgradeOldNight(ctx: MutationCtx, s: Doc<"sessions">) {
 
 export const ROUND_OPEN = "Finish the round first: reveal the card they answered, then try again.";
 
-/** Whether a team has answers, fixes, stars, or a finish in on a card tonight that hasn't been scored yet. */
+/** Whether a team has answers, fixes, stars, a finish, or guesses in on a card tonight that hasn't been scored yet. */
 export async function hasUnscored(ctx: QueryCtx, s: Doc<"sessions">, teamId: Id<"teams">) {
-  for (const table of ["answers", "fixes", "stars", "races"] as const)
+  for (const table of ["answers", "fixes", "stars", "races", "guesses"] as const)
     for (const row of await ctx.db
       .query(table)
       .withIndex("by_team_card", (q) => q.eq("teamId", teamId))

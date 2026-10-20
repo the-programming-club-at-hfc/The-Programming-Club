@@ -1,27 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
-import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "convex/react";
+import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
-import { FixRound } from "#/components/fix";
-import { PuzzleRound } from "#/components/puzzle";
 import { fmtClock, useRemaining } from "#/components/game";
 import { Picto, Wrap } from "#/components/ui";
-import { answersOpen, cardKey } from "#/lib/grading";
-import { PUZZLES, puzzleSeed } from "#/lib/puzzles";
+import { LiveFix, LivePuzzle } from "#/components/workspace";
+import type { Live } from "#/components/workspace";
+import { cardKey } from "#/lib/grading";
 import { usePython } from "#/lib/python";
 import type { Python } from "#/lib/python";
 import { CLUB } from "#/lib/season";
 import { teamWords } from "#/lib/words";
 
-// A team's lab computer for Fix it for real and puzzles. No sign-in: the computer enters the team key shown on the team's phones.
+// A lab computer for Fix it for real and puzzles, for players without a laptop of their own. No sign-in: the computer
+// enters the team key shown on the team's phones. (A laptop can just open the join page instead.)
 export const Route = createFileRoute("/hello-world/fix")({
   head: () => ({ meta: [{ title: `Team computer · ${CLUB.season}` }, { name: "robots", content: "noindex" }] }),
   component: FixPage,
 });
 
-type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 const storeKey = (sessionId: string) => `hwc.fixTeam.${sessionId}`;
 
 function FixPage() {
@@ -160,13 +157,13 @@ function TeamComputer({
           key={cardKey("puzzle", index)}
           live={live}
           teamId={team._id}
-          teamKey={teamKey}
+          by={{ teamKey }}
           index={index}
           remaining={remaining}
           py={py}
         />
       ) : index !== undefined ? (
-        <LiveFix key={cardKey("fix", index)} live={live} teamId={team._id} teamKey={teamKey} index={index} remaining={remaining} py={py} />
+        <LiveFix key={cardKey("fix", index)} live={live} teamId={team._id} by={{ teamKey }} index={index} remaining={remaining} py={py} />
       ) : (
         <div className="card grid min-h-[50vh] place-items-center p-8 text-center">
           <div>
@@ -186,93 +183,5 @@ function TeamComputer({
         </div>
       )}
     </Wrap>
-  );
-}
-
-function LiveFix({
-  live,
-  teamId,
-  teamKey,
-  index,
-  remaining,
-  py,
-}: {
-  live: Live;
-  teamId: Id<"teams">;
-  teamKey: string;
-  index: number;
-  remaining: number;
-  py: Python;
-}) {
-  const board = useQuery(api.fixes.board);
-  const report = useMutation(api.fixes.report);
-  const key = cardKey("fix", index);
-  const mine = board?.card === key ? (board.fixed.find((f) => f.teamId === teamId) ?? null) : null;
-  const scored = live.scored.includes(key);
-  return (
-    <FixRound
-      index={index}
-      py={py}
-      // Once scored, the result stays up even if an officer hides the answer again.
-      revealed={!!live.screen.revealed || scored}
-      hint={!!live.screen.hint}
-      open={isOpen(live, key, remaining)}
-      fixed={mine && { ms: mine.ms }}
-      result={mine?.result ?? null}
-      saveKey={`hwc.fixCode.${live._id}.${teamId}.${key}`}
-      onFixed={(code) => report({ teamKey, card: key, code })}
-    />
-  );
-}
-
-/** Whether the card on the TV still takes answers, as the server will see it (minus its grace). */
-const isOpen = (live: Live, key: string, remaining: number) =>
-  answersOpen({
-    revealed: !!live.screen.revealed,
-    scored: live.scored.includes(key),
-    endedAt: live.card?.key === key ? live.card.endedAt : undefined,
-    own: live.timer.card === key,
-    running: !!live.timer.startedAt,
-    remaining,
-    now: Date.now(),
-    grace: 0,
-  });
-
-function LivePuzzle({
-  live,
-  teamId,
-  teamKey,
-  index,
-  remaining,
-  py,
-}: {
-  live: Live;
-  teamId: Id<"teams">;
-  teamKey: string;
-  index: number;
-  remaining: number;
-  py: Python;
-}) {
-  const board = useQuery(api.puzzles.board);
-  const submit = useMutation(api.puzzles.submit);
-  const key = cardKey("puzzle", index);
-  const mine = board?.card === key ? board.teams.find((t) => t.teamId === teamId) : undefined;
-  // The same seed the server uses to check answers, so this is exactly the input it expects.
-  const input = useMemo(() => PUZZLES[index].generate(puzzleSeed(live._id, teamId, index)), [live._id, teamId, index]);
-  return (
-    <PuzzleRound
-      index={index}
-      input={input}
-      py={py}
-      revealed={!!live.screen.revealed || live.scored.includes(key)}
-      hint={!!live.screen.hint}
-      open={isOpen(live, key, remaining)}
-      stars={{ part1Ms: mine?.part1Ms ?? null, part2Ms: mine?.part2Ms ?? null }}
-      lockedUntil={mine?.lockedUntil ?? null}
-      result={mine?.result ?? null}
-      saveKey={`hwc.puzzleCode.${live._id}.${teamId}.${key}`}
-      onSubmit={(part, answer) => submit({ teamKey, card: key, part, answer })}
-      solo={live.teamSize === 1}
-    />
   );
 }

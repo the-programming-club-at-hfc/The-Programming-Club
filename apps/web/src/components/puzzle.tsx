@@ -1,5 +1,5 @@
-// A puzzle on a team computer: the story, the example, the team's own input, a Python editor, and an answer box per part.
-// Presentational: the /fix page wires it to Convex, and the officer test page drives it with local state.
+// A puzzle on a laptop: the story, the example, the team's own input, a Python editor, and an answer box per part.
+// Presentational: components/workspace.tsx wires it to Convex, and the officer test page drives it with local state.
 import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
 import { PUZZLES } from "#/lib/puzzles";
@@ -192,7 +192,7 @@ function Status({ revealed, open, stars, result }: Pick<Props, "revealed" | "ope
 }
 
 /** One part's answer. A wrong answer locks the team out for 30 seconds, counted down here. */
-function AnswerBox({
+export function AnswerBox({
   part,
   done,
   open,
@@ -251,7 +251,7 @@ function AnswerBox({
       <div className="mt-2 flex gap-2">
         <input
           id={`answer-${part}`}
-          className="field font-code"
+          className="field min-w-0 flex-1 font-code"
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           autoComplete="off"
@@ -260,7 +260,7 @@ function AnswerBox({
           maxLength={200}
           disabled={!open}
         />
-        <button className="btn btn-primary" disabled={!open || busy || wait > 0 || !answer.trim()}>
+        <button className="btn btn-primary shrink-0" disabled={!open || busy || wait > 0 || !answer.trim()}>
           {busy ? "Checking…" : "Submit"}
         </button>
       </div>
@@ -279,7 +279,7 @@ function AnswerBox({
 }
 
 /** The team's own input, to copy into another tool or download as input.txt. */
-function InputBox({ input, solo }: { input: string; solo?: boolean }) {
+export function InputBox({ input, solo }: { input: string; solo?: boolean }) {
   const [copied, setCopied] = useState(false);
   const download = () => {
     const url = URL.createObjectURL(new Blob([input + "\n"], { type: "text/plain" }));

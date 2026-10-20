@@ -1,16 +1,17 @@
 import { ConvexError, v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { award, openSession, requireOpenSession, sessionTeams, teamByKey } from "./lib";
+import { award, openSession, requireOpenSession, sessionTeams, teamByKey, teamByToken } from "./lib";
 import { cardStart, isOpen, liveCard } from "./answers";
 import { puzzleCard } from "./puzzles";
 import { FIXES } from "../src/lib/fixes";
 import { cardKey, fixAwardsFor } from "../src/lib/grading";
 import { wikiCard } from "./wiki";
 
-// Fix it for real: each team's computer runs the tests in the browser and reports here once they all pass.
+// Fix it for real: a team's laptop (its join page, or a lab computer with the team key) runs the tests in the browser
+// and reports here once they all pass.
 // The scoring rules live in src/lib/grading.ts so the officer test page scores the same way.
 
 /** The Fix it for real card on the TV, if any. */
@@ -40,23 +41,36 @@ async function cardFixes(ctx: QueryCtx, s: Doc<"sessions">, card: string) {
   return { teams, fixed };
 }
 
-/** A team computer reports that its fix passes every test. The first report per team counts; later ones are ignored. */
+/** Records that a team's fix passes every test. The first report per team counts; later ones are ignored. */
+async function reportFix(ctx: MutationCtx, s: Doc<"sessions">, teamId: Id<"teams">, { card, code }: { card: string; code: string }) {
+  const c = fixCard(s);
+  if (!c || c.key !== card) throw new ConvexError("That card isn’t up anymore.");
+  if (!isOpen(s, c.key)) throw new ConvexError("Time’s up. Fixes are closed for this card.");
+  if (code.length > 20_000) throw new ConvexError("That program is too long.");
+  const row = await ctx.db
+    .query("fixes")
+    .withIndex("by_team_card", (q) => q.eq("teamId", teamId).eq("card", card))
+    .unique();
+  if (!row) await ctx.db.insert("fixes", { sessionId: s._id, teamId, card, at: Date.now(), code });
+}
+
+/** A lab computer reports a passing fix, signed in with the team key from the team's phones. */
 export const report = mutation({
   args: { teamKey: v.string(), card: v.string(), code: v.string() },
-  handler: async (ctx, { teamKey, card, code }) => {
+  handler: async (ctx, { teamKey, ...f }) => {
     const s = await requireOpenSession(ctx);
     const team = await teamByKey(ctx, s._id, teamKey);
     if (!team) throw new ConvexError("That team key isn’t playing tonight. Enter the key from your phones again.");
-    const teamId = team._id;
-    const c = fixCard(s);
-    if (!c || c.key !== card) throw new ConvexError("That card isn’t up anymore.");
-    if (!isOpen(s, c.key)) throw new ConvexError("Time’s up. Fixes are closed for this card.");
-    if (code.length > 20_000) throw new ConvexError("That program is too long.");
-    const row = await ctx.db
-      .query("fixes")
-      .withIndex("by_team_card", (q) => q.eq("teamId", teamId).eq("card", card))
-      .unique();
-    if (!row) await ctx.db.insert("fixes", { sessionId: s._id, teamId, card, at: Date.now(), code });
+    await reportFix(ctx, s, team._id, f);
+  },
+});
+
+/** A player's join page on a laptop reports a passing fix. */
+export const reportByToken = mutation({
+  args: { token: v.string(), card: v.string(), code: v.string() },
+  handler: async (ctx, { token, ...f }) => {
+    const { s, teamId } = await teamByToken(ctx, token);
+    await reportFix(ctx, s, teamId, f);
   },
 });
 

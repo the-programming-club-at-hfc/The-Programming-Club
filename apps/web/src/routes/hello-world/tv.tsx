@@ -7,11 +7,12 @@ import type { ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
+import { Blanks, Sketch } from "#/components/draw";
 import { InstagramQr } from "#/components/instagram";
 import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
-import { cardKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
+import { cardKey, drawKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
 import { nextMeeting, useJustEnded, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
 import { playMusic, setVolume, sfx, unlockAudio } from "#/lib/sound";
@@ -126,7 +127,7 @@ function Attract() {
           </p>
         )}
         <p className="mt-[0.8vw] text-[1.5vw] text-dim">Grab a seat. The game starts soon.</p>
-        <InstagramQr compact className="mt-[2.5vw]" />
+        <InstagramQr row className="mt-[2.5vw]" />
       </div>
     </div>
   );
@@ -212,7 +213,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
             <div className={board?.results || fixBoard || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
               <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" solo={w.solo} />
               {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
-              {fixBoard && <FixList board={fixBoard} done={done} w={w} />}
+              {fixBoard && <FixList board={fixBoard} done={done} />}
               {puzzleBoard && <StarBoard board={puzzleBoard} done={done} w={w} />}
             </div>
           </div>
@@ -251,6 +252,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
             {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} w={w} />}
           </div>
         )}
+        {s.mode === "draw" && s.drawing !== undefined && <DrawView n={s.drawing} live={live} remaining={remaining} w={w} />}
         {s.mode === "message" && (
           <div className="grid h-full place-items-center text-center">
             <p className="max-w-[18ch] text-[5.5vw] leading-[1] font-extrabold tracking-[-0.03em] text-balance">{s.message}</p>
@@ -328,10 +330,12 @@ const NAME = (tight: boolean) => (tight ? "text-[1.4vw]" : "text-[1.8vw]");
 const END = (tight: boolean) => (tight ? "text-[1.8vw]" : "text-[2.6vw]");
 
 /** Fix it for real: the teams that fixed it, in order, with their times. Points join them once it's scored. No code. */
-function FixList({ board, done, w }: { board: FixBoard; done: boolean; w: TeamWords }) {
+function FixList({ board, done }: { board: FixBoard; done: boolean }) {
   return (
     <div>
-      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on your {w.computer}</p>}
+      {!done && (
+        <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on a laptop, on the join page</p>
+      )}
       {board.fixed.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
       ) : (
@@ -371,7 +375,7 @@ function StarBoard({ board, done, w }: { board: PuzzleBoard; done: boolean; w: T
   );
   return (
     <div>
-      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your {w.computer}</p>}
+      {!done && <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Answer on your phone or laptop</p>}
       {board.teams.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{w.noTeams}</p>
       ) : (
@@ -459,6 +463,87 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
   );
 }
 
+/** Tech Pictionary: the live drawing, who's drawing, the word as blanks, the clock, and who has got it so far. On the
+ *  reveal, the word and every team's points. Wrong guesses never come here. */
+function DrawView({ n, live, remaining, w }: { n: number; live: Live; remaining: number; w: TeamWords }) {
+  const data = useQuery(api.drawings.board);
+  const b = data?.key === drawKey(n) ? data : null;
+  useCountSound(b?.key, b ? b.got.length : null);
+  if (!b) return null;
+  const done = !!live.screen.revealed || b.scored;
+  const running = !!live.timer.startedAt;
+  return (
+    <div className="grid h-full grid-cols-[minmax(0,1fr)_28vw] gap-[3vw]">
+      <Sketch drawingId={b._id} className="min-h-0" canvasClass="size-full" />
+      <div className="flex min-h-0 flex-col overflow-hidden">
+        {done && b.word ? (
+          <>
+            <p className="text-[1.8vw] font-bold text-dim">The word was</p>
+            <p className="mt-[0.4vw] text-[3.6vw] leading-[0.95] font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
+          </>
+        ) : (
+          <>
+            <p className="truncate text-[2vw] font-extrabold">{b.drawer} is drawing</p>
+            <Blanks text={b.blanks} className="mt-[1vw] text-[2.4vw] font-extrabold" />
+            <p
+              className={`narrow mt-[1vw] text-[6vw] leading-[0.85] font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}
+            >
+              {remaining === 0 && running ? "time" : fmtClock(remaining)}
+            </p>
+          </>
+        )}
+        <p className="mt-[1.2vw] text-[1.6vw] font-bold">
+          {b.results
+            ? "Points"
+            : b.got.length
+              ? `${b.got.length} of ${b.guessing} ${w.teams} got it`
+              : "Guess on your phone. Nobody has it yet."}
+        </p>
+        <DrawRows
+          rows={
+            b.results
+              ? b.results.map((r) => ({ key: r.teamId, lead: "", name: r.name, note: r.drawer ? "drew it" : "", end: `+${r.points}` }))
+              : b.got.map((g, i) => ({
+                  key: g.teamId,
+                  lead: String(i + 1),
+                  name: g.name,
+                  note: w.solo ? "" : g.by,
+                  end: g.ms === null ? "✓" : fmtElapsed(g.ms),
+                }))
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+/** The drawing's sidebar list, sized to fit under the clock on any 16:9 TV: full rows for a few, two compact columns for
+ *  more, and past 16 the rest counted. */
+function DrawRows({ rows }: { rows: { key: string; lead: string; name: string; note: string; end: string }[] }) {
+  const compact = rows.length > 6;
+  const shown = rows.slice(0, compact ? 16 : 6);
+  return (
+    <div className="mt-[0.6vw] min-h-0 flex-1 overflow-hidden">
+      <ol className={`grid gap-[0.4vw] ${compact ? "grid-cols-2" : ""}`}>
+        {shown.map((r) => (
+          <li
+            key={r.key}
+            className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[0.6vw] bg-mist ${compact ? "px-[0.6vw] py-[0.3vw]" : "px-[1.2vw] py-[0.6vw]"}`}
+          >
+            <span className={`narrow ${compact ? "text-[1.2vw]" : "text-[1.8vw]"} leading-none font-extrabold text-meadow`}>{r.lead}</span>
+            <span className="min-w-0">
+              <span className={`block truncate ${compact ? "text-[1.2vw]" : "text-[1.6vw]"} leading-tight font-extrabold`}>{r.name}</span>
+              {!compact && r.note && <span className="block truncate text-[1.1vw] text-dim">{r.note}</span>}
+            </span>
+            <span className={`narrow ${compact ? "text-[1.2vw]" : "text-[1.8vw]"} leading-none font-extrabold`}>{r.end}</span>
+          </li>
+        ))}
+      </ol>
+      {rows.length > shown.length && <p className="mt-[0.4vw] text-[1.2vw] text-dim">+ {rows.length - shown.length} more</p>}
+    </div>
+  );
+}
+
 /** Who got what on the revealed card. Picks stay hidden until now. */
 function Results({ results, bug }: { results: NonNullable<Board["results"]>; bug: boolean }) {
   return (
@@ -509,10 +594,11 @@ function useTvSound(live: Live, remaining: number, on: boolean) {
       s.index !== ps.index ||
       s.wikiFrom !== ps.wikiFrom ||
       s.wikiReady !== ps.wikiReady ||
+      s.drawing !== ps.drawing ||
       s.message !== ps.message
     ) {
       if (s.mode === "scoreboard") sfx.scoreboard();
-      else if (s.mode === "card" || s.mode === "wiki" || s.mode === "message") sfx.card();
+      else if (s.mode === "card" || s.mode === "wiki" || s.mode === "draw" || s.mode === "message") sfx.card();
     } else if (s.revealed && !ps.revealed) sfx.reveal();
 
     const before = new Map(p.teams.map((t) => [t._id, t.score]));

@@ -107,20 +107,20 @@ export const joinSignedIn = mutation({
   },
 });
 
-/** A signed-in officer checks in to run the night: counted present, off the teams. */
+/** A signed-in officer checks in as themselves, with the account's own email: counted present and playing, until they
+ *  switch to "Just hosting". Anyone else on that phone signs out and joins with the regular form. */
 export const checkInOfficer = mutation({
-  args: { name: v.string(), email: v.string() },
-  handler: async (ctx, { name, email }) => {
+  args: { name: v.string() },
+  handler: async (ctx, { name }) => {
     const officerEmail = await requireOfficer(ctx);
     const session = await requireOpenSession(ctx);
-    const token = await addToSession(ctx, session, name, email, undefined, true);
-    // The sign-in proves the account's own email; a typed HawkMail can differ, so only that one is claimed.
-    if (email.trim().toLowerCase() === officerEmail) await claimAccount(ctx, officerEmail);
+    const token = await addToSession(ctx, session, name, officerEmail, undefined, true);
+    await claimAccount(ctx, officerEmail);
     return token;
   },
 });
 
-/** An officer's "Play tonight" switch: on puts them on a team the way joining does, off takes them back off the teams. */
+/** An officer's Playing / Just hosting switch: playing puts them on a team the way joining does, hosting takes them off. */
 export const setPlaying = mutation({
   args: { token: v.string(), playing: v.boolean() },
   handler: async (ctx, { token, playing }) => {

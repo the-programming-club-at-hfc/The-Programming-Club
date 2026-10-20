@@ -1,12 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { BUGS, LANGS, OUTPUTS, WIKI_RACES } from "./content";
+import { BUGS, LANGS, OUTPUTS, PICTIONARY, WIKI_RACES } from "./content";
 import { FIXES } from "./fixes";
 import { PUZZLES, puzzleSeed } from "./puzzles";
+import { blanks } from "./draw";
 import {
   LANGUAGES,
   answerKey,
   answersOpen,
   awardsFor,
+  checkGuess,
+  drawAwardsFor,
+  drawKey,
+  editDistance,
+  guessKey,
   cardSeconds,
   choices,
   clockLeft,
@@ -528,5 +534,71 @@ describe("Wiki Race", () => {
     const finishes = [{ team: "a", at: sec(1) }];
     const first = wikiAwardsFor({ ...base, finishes })!;
     expect(wikiAwardsFor({ ...base, scored: first.scored, finishes })).toBeNull();
+  });
+});
+
+describe("Tech Pictionary", () => {
+  test("guesses ignore case, spaces, and punctuation, and plurals count but cut-short words don't", () => {
+    expect(checkGuess("Wifi", "Wi-Fi")).toBe("right");
+    expect(checkGuess("  usb-STICKS!", "USB stick")).toBe("right");
+    expect(checkGuess("rubber ducks", "rubber duck")).toBe("right");
+    expect(checkGuess("headphone", "headphones")).toBe("right");
+    expect(checkGuess("Viruses", "virus")).toBe("right");
+    expect(checkGuess("viru", "virus")).toBe("close");
+    expect(checkGuess("magnifying glasses", "magnifying glass")).toBe("right");
+    expect(checkGuess("magnifying glas", "magnifying glass")).toBe("close");
+    expect(checkGuess("bugs", "bug")).toBe("right");
+    expect(checkGuess("3-D printers", "3D printer")).toBe("right");
+    expect(checkGuess("", "bug")).toBe("wrong");
+    expect(checkGuess("?!", "bug")).toBe("wrong");
+  });
+
+  test("one or two letters off is close, and short words only get one", () => {
+    expect(checkGuess("keybord", "keyboard")).toBe("close");
+    expect(checkGuess("kyboad", "keyboard")).toBe("close");
+    expect(checkGuess("kboad", "keyboard")).toBe("wrong");
+    expect(checkGuess("mug", "bug")).toBe("close");
+    expect(checkGuess("mag", "bug")).toBe("wrong");
+    expect(checkGuess("printer", "firewall")).toBe("wrong");
+  });
+
+  test("every word in the deck is its own, so a night never draws the same word twice", () => {
+    const keys = PICTIONARY.map(guessKey);
+    expect(new Set(keys).size).toBe(PICTIONARY.length);
+  });
+
+  test("edit distance counts adds, drops, and changes", () => {
+    expect([editDistance("", "abc"), editDistance("kitten", "sitting"), editDistance("same", "same")]).toEqual([3, 3, 0]);
+  });
+
+  test("the TV's blanks hide every letter and number, keeping spaces and punctuation", () => {
+    expect([blanks("hard drive"), blanks("Wi-Fi"), blanks("QR code")]).toEqual(["____ _____", "__-__", "__ ____"]);
+  });
+
+  const base = { key: drawKey(1), double: false, scored: [] as string[], drawer: "d", guessing: 4 };
+  const points = (r: ReturnType<typeof drawAwardsFor<string>>) => Object.fromEntries(r!.awards.map((a) => [a.team, a.points]));
+
+  test("3 for the first team to get it, 2 for every other, and 2 for the drawer's team", () => {
+    expect(points(drawAwardsFor({ ...base, got: ["b"] }))).toEqual({ b: 3, d: 2 });
+  });
+
+  test("the drawer's team gets 3 once at least half the guessing teams got it", () => {
+    expect(points(drawAwardsFor({ ...base, got: ["c", "a"] }))).toEqual({ c: 3, a: 2, d: 3 });
+    expect(points(drawAwardsFor({ ...base, guessing: 5, got: ["c", "a"] }))).toEqual({ c: 3, a: 2, d: 2 });
+  });
+
+  test("nobody got it: nobody scores, the drawer included", () => {
+    expect(drawAwardsFor({ ...base, got: [] })!.awards).toEqual([]);
+  });
+
+  test("double points doubles everything, and the drawer's team may be gone", () => {
+    expect(points(drawAwardsFor({ ...base, double: true, got: ["a", "b", "c"] }))).toEqual({ a: 6, b: 4, c: 4, d: 6 });
+    expect(points(drawAwardsFor({ ...base, drawer: null, got: ["a"] }))).toEqual({ a: 3 });
+  });
+
+  test("scoring twice scores once", () => {
+    const first = drawAwardsFor({ ...base, got: ["a"] })!;
+    expect(first.scored).toEqual(["draw:1"]);
+    expect(drawAwardsFor({ ...base, scored: first.scored, got: ["a"] })).toBeNull();
   });
 });

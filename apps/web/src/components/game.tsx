@@ -8,7 +8,6 @@ import type { Puzzle } from "#/lib/puzzles";
 import { cardSeconds } from "#/lib/grading";
 import { Code } from "./ui";
 import { sfx } from "#/lib/sound";
-import { teamWords } from "#/lib/words";
 
 export type Screen = Doc<"sessions">["screen"];
 export type Timer = Doc<"sessions">["timer"];
@@ -160,7 +159,7 @@ export function CardView({
     return (
       <div>
         <p className={`text-dim ${big ? "text-[clamp(1.1rem,1.6vw,1.8rem)]" : ""}`}>
-          Solve it on your {teamWords(solo).computer}, in any language.{" "}
+          Solve it in any language, then answer on your phone or laptop.{" "}
           {!solo && (p.relay ? "One keyboard: swap drivers at every chime." : "Everyone helps.")}
           <LevelChip level={p.level} />
         </p>
@@ -188,7 +187,7 @@ export function CardView({
               Hints: <strong>1.</strong> {p.hint[0]} <strong>2.</strong> {p.hint[1]}
             </p>
             <details className="text-sm">
-              <summary className="cursor-pointer font-bold">A Python solution</summary>
+              <summary className="cursor-pointer py-2 font-bold">A Python solution</summary>
               <Code code={p.solution} className="mt-2" />
             </details>
           </div>

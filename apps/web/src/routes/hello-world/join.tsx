@@ -6,12 +6,16 @@ import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { NO_PICK, PhoneRound } from "#/components/answer";
-import { CardView, Hint, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { CardView, Hint, PuzzleExample, Rich, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
+import { PhoneDraw } from "#/components/draw";
 import { InstagramLink } from "#/components/instagram";
+import { AnswerBox, InputBox } from "#/components/puzzle";
 import { Picto, Wrap, ordinal, weekTile } from "#/components/ui";
 import { WikiPair, WikiRound } from "#/components/wiki";
-import { answersOpen, cardKey, isAnswerGame, wikiKey } from "#/lib/grading";
+import { LiveFix, LivePuzzle, useLaptop, usePuzzleInput } from "#/components/workspace";
+import { answersOpen, cardKey, drawKey, isAnswerGame, wikiKey } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
+import { usePython } from "#/lib/python";
 import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
 import { gamesIn, useJustEnded, useSchedule, usesTeamComputer } from "#/lib/schedule";
@@ -78,7 +82,7 @@ function Join() {
           See this week’s game
         </Link>
         <p className="mt-8">
-          <InstagramLink className="link" />
+          <InstagramLink className="link py-2.5" />
         </p>
       </Center>
     );
@@ -104,7 +108,7 @@ function NightOver({ me }: { me: Me }) {
   const t = me.tonight;
   return (
     <Center>
-      <p className="text-dim">
+      <p className="text-dim wrap-anywhere">
         Week {me.week} is over. Thanks, {me.name}!
       </p>
       {t ? (
@@ -123,7 +127,7 @@ function NightOver({ me }: { me: Me }) {
         See the scores
       </Link>
       <p className="mt-8 text-dim">Got photos from tonight? Tag us.</p>
-      <InstagramLink className="link mt-1" />
+      <InstagramLink className="link py-2.5" />
     </Center>
   );
 }
@@ -173,10 +177,6 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
     setFirstPhone(!Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
   }, []);
 
-  useEffect(() => {
-    if (officer && account.email) setProfile((p) => (p.email ? p : { ...p, email: account.email }));
-  }, [officer, account?.email]);
-
   async function submit(e: { preventDefault: () => void }) {
     e.preventDefault();
     setError("");
@@ -184,11 +184,11 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
     try {
       const extras = { broughtBy: broughtBy || undefined, idea: (firstPhone && idea) || undefined };
       const token = officer
-        ? await checkInOfficer(profile)
+        ? await checkInOfficer({ name: profile.name })
         : member
           ? await joinSignedIn({ code, name: account.name ? undefined : profile.name, ...extras })
           : await join({ code, ...profile, ...extras });
-      if (!member) localStorage.setItem("hwc.profile", JSON.stringify(profile));
+      if (!member && !officer) localStorage.setItem("hwc.profile", JSON.stringify(profile));
       localStorage.setItem(tokenKey(sessionId), token);
       onJoined(token);
     } catch (err) {
@@ -213,13 +213,13 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
   const askName = !officer && !(member && account.name);
   return (
     <Wrap className="flex min-h-dvh max-w-xl flex-col py-5">
-      <form onSubmit={submit} className="flex flex-1 flex-col gap-4">
+      <form onSubmit={submit} className="flex flex-1 flex-col gap-4 [&_input,&_textarea]:scroll-mb-36">
         <div>
           <h1 className="text-[clamp(2.2rem,10vw,3.2rem)] leading-[0.9] lowercase">{officer ? "officer check-in" : "join the game"}</h1>
           {(officer || wrongAccount) && (
             <p className="mt-2 text-dim">
               {officer
-                ? "You’re signed in as an officer. You’ll be counted here and kept off the teams so you can run the night."
+                ? `You’re checking in as ${account.email}, an officer. You’ll play like everyone else (in Pictionary you draw but don’t guess, since the host page shows the word); switch to Just hosting anytime. Joining someone else on this phone? Sign out first.`
                 : `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`}
             </p>
           )}
@@ -268,7 +268,7 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
             />
           </label>
         )}
-        {!member && (
+        {!member && !officer && (
           <label className="block">
             <span className="font-bold">HawkMail</span> <span className="text-sm text-dim">Keeps your XP together week to week.</span>
             <input
@@ -331,14 +331,14 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
           <p className="mt-2 text-center text-sm text-dim">
             {isAuthenticated ? (
               <SignOutButton redirectUrl={here}>
-                <button type="button" className="link">
+                <button type="button" className="link py-2.5">
                   Not you? Sign out
                 </button>
               </SignOutButton>
             ) : (
               <SignInButton mode="modal" withSignUp forceRedirectUrl={here} initialValues={{ emailAddress: profile.email || undefined }}>
                 {/* Keeps the name typed so far for after signing in. */}
-                <button type="button" className="link" onClick={() => localStorage.setItem("hwc.profile", JSON.stringify(profile))}>
+                <button type="button" className="link py-2.5" onClick={() => localStorage.setItem("hwc.profile", JSON.stringify(profile))}>
                   Sign in with your HawkMail to join in one tap next time
                 </button>
               </SignInButton>
@@ -364,136 +364,271 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const teamComputer = gamesIn(round).some(usesTeamComputer) || (s.mode === "card" && !!s.game && usesTeamComputer(s.game));
   const solo = live.teamSize === 1;
   const w = teamWords(solo);
+  // On a laptop, puzzles and Fix it for real get the full workspace right here; a phone or tablet can open it too.
+  const laptop = useLaptop();
+  const card = s.mode === "card" && s.game && s.index !== undefined ? cardKey(s.game, s.index) : null;
+  // The card the workspace is open for. Opening is per card, and a laptop window shrunk mid-card keeps its workspace
+  // (and a check that's running).
+  const [fullFor, setFullFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (laptop && card) setFullFor(card);
+  }, [laptop, card]);
+  const work = !!me.team && (laptop || (!!card && fullFor === card));
+  const py = usePython(work && teamComputer);
+  const wide = work && s.mode === "card" && (s.game === "fix" || s.game === "puzzle");
+  // A game is up: phones and portrait tablets trade the big name and player card for one slim bar so the game gets the
+  // screen, and wide screens (a tablet in landscape, a laptop) put the player card on the left with the game beside it.
+  const game =
+    (s.mode === "card" && !!s.game && s.index !== undefined) ||
+    (s.mode === "wiki" && (!!s.wikiReady || (!!s.wikiFrom && !!s.wikiTo))) ||
+    (s.mode === "draw" && s.drawing !== undefined) ||
+    (s.mode === "message" && !!s.message);
+  const split = !wide && game;
+  const timed = !!live.timer.startedAt || s.mode === "timer";
+  const clock = remaining === 0 && live.timer.startedAt ? "time" : fmtClock(remaining);
+  const hosting = me.officer && !me.playing;
+  // The game's column is as wide as it needs (a drawing sizes itself to the screen), and the pair sits centered.
+  const columns = s.mode === "draw" ? "lg:grid-cols-[20rem_auto]" : "lg:grid-cols-[20rem_minmax(0,52rem)]";
+  const phoneView = !laptop && (
+    <button className="link mb-1 py-2.5 text-sm text-dim" onClick={() => setFullFor(null)}>
+      Back to the phone view
+    </button>
+  );
+  const footer = (className: string) => (
+    <div className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-dim ${className}`}>
+      {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
+      {me.officer ? (
+        <PlayTonight token={token} playing={me.playing} />
+      ) : (
+        <p>
+          Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
+          {me.weeks === 1 ? "" : "s"}
+        </p>
+      )}
+      <button onClick={onSwitch} className="link py-2.5 wrap-anywhere">
+        Not {me.name}? Switch player
+      </button>
+      <InstagramLink className="w-full justify-center border-t border-line pt-3 pb-2" />
+    </div>
+  );
   return (
-    <Wrap className="flex min-h-dvh max-w-2xl flex-col py-5">
-      <p className="text-sm text-dim">
-        Week {live.week}: {wk.title}
-      </p>
-      <h1 className="mt-0.5 text-[clamp(2rem,8vw,3rem)] lowercase">{me.name}</h1>
-      {me.practice && <p className="mt-2 font-semibold text-pine">Practice night: nothing tonight counts toward XP.</p>}
-
-      <div className="mt-4 grid grid-cols-[auto_1fr] gap-[3px]">
-        <div className={`tile ${t.tile} w-16 sm:w-32`}>
-          <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
-        </div>
-        <div className="theme-pine p-4 sm:p-6">
-          {me.officer && !me.playing ? (
-            <>
-              <p className="text-dim">Officer</p>
-              <h2 className="mt-1 text-2xl sm:text-3xl">You’re running tonight</h2>
-              <p className="mt-2 text-dim">Checked in and off the teams.</p>
-              <Link to="/hello-world/host" className="btn btn-primary mt-4 w-full">
-                Open host controls
+    <Wrap
+      className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"}`}
+    >
+      <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
+        {game && (
+          <div className="theme-pine sticky top-2 z-20 flex items-center gap-3 rounded-[10px] p-2 pr-4 lg:hidden">
+            <div className={`tile ${t.tile} size-11 shrink-0 rounded-[6px]`}>
+              <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
+            </div>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate font-bold">{me.team ? me.team.name : hosting ? "Just hosting" : me.name}</p>
+              <p className="truncate text-sm text-dim">
+                {me.team ? `${ordinal(me.team.rank)} of ${me.team.of}` : hosting ? "Off the teams" : w.waiting}
+                {me.practice && " · practice"}
+              </p>
+            </div>
+            {me.team && <p className="narrow text-3xl leading-none font-extrabold">{me.team.score}</p>}
+            {hosting && (
+              <Link to="/hello-world/host" className="btn btn-sm">
+                Host
               </Link>
-            </>
-          ) : me.team ? (
-            <>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-dim">{w.yourTeam}</p>
-                  <h2 className="mt-1 text-2xl sm:text-3xl">{me.team.name}</h2>
-                  <p className="mt-2 font-semibold">
-                    {ordinal(me.team.rank)} of {me.team.of}
+            )}
+            {timed && (
+              <p className={`narrow border-l border-line pl-3 text-3xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>{clock}</p>
+            )}
+          </div>
+        )}
+        <div className={`${split ? "lg:sticky lg:top-5" : ""} ${game ? "hidden lg:block" : ""}`}>
+          <p className="text-sm text-dim">
+            Week {live.week}: {wk.title}
+          </p>
+          <h1 className={`mt-0.5 text-[clamp(2rem,8vw,3rem)] lowercase wrap-anywhere ${split ? "lg:text-4xl" : ""}`}>{me.name}</h1>
+          {me.practice && <p className="mt-2 font-semibold text-pine">Practice night: nothing tonight counts toward XP.</p>}
+
+          <div className="mt-4 grid grid-cols-[auto_1fr] gap-[3px]">
+            <div className={`tile ${t.tile} w-16 sm:w-32 ${split ? "lg:w-20" : ""}`}>
+              <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
+            </div>
+            <div className={`theme-pine min-w-0 p-4 sm:p-6 ${split ? "lg:p-4" : ""}`}>
+              {hosting ? (
+                <>
+                  <p className="text-dim">Officer</p>
+                  <h2 className={`mt-1 text-2xl sm:text-3xl ${split ? "lg:text-2xl" : ""}`}>You’re just hosting</h2>
+                  <p className={`mt-2 text-dim ${split ? "lg:hidden" : ""}`}>
+                    Checked in and off the teams. Switch to Playing below to join in.
                   </p>
-                </div>
-                <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
-              </div>
-              {!solo && <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>}
-              {me.team.key && teamComputer && (
-                <p className="mt-1 text-sm text-dim">
-                  {w.key}: <strong className="narrow text-lg tracking-[0.15em] text-ink">{me.team.key}</strong>
+                  <Link to="/hello-world/host" className="btn btn-primary mt-4 w-full">
+                    Open host controls
+                  </Link>
+                </>
+              ) : me.team ? (
+                <>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-dim">{w.yourTeam}</p>
+                      <h2 className="mt-1 text-2xl wrap-anywhere sm:text-3xl">{me.team.name}</h2>
+                      <p className="mt-2 font-semibold">
+                        {ordinal(me.team.rank)} of {me.team.of}
+                      </p>
+                    </div>
+                    <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
+                  </div>
+                  {!solo && <p className="mt-3 border-t border-line pt-2 text-sm text-dim wrap-anywhere">{me.team.members.join(", ")}</p>}
+                  {/* Only for a lab computer at /hello-world/fix: this page does it all, on a phone or a laptop. */}
+                  {me.team.key && teamComputer && (
+                    <p className="mt-1 text-xs text-dim">
+                      {w.key} <strong className="narrow tracking-[0.15em]">{me.team.key}</strong>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xl font-semibold">
+                  {w.waiting}
+                  <span className="blink"> _</span>
                 </p>
               )}
-            </>
-          ) : (
-            <p className="text-xl font-semibold">
-              {w.waiting}
-              <span className="blink"> _</span>
+            </div>
+          </div>
+
+          {timed && (
+            <p
+              className={`narrow mt-5 text-center text-7xl leading-none font-extrabold ${split ? "lg:mt-3" : ""} ${hot ? "text-signal" : ""}`}
+            >
+              {clock}
             </p>
           )}
+          {split && footer("mt-4 hidden lg:flex")}
         </div>
-      </div>
 
-      {(live.timer.startedAt || s.mode === "timer") && (
-        <p className={`narrow mt-5 text-center text-7xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>
-          {remaining === 0 && live.timer.startedAt ? "time" : fmtClock(remaining)}
-        </p>
-      )}
-
-      {s.mode === "card" && s.game && s.index !== undefined && (
-        <div className="mt-5">
-          {isAnswerGame(s.game) && me.team ? (
-            <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
-          ) : s.game === "fix" && me.team ? (
-            <FixStatus live={live} index={s.index} teamId={me.team._id} />
-          ) : s.game === "puzzle" && me.team ? (
-            <PuzzleStatus live={live} index={s.index} teamId={me.team._id} />
-          ) : (
-            <div className="card p-5">
-              <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} solo={solo} />
+        <div className={`min-w-0 ${game ? "[&>:first-child]:mt-3" : ""} ${split ? "lg:[&>:first-child]:mt-0" : ""}`}>
+          {s.mode === "card" && s.game && s.index !== undefined && (
+            <div className="mt-5">
+              {isAnswerGame(s.game) && me.team ? (
+                <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
+              ) : s.game === "fix" && me.team ? (
+                work ? (
+                  <>
+                    {phoneView}
+                    <LiveFix
+                      key={cardKey("fix", s.index)}
+                      live={live}
+                      teamId={me.team._id}
+                      by={{ token }}
+                      index={s.index}
+                      remaining={remaining}
+                      py={py}
+                    />
+                  </>
+                ) : (
+                  <FixStatus live={live} index={s.index} teamId={me.team._id} onOpen={() => setFullFor(card)} />
+                )
+              ) : s.game === "puzzle" && me.team ? (
+                work ? (
+                  <>
+                    {phoneView}
+                    <LivePuzzle
+                      key={cardKey("puzzle", s.index)}
+                      live={live}
+                      teamId={me.team._id}
+                      by={{ token }}
+                      index={s.index}
+                      remaining={remaining}
+                      py={py}
+                    />
+                  </>
+                ) : (
+                  <PuzzleStatus
+                    key={cardKey("puzzle", s.index)}
+                    token={token}
+                    live={live}
+                    index={s.index}
+                    teamId={me.team._id}
+                    remaining={remaining}
+                    onOpen={() => setFullFor(card)}
+                  />
+                )
+              ) : (
+                <div className="card p-5">
+                  <CardView game={s.game} index={s.index} answer={!!s.revealed} hint={!!s.hint} solo={solo} />
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
-      {s.mode === "wiki" && s.wikiReady && (
-        <p className="card mt-5 p-6 text-xl font-bold">
-          Wiki Race next! Open {CLUB.url}/wiki on your {w.computer}. It jumps to the start article when the race starts.
-        </p>
-      )}
-      {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
-        <div className="mt-5">
-          {me.team ? (
-            <TeamRace
-              key={wikiKey(s.wikiFrom, s.wikiTo)}
-              token={token}
-              live={live}
-              from={s.wikiFrom}
-              to={s.wikiTo}
-              teamId={me.team._id}
-              remaining={remaining}
-            />
-          ) : (
-            <WikiPair from={s.wikiFrom} to={s.wikiTo} />
+          {s.mode === "wiki" && s.wikiReady && (
+            <div className="card mt-5 p-6">
+              <p className="text-xl font-bold">Wiki Race next! Open the race here. It jumps to the start article when the race starts.</p>
+              {/* A new tab, so this page stays open for the finish. */}
+              <Link to="/hello-world/wiki" target="_blank" className="btn btn-primary mt-4 w-full text-lg">
+                Open the race
+              </Link>
+              <p className="mt-2 text-sm text-dim">On a lab computer? Open {CLUB.url}/wiki there.</p>
+            </div>
           )}
+          {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
+            <div className="mt-5">
+              {me.team ? (
+                <TeamRace
+                  key={wikiKey(s.wikiFrom, s.wikiTo)}
+                  token={token}
+                  live={live}
+                  from={s.wikiFrom}
+                  to={s.wikiTo}
+                  teamId={me.team._id}
+                  remaining={remaining}
+                />
+              ) : (
+                <WikiPair from={s.wikiFrom} to={s.wikiTo} />
+              )}
+            </div>
+          )}
+          {s.mode === "draw" && s.drawing !== undefined && (
+            <div className="mt-5">
+              <PhoneDraw
+                key={s.drawing}
+                token={token}
+                live={live}
+                open={phoneOpen(live, drawKey(s.drawing), remaining)}
+                playing={!!me.team}
+                officer={me.officer}
+              />
+            </div>
+          )}
+          {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold wrap-anywhere">{s.message}</p>}
         </div>
-      )}
-      {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
-
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
-        {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
-        {me.officer ? (
-          <PlayTonight token={token} playing={me.playing} when={w.officerPlays} />
-        ) : (
-          <p>
-            Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
-            {me.weeks === 1 ? "" : "s"}
-          </p>
-        )}
-        <button onClick={onSwitch} className="link">
-          Not {me.name}? Switch player
-        </button>
-        <InstagramLink className="w-full justify-center border-t border-line pt-3" />
       </div>
+
+      {/* Below the game, or in the left column beside it on a wide screen, so a tablet needs no scrolling. */}
+      {footer(`mt-auto pt-8 ${split ? "lg:hidden" : ""}`)}
     </Wrap>
   );
 }
 
-/** An officer's switch for nights when a team is short: on puts them on the smallest team (their own, solo). */
-function PlayTonight({ token, playing, when }: { token: string; playing: boolean; when: string }) {
+/** An officer's Playing / Just hosting switch. Officers check in playing; hosting takes them off the teams. */
+function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
   const setPlaying = useMutation(api.players.setPlaying);
   const [error, setError] = useState("");
   return (
-    <label className="flex items-center gap-2 font-semibold text-ink">
-      <input
-        type="checkbox"
-        className="size-5 accent-pine"
-        checked={playing}
-        onChange={(e) => sender(setError)(setPlaying({ token, playing: e.target.checked }))}
-      />
-      Play tonight
-      {!playing && <span className="font-normal text-dim">({when})</span>}
-      {error && <span className="font-normal text-signal">{error}</span>}
-    </label>
+    <div className="flex flex-wrap items-center gap-2">
+      <div role="group" aria-label="Tonight" className="inline-flex rounded-[6px] bg-mist p-1">
+        {(
+          [
+            [true, "Playing"],
+            [false, "Just hosting"],
+          ] as const
+        ).map(([on, label]) => (
+          <button
+            key={String(on)}
+            className={`min-h-10 rounded-[4px] px-3 font-semibold ${on === playing ? "bg-ink text-paper" : "text-ink"}`}
+            aria-pressed={on === playing}
+            onClick={() => on !== playing && sender(setError)(setPlaying({ token, playing: on }))}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {error && <span className="text-signal">{error}</span>}
+    </div>
   );
 }
 
@@ -598,8 +733,9 @@ function TeamAnswer({
   );
 }
 
-/** Fix it for real happens on the team computer; the phone shows the card and whether the team has fixed it. */
-function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId: Id<"teams"> }) {
+/** Fix it for real needs a laptop (this page, joined with the same HawkMail); the phone shows the card and whether the team
+ *  has fixed it. */
+function FixStatus({ live, index, teamId, onOpen }: { live: Live; index: number; teamId: Id<"teams">; onOpen: () => void }) {
   const board = useQuery(api.fixes.board);
   const key = cardKey("fix", index);
   const mine = board?.card === key ? board.fixed.find((f) => f.teamId === teamId) : undefined;
@@ -616,9 +752,18 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
     <div className="space-y-3">
       <div className={`rounded-[10px] p-5 ${mine ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
         <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">{status}</p>
-        {!done && <p className="mt-2 font-semibold">Fix it on your {w.computer}. This phone keeps you posted.</p>}
+        {!done && (
+          <p className="mt-2 font-semibold">
+            Fix it on a laptop: open this page there and join with the same HawkMail. This phone keeps you posted.
+          </p>
+        )}
         {mine?.result?.first && <p className="mt-2 font-semibold">{w.first} to fix it.</p>}
       </div>
+      {!done && (
+        <button className="link py-2.5 text-sm text-dim" onClick={onOpen}>
+          On a tablet? Open the full fix here
+        </button>
+      )}
       <div className="card p-5">
         <CardView game="fix" index={index} answer={done} hint={!!live.screen.hint} />
       </div>
@@ -626,12 +771,30 @@ function FixStatus({ live, index, teamId }: { live: Live; index: number; teamId:
   );
 }
 
-/** Puzzles are answered on the team computer; the phone shows the story and the team's stars. */
-function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; teamId: Id<"teams"> }) {
+/** A puzzle on a phone: the team's stars, an answer box for the current part, the team's own input, and the story. */
+function PuzzleStatus({
+  token,
+  live,
+  index,
+  teamId,
+  remaining,
+  onOpen,
+}: {
+  token: string;
+  live: Live;
+  index: number;
+  teamId: Id<"teams">;
+  remaining: number;
+  onOpen: () => void;
+}) {
   const board = useQuery(api.puzzles.board);
+  const submit = useMutation(api.puzzles.submitByToken);
+  const input = usePuzzleInput(live, teamId, index);
   const key = cardKey("puzzle", index);
   const mine = board?.card === key ? board.teams.find((t) => t.teamId === teamId) : undefined;
   const done = !!live.screen.revealed || live.scored.includes(key);
+  const open = phoneOpen(live, key, remaining);
+  const p = PUZZLES[index];
   const w = teamWords(live.teamSize === 1);
   const times = [mine?.part1Ms ?? null, mine?.part2Ms ?? null];
   const n = times.filter((ms) => ms !== null).length;
@@ -653,12 +816,45 @@ function PuzzleStatus({ live, index, teamId }: { live: Live; index: number; team
             {w.first} to the {firsts.join(" and ")} star.
           </p>
         )}
-        {!done && <p className="mt-1">Answers go in on your {w.computer}. This phone keeps you posted.</p>}
       </div>
-      {!done && live.screen.hint && <Hint text={`Part ${n ? 2 : 1}: ${PUZZLES[index].hint[n ? 1 : 0]}`} />}
       <div className="card p-5">
         <CardView game="puzzle" index={index} answer={done} solo={w.solo} />
       </div>
+      {!done && n < 2 && (
+        <>
+          <p className="text-lg">
+            <strong className="font-extrabold">Part {n + 1}.</strong> <Rich text={n ? p.part2 : p.part1} />
+          </p>
+          <AnswerBox
+            key={n}
+            part={n ? 2 : 1}
+            done={false}
+            open={open}
+            lockedUntil={mine?.lockedUntil ?? null}
+            onSubmit={(part, answer) => submit({ token, card: key, part, answer })}
+          />
+        </>
+      )}
+      {!done && live.screen.hint && <Hint text={`Part ${n ? 2 : 1}: ${p.hint[n ? 1 : 0]}`} />}
+      {!done && (
+        <>
+          <details>
+            <summary className="cursor-pointer py-2 font-bold">The example</summary>
+            <div className="mt-2">
+              <PuzzleExample p={p} part2={n > 0} />
+            </div>
+          </details>
+          <details>
+            <summary className="cursor-pointer py-2 font-bold">My puzzle input</summary>
+            <div className="mt-2">
+              <InputBox input={input} solo={w.solo} />
+            </div>
+          </details>
+          <button className="link py-2.5 text-sm text-dim" onClick={onOpen}>
+            Open the full puzzle here, with a Python editor
+          </button>
+        </>
+      )}
     </div>
   );
 }

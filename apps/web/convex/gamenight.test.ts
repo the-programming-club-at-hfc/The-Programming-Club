@@ -9,10 +9,12 @@ import { placeXpFor } from "./lib";
 import { answersFor } from "./puzzles";
 import { BUGS, LANGS, OUTPUTS } from "../src/lib/content";
 import { LANGUAGES, choices } from "../src/lib/grading";
+import { COLORS, SIZES } from "../src/lib/draw";
 
 const modules = {
   "./_generated/api.js": () => import("./_generated/api.js"),
   "./answers.ts": () => import("./answers"),
+  "./drawings.ts": () => import("./drawings"),
   "./fixes.ts": () => import("./fixes"),
   "./officers.ts": () => import("./officers"),
   "./players.ts": () => import("./players"),
@@ -65,7 +67,9 @@ function setup() {
 
   const show = (screen: Doc<"sessions">["screen"]) => officer.mutation(api.sessions.setScreen, { screen });
 
-  return { t, officer, signedInStudent, attendance, teams, score, startNight, join, nightWithTeams, show };
+  // "Just hosting": an officer off the teams to run the night. Officers check in playing.
+  const host = (token: string) => t.mutation(api.players.setPlaying, { token, playing: false });
+  return { t, officer, signedInStudent, attendance, teams, score, startNight, join, nightWithTeams, show, host };
 }
 
 beforeEach(() => at(0));
@@ -112,21 +116,30 @@ describe("joining", () => {
     expect(await attendance()).toHaveLength(1);
   });
 
-  test("officers check in off the teams, signed in or by typing their email", async () => {
-    const { t, officer, signedInStudent, startNight, join, attendance } = setup();
+  test("officers check in playing, signed in or by typing their email, and Just hosting takes them off the teams", async () => {
+    const { t, officer, signedInStudent, startNight, join, attendance, host } = setup();
     const code = await startNight();
-    await expect(signedInStudent.mutation(api.players.checkInOfficer, student(1))).rejects.toThrow("Only club officers");
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await expect(signedInStudent.mutation(api.players.checkInOfficer, { name: "Student 1" })).rejects.toThrow("Only club officers");
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    // An officer's phone checks in its own account, never an email typed on it: someone else signs out and joins.
+    const row = (await attendance()).find((a) => a.token === ada)!;
+    expect((await t.run((ctx) => ctx.db.get(row.playerId)))!.email).toBe(ADA);
     // Grace isn't signed in on her phone, so she uses the normal join form.
     const grace = await join(code, { name: "Grace", email: GRACE });
     for (const token of [ada, grace]) {
       const me = (await t.query(api.players.me, { token }))!;
-      expect([me.officer, me.playing, me.team]).toEqual([true, false, null]);
+      expect([me.officer, me.playing, !!me.team]).toEqual([true, true, true]);
+      await host(token);
     }
     expect((await attendance()).map((a) => [a.officer, a.playing, a.teamId])).toEqual([
       [true, false, undefined],
       [true, false, undefined],
     ]);
+    // Students aren't officers, so they get no Playing / Just hosting switch, and the server refuses one anyway.
+    const ann = await join(code, student(1));
+    const me = (await t.query(api.players.me, { token: ann }))!;
+    expect([me.officer, me.playing, !!me.team]).toEqual([false, false, true]);
+    await expect(t.mutation(api.players.setPlaying, { token: ann, playing: false })).rejects.toThrow("Only officers");
   });
 
   test("first time means no earlier real night: practice nights don't count", async () => {
@@ -147,12 +160,12 @@ describe("joining", () => {
 });
 
 describe("teams", () => {
-  test("Make teams splits students evenly and leaves officers out", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+  test("Make teams splits students evenly and leaves hosting officers out", async () => {
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 7; i++) await join(code, student(i));
-    await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
-    await join(code, { name: "Grace", email: GRACE });
+    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada" }));
+    await host(await join(code, { name: "Grace", email: GRACE }));
 
     for (const [size, count, sizes] of [
       [3, 3, [2, 2, 3]],
@@ -176,13 +189,13 @@ describe("teams", () => {
     expect(live.teams.flatMap((tm) => tm.members)).toHaveLength(7);
   });
 
-  test("late joiners: students go on the smallest team with room, officers stay off", async () => {
-    const { officer, startNight, join, attendance, teams } = setup();
+  test("late joiners: students go on the smallest team with room, hosting officers stay off", async () => {
+    const { officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 7; i++) await join(code, student(i));
     await officer.mutation(api.teams.make, { size: 3 }); // 3 + 2 + 2
     await join(code, student(8));
-    await join(code, { name: "Grace", email: GRACE });
+    await host(await join(code, { name: "Grace", email: GRACE }));
     const att = await attendance();
     const sizes = (await teams()).map((tm) => att.filter((a) => a.teamId === tm._id).length);
     expect(sizes.sort()).toEqual([2, 3, 3]);
@@ -190,13 +203,14 @@ describe("teams", () => {
   });
 
   test("solo by default: each joiner gets a team of their own, named after them", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 3; i++) await join(code, student(i));
     // Same name, different person: numbered so the TV can tell them apart.
     await join(code, { name: "Student 1", email: "other1@hawkmail.hfcc.edu" });
-    await join(code, { name: "Grace", email: GRACE });
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await host(await join(code, { name: "Grace", email: GRACE }));
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    await host(ada);
     const live = (await t.query(api.sessions.live, {}))!;
     expect([live.autoTeams, live.teamSize]).toEqual([true, 1]);
     expect(live.teams.map((tm) => [tm.name, tm.members]).sort(([a], [b]) => (a < b ? -1 : 1))).toEqual([
@@ -207,17 +221,17 @@ describe("teams", () => {
     ]);
     expect((await attendance()).filter((a) => a.officer).map((a) => a.teamId)).toEqual([undefined, undefined]);
     expect(new Set((await teams()).map((tm) => tm.key)).size).toBe(4);
-    // Play tonight puts an officer on a team of their own too.
+    // Playing puts an officer on a team of their own too.
     await t.mutation(api.players.setPlaying, { token: ada, playing: true });
     const team = (await t.query(api.players.me, { token: ada }))!.team!;
     expect([team.name, team.members]).toEqual(["Ada", ["Ada"]]);
   });
 
   test("Make teams with size 1: everyone solo with their own points, and late joiners get their own", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 5; i++) await join(code, student(i));
-    await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada" }));
     await officer.mutation(api.teams.make, { size: 2 });
     expect(await teams()).toHaveLength(2);
     const scored = (await teams())[0]._id;
@@ -299,7 +313,7 @@ describe("teams", () => {
     const { t, officer, startNight, join, teams } = setup();
     const code = await startNight();
     await join(code, student(1));
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await t.mutation(api.players.setPlaying, { token: ada, playing: true });
     const mine = async () => (await t.query(api.players.me, { token: ada }))!.team;
     await officer.mutation(api.teams.score, { teamId: (await mine())!._id, delta: 4 });
@@ -362,7 +376,7 @@ describe("teams", () => {
     const code = await startNight();
     await join(code, student(1));
     await officer.mutation(api.teams.make, { size: 2 });
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await t.mutation(api.players.setPlaying, { token: ada, playing: true });
     const team = (await attendance()).find((a) => a.token === ada)!.teamId!;
     await officer.mutation(api.teams.score, { teamId: team, delta: 3 });
@@ -385,12 +399,12 @@ describe("teams", () => {
   });
 
   test("auto teams fill teams up to the last Make teams size", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     // Picking teams of 2 before anyone joins sets the night's size.
     await officer.mutation(api.teams.make, { size: 2 });
     for (let i = 1; i <= 7; i++) await join(code, student(i));
-    await join(code, { name: "Grace", email: GRACE });
+    await host(await join(code, { name: "Grace", email: GRACE }));
     const att = await attendance();
     const sizes = (await teams()).map((tm) => att.filter((a) => a.teamId === tm._id).length);
     expect(sizes.sort()).toEqual([1, 2, 2, 2]);
@@ -435,7 +449,7 @@ describe("teams", () => {
     const code = await startNight();
     const tokens = [];
     for (let i = 1; i <= 4; i++) tokens.push(await join(code, student(i)));
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await officer.mutation(api.teams.make, { size: 2 });
 
     await expect(t.mutation(api.players.setPlaying, { token: tokens[0], playing: true })).rejects.toThrow("Only officers");
@@ -465,9 +479,10 @@ describe("teams", () => {
   });
 
   test("an officer who isn't playing can't answer for a team", async () => {
-    const { t, officer, nightWithTeams, show } = setup();
+    const { t, officer, nightWithTeams, show, host } = setup();
     await nightWithTeams(4);
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    await host(ada);
     await show({ mode: "card", game: "output", index: 0 });
     await expect(t.mutation(api.answers.pick, { token: ada, card: "output:0", choice: OUTPUTS[0].answer })).rejects.toThrow(
       "not on a team",
@@ -644,6 +659,92 @@ describe("points", () => {
     expect(await score(teams[0]._id)).toBe((3 + 2) * 2);
   });
 
+  test("puzzles from the join page: a token answers for the whole team, with the same lockout as the team key", async () => {
+    const { t, nightWithTeams, show, score, join } = setup();
+    const { code, teams } = await nightWithTeams(4);
+    const sessionId = (await t.query(api.sessions.live, {}))!._id;
+    // A laptop joined with the same HawkMail gets the phone's spot, so it answers for the same team.
+    const laptop = await join(code, student(1));
+    const a = teams.find((tm) => tm.tokens.includes(laptop))!;
+    const b = teams.find((tm) => tm !== a)!;
+    const mate = a.tokens.find((tk) => tk !== laptop)!;
+    const right = (team: (typeof teams)[number]) => answersFor(sessionId, team._id, 0);
+    const card = "puzzle:0";
+    const submit = (token: string, part: 1 | 2, answer: string) => t.mutation(api.puzzles.submitByToken, { token, card, part, answer });
+
+    await expect(submit(laptop, 1, right(a).part1)).rejects.toThrow("isn’t up anymore");
+    await show({ mode: "card", game: "puzzle", index: 0 });
+    await expect(submit("nope", 1, "1")).rejects.toThrow("This night has ended");
+    later(30);
+    expect(await submit(laptop, 1, right(b).part1)).toEqual({ right: false, waitMs: 30_000 });
+    // The lockout is the team's: a teammate's phone and a lab computer with the team key wait too.
+    await expect(submit(mate, 1, right(a).part1)).rejects.toThrow("Wait 30s");
+    await expect(t.mutation(api.puzzles.submit, { teamKey: a.key!, card, part: 1, answer: right(a).part1 })).rejects.toThrow("Wait 30s");
+    later(30);
+    expect(await submit(mate, 1, right(a).part1)).toEqual({ right: true, waitMs: 0 });
+    later(10);
+    expect(await submit(laptop, 2, right(a).part2)).toEqual({ right: true, waitMs: 0 });
+
+    const board = (await t.query(api.puzzles.board, {}))!;
+    expect(board.teams.map((x) => [x.name, x.part1Ms, x.part2Ms])).toEqual([
+      [a.name, 60_000, 70_000],
+      [b.name, null, null],
+    ]);
+    await show({ mode: "card", game: "puzzle", index: 0, revealed: true });
+    expect([await score(a._id), await score(b._id)]).toEqual([3 + 5 + 2 + 2, 0]);
+    await expect(submit(mate, 2, right(a).part2)).rejects.toThrow("Time’s up");
+  });
+
+  test("puzzles from the join page on a solo night: each player answers for themselves, from their own input", async () => {
+    const { t, officer, startNight, join, show, score, host } = setup();
+    const code = await startNight();
+    const [ann, ben] = [await join(code, student(1)), await join(code, student(2))];
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    await host(ada);
+    const live = (await t.query(api.sessions.live, {}))!;
+    const teamOf = async (token: string) => (await t.query(api.players.me, { token }))!.team!._id;
+    const [annTeam, benTeam] = [await teamOf(ann), await teamOf(ben)];
+    const right = (teamId: Id<"teams">) => answersFor(live._id, teamId, 0);
+    const card = "puzzle:0";
+    const submit = (token: string, answer: string) => t.mutation(api.puzzles.submitByToken, { token, card, part: 1, answer });
+
+    await show({ mode: "card", game: "puzzle", index: 0 });
+    expect(right(annTeam).part1).not.toBe(right(benTeam).part1);
+    later(20);
+    expect(await submit(ann, right(benTeam).part1)).toEqual({ right: false, waitMs: 30_000 });
+    expect(await submit(ben, right(benTeam).part1)).toEqual({ right: true, waitMs: 0 });
+    await expect(submit(ann, right(annTeam).part1)).rejects.toThrow("Wait 30s");
+    // An officer running the night has no team to answer for.
+    await expect(submit(ada, right(annTeam).part1)).rejects.toThrow("not on a team");
+    later(30);
+    expect(await submit(ann, right(annTeam).part1)).toEqual({ right: true, waitMs: 0 });
+    await show({ mode: "card", game: "puzzle", index: 0, revealed: true });
+    expect([await score(annTeam), await score(benTeam)]).toEqual([3, 3 + 2]);
+  });
+
+  test("Fix it for real from the join page on a laptop: reported by token, alongside lab computers with the team key", async () => {
+    const { t, officer, nightWithTeams, show, score } = setup();
+    const { teams } = await nightWithTeams(4);
+    const [a, b] = teams;
+    const card = "fix:0";
+    const report = (token: string, code: string) => t.mutation(api.fixes.reportByToken, { token, card, code });
+    await show({ mode: "card", game: "fix", index: 0 });
+    await expect(report("nope", "x")).rejects.toThrow("This night has ended");
+    later(20);
+    await report(b.tokens[1], "print(1)");
+    later(20);
+    await t.mutation(api.fixes.report, { teamKey: a.key!, card, code: "print(2)" });
+    await report(b.tokens[0], "print(3)"); // later reports from the team are ignored
+    expect((await t.query(api.fixes.board, {}))!.fixed.map((f) => [f.name, f.ms])).toEqual([
+      [b.name, 20_000],
+      [a.name, 40_000],
+    ]);
+    await show({ mode: "card", game: "fix", index: 0, revealed: true });
+    expect([await score(a._id), await score(b._id)]).toEqual([3, 5]);
+    expect((await officer.query(api.fixes.host, {}))!.teams.find((x) => x._id === b._id)!.code).toBe("print(1)");
+    await expect(report(a.tokens[0], "print(4)")).rejects.toThrow("Time’s up");
+  });
+
   test("Wiki Race: 5, 4, 3 by place, 1 for playing, and the referee can turn a finish down", async () => {
     const { t, officer, nightWithTeams, show, score } = setup();
     const { teams } = await nightWithTeams(8);
@@ -735,10 +836,11 @@ describe("ending the night", () => {
   });
 
   test("place XP by rank (ties share), nothing for 0 points or for officers running the night, who stay off the leaderboard", async () => {
-    const { t, officer, nightWithTeams, attendance, score } = setup();
+    const { t, officer, nightWithTeams, attendance, score, host } = setup();
     const { code, teams } = await nightWithTeams(8);
     const [a, b, c, d] = teams;
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    await host(ada);
     const grace = await t.mutation(api.players.join, { code, name: "Grace", email: GRACE, broughtBy: "Student 1" });
     await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // a new team, with 0 points
     // c and d tie for 3rd with 0 points, which earns nothing.
@@ -931,5 +1033,357 @@ describe("ending the night", () => {
     // Each night's breakdown, for /scores. Names only: no emails on this public query.
     expect(row.nights).toEqual([1, 2].map((week) => ({ week, show: 3, place: 3, bonus: 0 })));
     expect(JSON.stringify(await t.query(api.stats.leaderboard, {}))).not.toContain("@");
+  });
+});
+
+describe("Tech Pictionary", () => {
+  /** A solo night with `n` students. Returns their tokens. */
+  async function soloNight(o: ReturnType<typeof setup>, n: number) {
+    const code = await o.startNight(2);
+    const tokens = [];
+    for (let i = 1; i <= n; i++) tokens.push(await o.join(code, student(i)));
+    return tokens;
+  }
+
+  /** What /host's New drawing does: pick the drawer and word, put it on the TV, start its clock. `word` sets the word. */
+  async function newDrawing(o: ReturnType<typeof setup>, word?: string) {
+    const n = await o.officer.mutation(api.drawings.start, {});
+    await o.show({ mode: "draw", drawing: n });
+    await o.officer.mutation(api.sessions.timer, { action: "set", seconds: 75, autostart: true });
+    const d = (await o.officer.query(api.drawings.host, {}))!.current!;
+    if (word) await o.t.run((ctx) => ctx.db.patch(d._id, { word }));
+    const drawer = (await o.attendance()).find((a) => a._id === d.drawer)!;
+    return { n, key: d.key, id: d._id, word: word ?? d.word, drawer };
+  }
+
+  const reveal = (o: ReturnType<typeof setup>, n: number) => o.show({ mode: "draw", drawing: n, revealed: true });
+
+  test("the word never reaches the TV or a guesser: only the drawer's phone and officers", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 4);
+    // A set word: a random one could be "key", which every JSON reply has as a field name.
+    const d = await newDrawing(o, "spreadsheet");
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    const word = JSON.stringify(d.word);
+    expect(JSON.stringify(await o.t.query(api.sessions.live, {}))).not.toContain(word);
+    const board = (await o.t.query(api.drawings.board, {}))!;
+    expect([board.word, board.blanks.length]).toEqual([null, d.word.length]);
+    expect(JSON.stringify(board)).not.toContain(word);
+    expect(JSON.stringify(await o.t.query(api.drawings.mine, { token: guesser }))).not.toContain(word);
+    expect((await o.t.query(api.drawings.mine, { token: d.drawer.token }))!).toEqual({ key: d.key, drawer: true, word: d.word });
+    await expect(o.signedInStudent.query(api.drawings.host, {})).rejects.toThrow("Only club officers");
+    // Nobody else can draw on it or skip its word.
+    const ink = { drawingId: d.id, rev: 0, stroke: "s", color: COLORS[0], size: SIZES[0], points: [10, 10] };
+    await expect(o.t.mutation(api.drawings.ink, { ...ink, token: guesser })).rejects.toThrow("someone else’s turn");
+    await expect(o.t.mutation(api.drawings.ink, ink)).rejects.toThrow("Only club officers");
+    await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: guesser })).rejects.toThrow("someone else’s turn");
+    // The reveal puts it up for everyone.
+    await reveal(o, d.n);
+    expect((await o.t.query(api.drawings.board, {}))!.word).toBe(d.word);
+  });
+
+  test("guesses: wrong, close, and right, one a second, then 3 and 2 for the first two and 3 for the drawer", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 4);
+    const d = await newDrawing(o, "keyboard");
+    const [a, b, c] = tokens.filter((tk) => tk !== d.drawer.token);
+    const guess = (token: string, text: string) => o.t.mutation(api.drawings.guess, { token, card: d.key, text });
+    later(5);
+    expect(await guess(a, "printer")).toBe("wrong");
+    later(2);
+    expect(await guess(a, "keybord")).toBe("close");
+    await expect(guess(a, "keyboard")).rejects.toThrow("one guess every 2 seconds");
+    await expect(guess(a, "x".repeat(61))).rejects.toThrow("too long");
+    later(2);
+    expect(await guess(a, " Key-Boards ")).toBe("right");
+    await expect(guess(a, "keyboard")).rejects.toThrow("Already got it");
+    await expect(guess(d.drawer.token, "keyboard")).rejects.toThrow("the one drawing");
+    later(5);
+    expect(await guess(b, "KEYBOARD")).toBe("right");
+    // Guesses in hold the teams until the reveal.
+    await expect(o.officer.mutation(api.teams.make, { size: 2 })).rejects.toThrow("Finish the round first");
+
+    const board = (await o.t.query(api.drawings.board, {}))!;
+    expect(board.got.map((g) => [g.by, g.ms])).toEqual([
+      ["Student " + (tokens.indexOf(a) + 1), 9_000],
+      ["Student " + (tokens.indexOf(b) + 1), 14_000],
+    ]);
+    expect([board.guessing, board.results]).toEqual([3, null]);
+    expect((await o.t.query(api.drawings.mine, { token: b }))!).toEqual({
+      key: d.key,
+      drawer: false,
+      teammate: false,
+      place: 2,
+      by: null,
+      points: null,
+    });
+
+    // 2 of 3 guessing players got it, so the drawer gets 3. Revealing again, or going away and back, never scores twice.
+    await reveal(o, d.n);
+    await o.show({ mode: "scoreboard", drawing: d.n, revealed: true });
+    await reveal(o, d.n);
+    const points = async (token: string) => (await o.t.query(api.players.me, { token }))!.team!.score;
+    expect(await Promise.all([a, b, c, d.drawer.token].map(points))).toEqual([3, 2, 0, 3]);
+    expect((await o.t.query(api.drawings.mine, { token: a }))!.points).toBe(3);
+    await expect(guess(c, "keyboard")).rejects.toThrow("Time’s up");
+  });
+
+  test("team nights: the drawer's team sits it out, and each team's first right guess counts", async () => {
+    const o = setup();
+    const { teams } = await o.nightWithTeams(6, 2);
+    const d = await newDrawing(o, "cloud");
+    const mine = teams.find((tm) => tm._id === d.drawer.teamId)!;
+    const [x, y] = teams.filter((tm) => tm !== mine);
+    const guess = (token: string, text: string) => o.t.mutation(api.drawings.guess, { token, card: d.key, text });
+    const mate = mine.tokens.find((tk) => tk !== d.drawer.token)!;
+    await expect(guess(mate, "cloud")).rejects.toThrow("Your team is drawing");
+    expect((await o.t.query(api.drawings.mine, { token: mate }))!.teammate).toBe(true);
+    expect(await guess(x.tokens[0], "clouds")).toBe("right");
+    await expect(guess(x.tokens[1], "cloud")).rejects.toThrow("Already got it");
+    expect((await o.t.query(api.drawings.mine, { token: x.tokens[1] }))!.place).toBe(1);
+    // 1 of 2 guessing teams is half, so the drawer's team gets 3.
+    await reveal(o, d.n);
+    expect([await o.score(x._id), await o.score(y._id), await o.score(mine._id)]).toEqual([3, 0, 3]);
+  });
+
+  test("a drawing never revealed scores when the night ends, with the double points it went up with, and only once", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const first = await newDrawing(o, "robot");
+    const guesser = tokens.find((tk) => tk !== first.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser, card: first.key, text: "robot" });
+    await reveal(o, first.n);
+    await o.officer.mutation(api.sessions.setDouble, { on: true });
+    const second = await newDrawing(o, "drone");
+    const other = tokens.find((tk) => tk !== second.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: other, card: second.key, text: "drone" });
+    await o.officer.mutation(api.sessions.setDouble, { on: false });
+    await o.show({ mode: "scoreboard", drawing: second.n });
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([second.key]);
+    await o.officer.mutation(api.sessions.end, {});
+    // First: 3 + 3 (1 of 2 is half). Second, doubled: 6 + 6.
+    const att = await o.attendance();
+    const pts = (tk: string) => att.find((x) => x.token === tk)!.points ?? 0;
+    const want = new Map<string, number>();
+    for (const [tk, p] of [
+      [guesser, 3],
+      [first.drawer.token, 3],
+      [other, 6],
+      [second.drawer.token, 6],
+    ] as const)
+      want.set(tk, (want.get(tk) ?? 0) + p);
+    expect(tokens.map(pts)).toEqual(tokens.map((tk) => want.get(tk) ?? 0));
+  });
+
+  test("drawers take turns, fewest drawings first and across teams; words never repeat; the host can switch drawers", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const drawn = [];
+    for (let i = 0; i < 4; i++) drawn.push(await newDrawing(o));
+    expect(new Set(drawn.slice(0, 3).map((d) => d.drawer._id)).size).toBe(3);
+    expect(new Set(drawn.map((d) => d.word)).size).toBe(4);
+    const host = (await o.officer.query(api.drawings.host, {}))!;
+    expect([host.drawn, host.players.length]).toEqual([3, 3]);
+    expect(tokens).toHaveLength(3);
+
+    // Switching hands it over with a new word and a clean canvas.
+    const d = drawn[3];
+    await o.t.mutation(api.drawings.ink, {
+      drawingId: d.id,
+      rev: 0,
+      token: d.drawer.token,
+      stroke: "s",
+      color: COLORS[1],
+      size: SIZES[1],
+      points: [1, 2],
+    });
+    const to = (await o.attendance()).find((a) => a._id !== d.drawer._id)!;
+    await o.officer.mutation(api.drawings.switchDrawer, { drawingId: d.id, attendanceId: to._id });
+    const after = (await o.officer.query(api.drawings.host, {}))!.current!;
+    expect(after.drawer).toBe(to._id);
+    expect(drawn.map((x) => x.word)).not.toContain(after.word);
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+    // Ink drawn for the old word, still on its way, never lands on the new canvas.
+    const tablet = { drawingId: d.id, stroke: "t", color: COLORS[1], size: SIZES[1], points: [3, 4] };
+    await o.officer.mutation(api.drawings.ink, { ...tablet, rev: 0 });
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+    await o.officer.mutation(api.drawings.ink, { ...tablet, rev: after.rev });
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(1);
+    // Once someone has it, the drawer stays, and so do their points.
+    const guesser = (await o.attendance()).find((a) => a._id !== to._id)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser.token, card: d.key, text: after.word });
+    await expect(o.officer.mutation(api.drawings.switchDrawer, { drawingId: d.id, attendanceId: guesser._id })).rejects.toThrow(
+      "drawer stays",
+    );
+    expect((await o.t.query(api.drawings.board, {}))!.got).toHaveLength(1);
+
+    // Team nights go team by team.
+    const p = setup();
+    await p.nightWithTeams(4, 2);
+    const one = await newDrawing(p);
+    const two = await newDrawing(p);
+    const three = await newDrawing(p);
+    const four = await newDrawing(p);
+    expect([one.drawer.teamId === two.drawer.teamId, three.drawer.teamId === four.drawer.teamId]).toEqual([false, false]);
+    expect(new Set([one, two, three, four].map((x) => x.drawer._id)).size).toBe(4);
+  });
+
+  test("ink: rows from the drawer's phone and the officer tablet, undo, clear, skip, and pens down at time", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const d = await newDrawing(o, "mouse");
+    // From the drawer's phone, or the officer tablet (signed in, no token).
+    const ink = (stroke: string, points: number[], tablet = false, rev = 0) =>
+      tablet
+        ? o.officer.mutation(api.drawings.ink, { drawingId: d.id, rev, stroke, color: COLORS[0], size: SIZES[0], points })
+        : o.t.mutation(api.drawings.ink, { drawingId: d.id, rev, token: d.drawer.token, stroke, color: COLORS[0], size: SIZES[0], points });
+    await ink("a", [0, 0, 10, 10]);
+    await ink("a", [10, 10, 20, 20]);
+    await ink("b", [500, 300]);
+    await ink("c", [1000, 750], true);
+    await expect(ink("d", [1001, 0])).rejects.toThrow("off the canvas");
+    await expect(ink("d", [1, 2, 3])).rejects.toThrow("off the canvas");
+    await expect(
+      o.t.mutation(api.drawings.ink, {
+        drawingId: d.id,
+        rev: 0,
+        token: d.drawer.token,
+        stroke: "d",
+        color: "#00ff00",
+        size: SIZES[0],
+        points: [1, 1],
+      }),
+    ).rejects.toThrow("Pick a pen");
+    const rows = async () => (await o.t.query(api.drawings.inkBlock, { drawingId: d.id, block: 0 })).map((r) => r.stroke);
+    expect(await rows()).toEqual(["a", "a", "b", "c"]);
+    // Each device undoes its own stroke: the phone's "b" goes, the tablet's later "c" stays.
+    await o.t.mutation(api.drawings.undo, { drawingId: d.id, token: d.drawer.token, stroke: "b" });
+    expect(await rows()).toEqual(["a", "a", "c"]);
+    await o.officer.mutation(api.drawings.undo, { drawingId: d.id, stroke: "c" });
+    expect(await rows()).toEqual(["a", "a"]);
+    // Ink still on its way for an undone stroke never lands.
+    await ink("b", [510, 310]);
+    expect(await rows()).toEqual(["a", "a"]);
+    // Clear, with this device's newest stroke whose first ink hasn't landed yet: none of it comes back afterwards.
+    await o.t.mutation(api.drawings.clear, { drawingId: d.id, token: d.drawer.token, mine: ["a", "late"] });
+    await ink("a", [20, 20, 30, 30]);
+    await ink("late", [40, 40]);
+    expect(await o.t.query(api.drawings.inkBlocks, { drawingId: d.id })).toBe(0);
+    await ink("new", [50, 50]);
+    expect(await rows()).toEqual(["new"]);
+
+    // Skip: a new word on a clean canvas, until someone gets it.
+    await ink("e", [5, 5]);
+    await o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token });
+    const word = (await o.t.query(api.drawings.mine, { token: d.drawer.token }))!;
+    expect(word.drawer && word.word !== "mouse").toBe(true);
+    expect(await rows()).toEqual([]);
+    // A stroke still on its way from before the skip is dropped; the new word's ink lands.
+    await ink("e", [6, 6], true);
+    await ink("f", [7, 7], true, 1);
+    expect(await rows()).toEqual(["f"]);
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: word.drawer ? word.word : "" });
+    await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token })).rejects.toThrow("already got this one");
+
+    later(78);
+    await expect(ink("f", [1, 1])).rejects.toThrow("Pens down");
+  });
+
+  test("time's up: no skipping the word", async () => {
+    const o = setup();
+    await soloNight(o, 3);
+    const d = await newDrawing(o);
+    later(78);
+    await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token })).rejects.toThrow("Time’s up");
+  });
+
+  test("officers see the word, so a playing officer can draw but not guess", async () => {
+    const o = setup();
+    await soloNight(o, 2);
+    const ada = await o.officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    await o.t.mutation(api.players.setPlaying, { token: ada, playing: true });
+    // If Ada drew the first one, start another so she's a guesser.
+    let d = await newDrawing(o, "laptop");
+    if (d.drawer.token === ada) d = await newDrawing(o, "laptop");
+    await expect(o.t.mutation(api.drawings.guess, { token: ada, card: d.key, text: "laptop" })).rejects.toThrow("draw but don’t guess");
+    // She's still in the drawing rotation.
+    const drawers = new Set([d.drawer._id]);
+    for (let i = 0; i < 3; i++) drawers.add((await newDrawing(o)).drawer._id);
+    expect(drawers.has((await o.attendance()).find((a) => a.token === ada)!._id)).toBe(true);
+  });
+
+  test("playing officers can't guess, so they don't count toward half the room for the drawer's bonus", async () => {
+    const o = setup();
+    const code = await o.startNight(2);
+    const tokens = [];
+    for (let i = 1; i <= 3; i++) tokens.push(await o.join(code, student(i)));
+    // Two officers playing: one signed in, one by typing an officer email. Each is a team of their own.
+    await o.officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    await o.join(code, { name: "Grace", email: GRACE });
+    let d = await newDrawing(o, "mouse");
+    while (d.drawer.officer) d = await newDrawing(o, "mouse");
+    const board = (await o.t.query(api.drawings.board, {}))!;
+    // Two students can guess; the officers' teams aren't counted.
+    expect(board.guessing).toBe(2);
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: "mouse" });
+    await reveal(o, d.n);
+    // 1 of 2 is half, so the drawer gets 3, not 2.
+    expect((await o.t.query(api.players.me, { token: d.drawer.token }))!.team!.score).toBe(3);
+  });
+
+  test("a drawer's phone gets two skips a drawing; an officer can always skip; malformed stroke ids are turned away", async () => {
+    const o = setup();
+    await soloNight(o, 3);
+    const d = await newDrawing(o);
+    const skip = (token?: string) => o.t.mutation(api.drawings.skip, { drawingId: d.id, token });
+    await skip(d.drawer.token);
+    await skip(d.drawer.token);
+    await expect(skip(d.drawer.token)).rejects.toThrow("two skips");
+    await o.officer.mutation(api.drawings.skip, { drawingId: d.id });
+    const long = "x".repeat(41);
+    await expect(o.t.mutation(api.drawings.undo, { drawingId: d.id, token: d.drawer.token, stroke: long })).rejects.toThrow("not a stroke");
+    await expect(o.t.mutation(api.drawings.clear, { drawingId: d.id, token: d.drawer.token, mine: [long] })).rejects.toThrow("strokes");
+  });
+
+  test("moving the drawer to a team that already got it doesn't take that team's guess away", async () => {
+    const o = setup();
+    const { teams } = await o.nightWithTeams(6, 2);
+    const d = await newDrawing(o, "printer");
+    const mine = teams.find((tm) => tm._id === d.drawer.teamId)!;
+    const x = teams.find((tm) => tm !== mine)!;
+    expect(await o.t.mutation(api.drawings.guess, { token: x.tokens[0], card: d.key, text: "printer" })).toBe("right");
+    await o.officer.mutation(api.teams.move, { attendanceId: d.drawer._id, teamId: x._id });
+    expect((await o.t.query(api.drawings.board, {}))!.got.map((g) => g.teamId)).toEqual([x._id]);
+    // The drawing stays with the team it went up with: x keeps its 3, and the drawer's points go to that team.
+    await reveal(o, d.n);
+    expect([await o.score(x._id), await o.score(mine._id)]).toEqual([3, 3]);
+  });
+
+  test("a drawing left behind scores when another drawing, card, or round goes up, so teams aren't stuck", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const first = await newDrawing(o, "robot");
+    const g1 = tokens.find((tk) => tk !== first.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: g1, card: first.key, text: "robot" });
+    // The scoreboard keeps it: still waiting for its reveal.
+    await o.show({ mode: "scoreboard", drawing: first.n });
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([first.key]);
+    // Another drawing going up scores it.
+    const second = await newDrawing(o, "drone");
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
+    const points = async (token: string) => (await o.t.query(api.players.me, { token }))!.team!.score;
+    expect([await points(g1), await points(first.drawer.token)]).toEqual([3, 3]);
+    // So does a card.
+    const g2 = tokens.find((tk) => tk !== second.drawer.token && tk !== g1) ?? g1;
+    await o.t.mutation(api.drawings.guess, { token: g2, card: second.key, text: "drone" });
+    await o.show({ mode: "card", game: "output", index: 0 });
+    expect((await o.t.query(api.sessions.live, {}))!.unrevealed).toEqual([]);
+    await o.officer.mutation(api.teams.make, { size: 1 });
+    // And nothing scores twice at the end of the night.
+    const before = (await o.attendance()).map((a) => a.points);
+    await o.officer.mutation(api.sessions.end, {});
+    expect((await o.attendance()).map((a) => a.points)).toEqual(before);
   });
 });

@@ -1,4 +1,5 @@
-// Phone answers and automatic scoring for Bug Hunt, Output?, and Guess the Language, plus Fix it for real and puzzles.
+// Phone answers and automatic scoring for Bug Hunt, Output?, and Guess the Language, plus Fix it for real, puzzles,
+// Wiki Race, and Tech Pictionary.
 // Pure functions shared by Convex (convex/answers.ts) and the officer test page, so both score the same way.
 // Keep imports relative: Convex bundles this file too.
 import { BUGS, LANGS, OUTPUTS } from "./content";
@@ -411,6 +412,62 @@ export function wikiAwardsFor<T>(o: {
       return { team, place, points: o.double ? points * 2 : points };
     }),
   };
+}
+
+// ---- Tech Pictionary -------------------------------------------------------
+
+/** Seconds on the clock for a drawing. */
+export const DRAW_SECONDS = 75;
+
+/** A drawing's key, like a card's: "draw:3" is tonight's third drawing. */
+export const drawKey = (n: number) => `draw:${n}`;
+
+/** A guess (or the word) as it's compared: case, spaces, and punctuation don't matter. */
+export const guessKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Letters to add, drop, or change to turn one string into the other. */
+export function editDistance(a: string, b: string) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + Number(a[i - 1] !== b[j - 1]));
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Checks a guess against the word. Plurals count ("bugs", "viruses", "glasses"), and so does the singular of a plural
+ * word ("headphone"), but never a word cut short ("viru", "glas"). One or two letters off is "close" (it doesn't count,
+ * and only the guesser sees it); short words only get one, so "So close!" never gives a three-letter word away.
+ */
+export function checkGuess(guess: string, word: string): "right" | "close" | "wrong" {
+  const g = guessKey(guess);
+  const w = guessKey(word);
+  if (!g) return "wrong";
+  const plural = /s$/.test(w) && !/(ss|us)$/.test(w);
+  if ([w, `${w}s`, `${w}es`].includes(g) || (plural && g === w.slice(0, -1))) return "right";
+  return editDistance(g, w) <= (w.length >= 5 ? 2 : 1) ? "close" : "wrong";
+}
+
+/** Points for the first team to guess a drawing, every other team that does, and the drawer's team. */
+export const FIRST_GUESS_POINTS = 3;
+export const GUESS_POINTS = 2;
+export const DRAWER_POINTS = 2;
+export const DRAWER_HALF_POINTS = 3;
+
+/**
+ * What to award when a drawing is scored. `got` are the guessing teams that got it, in order. The first gets 3 and
+ * every other 2; the drawer's team gets 2 if anyone got it, 3 if at least half of the `guessing` teams did. All
+ * doubled on a double-points round. Returns null if the drawing was already scored tonight.
+ */
+export function drawAwardsFor<T>(o: { key: string; double: boolean; scored: string[]; drawer: T | null; guessing: number; got: T[] }) {
+  if (o.scored.includes(o.key)) return null;
+  const x = (p: number) => (o.double ? p * 2 : p);
+  const awards = o.got.map((team, i) => ({ team, points: x(i === 0 ? FIRST_GUESS_POINTS : GUESS_POINTS) }));
+  if (o.drawer !== null && o.got.length)
+    awards.push({ team: o.drawer, points: x(o.got.length * 2 >= o.guessing ? DRAWER_HALF_POINTS : DRAWER_POINTS) });
+  return { scored: [...o.scored, o.key], awards };
 }
 
 /** Place among `all` scores: ties share a place without skipping the next (13, 13, 11 is 1st, 1st, 2nd), so teammates,

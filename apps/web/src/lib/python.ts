@@ -37,20 +37,22 @@ class Runner {
 
   private start() {
     this.onStatus("loading");
-    const w = new Worker("/py-worker.js");
+    const w = new Worker("/py-worker.js", { type: "module" });
     this.worker = w;
     this.ready = new Promise((resolve, reject) => {
-      const fail = () => {
+      const fail = (why?: string) => {
+        // Officers can see why in the console; players get the reload message.
+        if (why) console.error("Python didn’t load:", why);
         this.onStatus("failed");
         reject(new Error("Python didn’t load."));
       };
-      w.onerror = fail;
+      w.onerror = (e) => fail(e.message);
       w.onmessage = (e: MessageEvent<FromWorker>) => {
         const m = e.data;
         if (m.type === "ready") {
           this.onStatus("ready");
           resolve();
-        } else if (m.type === "failed") fail();
+        } else if (m.type === "failed") fail(m.message);
         else {
           this.pending.get(m.id)?.({ stdout: m.stdout, error: m.error, timedOut: false });
           this.pending.delete(m.id);

@@ -28,26 +28,48 @@ export function InstagramLink({ className = "" }: { className?: string }) {
 /**
  * The TV's Instagram card, for breaks and the end of the night, never while people are joining (the join QR owns that).
  * A standard QR of the profile link, black on white with a full quiet zone so phone cameras read it from across the room.
+ * `row` lays it out as a strip, QR beside the words, to sit under other text (the attract screen).
  */
-export function InstagramQr({ className = "", compact = false }: { className?: string; compact?: boolean }) {
+export function InstagramQr({ className = "", row = false }: { className?: string; row?: boolean }) {
+  const qr = (
+    <QRCodeSVG
+      value={INSTAGRAM_URL}
+      title={`Scan to follow @${CLUB.instagram} on Instagram`}
+      size={512}
+      marginSize={4}
+      className={row ? "h-auto w-[9vw] shrink-0" : "mt-[1vw] h-auto w-full"}
+    />
+  );
+  const follow = (
+    <p className="flex items-center gap-[0.5vw] text-[1.35vw] leading-tight font-extrabold whitespace-nowrap">
+      <InstagramGlyph className="size-[1.8vw]" />
+      Follow @{CLUB.instagram}
+    </p>
+  );
+  const tag = (
+    <p className={`leading-snug ${row ? "mt-[0.6vw] max-w-[16em] text-[1.15vw]" : "mt-[0.9vw] text-[1.15vw]"}`}>
+      Like, share, and tag us in your club photos.
+    </p>
+  );
   return (
     <div
-      className={`${compact ? "w-[16vw]" : "w-[19vw]"} bg-[linear-gradient(135deg,#d62976,#962fbf_55%,#4f5bd5)] p-[1.2vw] text-white ${className}`}
+      className={`bg-[linear-gradient(135deg,#d62976,#962fbf_55%,#4f5bd5)] text-white ${row ? "inline-flex items-center gap-[1.4vw] p-[0.9vw] pr-[1.8vw]" : "w-[19vw] p-[1.2vw]"} ${className}`}
     >
-      <p
-        className={`flex items-center gap-[0.5vw] leading-tight font-extrabold whitespace-nowrap ${compact ? "text-[1.1vw]" : "text-[1.35vw]"}`}
-      >
-        <InstagramGlyph className="size-[1.8vw]" />
-        Follow @{CLUB.instagram}
-      </p>
-      <QRCodeSVG
-        value={INSTAGRAM_URL}
-        title={`Scan to follow @${CLUB.instagram} on Instagram`}
-        size={512}
-        marginSize={4}
-        className="mt-[1vw] h-auto w-full"
-      />
-      <p className={`mt-[0.9vw] leading-snug ${compact ? "text-[1vw]" : "text-[1.15vw]"}`}>Like, share, and tag us in your club photos.</p>
+      {row ? (
+        <>
+          {qr}
+          <div>
+            {follow}
+            {tag}
+          </div>
+        </>
+      ) : (
+        <>
+          {follow}
+          {qr}
+          {tag}
+        </>
+      )}
     </div>
   );
 }
