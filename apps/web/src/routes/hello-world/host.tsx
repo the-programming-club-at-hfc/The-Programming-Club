@@ -14,7 +14,7 @@ import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { WIKI_RACES, wikiUrl } from "#/lib/content";
 import { deckFor, filtersFor } from "#/lib/flow";
 import type { Filter } from "#/lib/flow";
-import { DRAW_SECONDS, isAnswerGame, wikiSeconds } from "#/lib/grading";
+import { DRAW_SECONDS, drawKey, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
@@ -88,7 +88,8 @@ function Running({
   // e.g. spooky cards for "Fix it for real, spooky".
   const playing = live.round !== null && live.round < lineup.length ? live.round : null;
   const label = playing === null ? null : lineup[playing].label;
-  const [tab, setTab] = useState<Tab>(() => tabFor(label) ?? "bug");
+  // Before the first round, the Games pane opens on tonight's first game.
+  const [tab, setTab] = useState<Tab>(() => tabFor(label) ?? tabFor(lineup[0]?.label ?? null) ?? "bug");
   useEffect(() => {
     const t = tabFor(label);
     if (t) setTab(t);
@@ -114,7 +115,8 @@ function Running({
           setTab(t);
           // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
           setPane("games");
-          deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          // After the pane shows, so there's something to scroll to.
+          setTimeout(() => deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
         }}
         className={`mt-6 ${on("run")}`}
       />
@@ -174,6 +176,21 @@ function PhoneBar({ live, pane, setPane }: { live: Live; pane: Pane; setPane: (p
   const code = useJoinCode();
   const plan = useSchedule();
   const running = !!live.timer.startedAt;
+  // The ⋯ menu closes on a tap outside it or Escape, so it never sits over a pane.
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: Event) => {
+      const m = menu.current;
+      if (m?.open && (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target instanceof Node && m.contains(e.target))))
+        m.open = false;
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
   const links = [
     ["/hello-world/kickoff", "Kickoff slides"],
     ["/hello-world/schedule", "Plan the season"],
@@ -200,7 +217,7 @@ function PhoneBar({ live, pane, setPane }: { live: Live; pane: Pane; setPane: (p
         >
           {running ? "❚❚" : "▶"} {running && remaining === 0 ? "TIME" : fmtClock(remaining)}
         </button>
-        <details className="relative">
+        <details ref={menu} className="relative">
           <summary className="btn btn-sm list-none [&::-webkit-details-marker]:hidden" aria-label="More">
             ⋯
           </summary>
@@ -234,6 +251,7 @@ function PhoneBar({ live, pane, setPane }: { live: Live; pane: Pane; setPane: (p
             className={`border-b-[3px] py-2.5 text-sm font-bold ${pane === p ? "border-ink text-ink" : "border-transparent text-dim"}`}
             onClick={() => {
               setPane(p);
+              menu.current?.removeAttribute("open");
               scrollTo({ top: 0 });
             }}
           >
@@ -300,7 +318,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   const [week, setWeek] = useState(() => likelyWeek(plan));
   const [practice, setPractice] = useState(false);
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 max-lg:pt-6 lg:grid-cols-2">
       <Panel title="Start tonight" className="ring-2 ring-gold">
         <p className="text-dim">Starting opens joining and puts the QR code on the TV.</p>
         <label className="mt-4 block font-bold">
@@ -343,7 +361,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
         {recent.length === 0 ? (
           <p className="text-dim">Nothing yet. Attendance exports show up here after each night.</p>
         ) : (
-          <ul className="divide-y-2 divide-grid/60">
+          <ul className="divide-y divide-line">
             {recent.map((s) => (
               <li key={s._id} className="flex flex-wrap items-center gap-2 py-2">
                 <span className="font-bold">Week {s.week}</span>
@@ -1049,7 +1067,7 @@ function AnswerStatus({ live }: { live: Live }) {
       {data.teams.length === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {data.teams.map((t) => {
             const p = t.pick;
             const status = p?.locked
@@ -1123,7 +1141,7 @@ function FixStatus({ live }: { live: Live }) {
       {data.teams.length === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {data.teams.map((t) => (
             <li key={t._id} className="py-1.5">
               <div className="flex flex-wrap items-center gap-2">
@@ -1199,7 +1217,7 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
       {board.teams.length === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {board.teams.map((t) => {
             const x = extra?.wrong.find((r) => r.teamId === t.teamId);
             const wait = t.lockedUntil === null ? 0 : Math.ceil((t.lockedUntil - now) / 1000);
@@ -1260,7 +1278,7 @@ function WikiStatus({ live }: { live: Live }) {
       {data.teams === 0 ? (
         <p className="text-sm text-dim">{w.noTeams}</p>
       ) : (
-        <ul className="mt-1 divide-y-2 divide-grid/60">
+        <ul className="mt-1 divide-y divide-line">
           {data.finished.map((f) => (
             <li key={f.teamId} className="flex flex-wrap items-center gap-2 py-1.5">
               <span className="narrow w-9 text-xl font-extrabold">{f.place !== null ? ordinal(f.place) : "–"}</span>
@@ -1448,18 +1466,24 @@ function PictionaryTool({ live }: { live: Live }) {
     setBusy(false);
   };
   // Like the big button: the reveal stops a running clock so the buzzer doesn't go off over the word.
+  // The drawing comes back on the TV for its reveal, even after the scoreboard or join screen went up meanwhile.
   const reveal = async () => {
-    await setScreen({ screen: { ...s, revealed: true } });
+    await setScreen({ screen: { ...s, mode: "draw", revealed: true } });
     if (live.timer.startedAt && remaining > 0) await timer({ action: "pause" });
   };
-  const up = s.mode === "draw" && s.drawing !== undefined;
+  // A drawing up and still open: not revealed, and not scored by the TV moving on.
+  const up = s.drawing !== undefined && !s.revealed && !live.scored.includes(drawKey(s.drawing));
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-sm btn-neon" disabled={busy} onClick={() => act(newDrawing)}>
+        <button
+          className="btn btn-sm btn-neon"
+          disabled={busy}
+          onClick={() => (!up || confirm("A drawing is still up. Score it as it stands and start a new one?")) && act(newDrawing)}
+        >
           New drawing, {fmtClock(DRAW_SECONDS * 1000)}
         </button>
-        {up && !s.revealed && (
+        {up && (
           <button className="btn btn-sm btn-coin" disabled={busy} onClick={() => act(reveal)}>
             Reveal the word and score
           </button>
@@ -1490,7 +1514,7 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
       {rows.length === 0 ? (
         <p className="text-dim">Nobody yet. Put the join screen on the TV.</p>
       ) : (
-        <ul className="divide-y-2 divide-grid/60">
+        <ul className="divide-y divide-line">
           {rows.map((r) => (
             <li key={r._id} className="flex flex-wrap items-center gap-2 py-2">
               <div className="min-w-40 flex-1">

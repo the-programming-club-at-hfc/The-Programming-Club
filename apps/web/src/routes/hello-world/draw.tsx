@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Sketch, drawOpen } from "#/components/draw";
 import { fmtClock, useRemaining } from "#/components/game";
@@ -25,7 +25,29 @@ function DrawPad() {
   );
 }
 
+/** Keeps the tablet's screen on while the pad is open, since it sits idle between drawings. Needs https, so it's quiet
+ *  elsewhere; the screen timeout in the tablet's settings is the backup (see the officer prep list). */
+function useWakeLock() {
+  useEffect(() => {
+    let lock: WakeLockSentinel | null = null;
+    const ask = () => {
+      if (document.visibilityState === "visible" && "wakeLock" in navigator)
+        navigator.wakeLock.request("screen").then(
+          (l) => (lock = l),
+          () => undefined,
+        );
+    };
+    ask();
+    document.addEventListener("visibilitychange", ask);
+    return () => {
+      document.removeEventListener("visibilitychange", ask);
+      void lock?.release();
+    };
+  }, []);
+}
+
 function Pad() {
+  useWakeLock();
   const live = useQuery(api.sessions.live);
   const data = useQuery(api.drawings.host);
   const skip = useMutation(api.drawings.skip);

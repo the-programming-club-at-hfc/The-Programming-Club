@@ -20,9 +20,14 @@ export function drawCard(s: Doc<"sessions">) {
   return { n: drawing, key: drawKey(drawing) };
 }
 
-// Guesses per player per drawing: at most one a second, and this many in all.
-const GUESS_GAP_MS = 1000;
-const MAX_GUESSES = 60;
+// Guesses per player per drawing: one every 2 seconds, and this many in all, so nobody can spam the public deck at the
+// blanks, while a 75-second drawing still leaves an eager guesser plenty of tries.
+const GUESS_GAP_MS = 2000;
+const MAX_GUESSES = 20;
+// Skips from the drawer's phone per drawing, so a drawer can't burn through the deck. Officers can always skip.
+const MAX_SKIPS = 2;
+// Stroke ids are short random strings from the drawing device.
+const STROKE_MAX = 40;
 
 /** A word's key in `shown`, so later nights can skip it like a card. */
 const wordKey = (i: number) => `pictionary:${i}`;
@@ -107,20 +112,27 @@ const lastInk = (ctx: QueryCtx, drawingId: Id<"drawings">) =>
     .order("desc")
     .first();
 
+/** The drawer's team for a drawing: the one it went up with (older drawings: the drawer's team now). */
+const teamOf = async (ctx: QueryCtx, d: Doc<"drawings">) => d.team ?? (await ctx.db.get(d.drawer))?.teamId;
+
 /**
  * The guessing teams that got a drawing, in order: each team's first right guess, leaving out teams that are gone and
- * the drawer's own. Also tonight's teams and the drawer's team.
+ * the drawer's own. Also tonight's teams, the drawer's team, and how many teams can guess: not the drawer's, and not a
+ * team of only officers, who see the word.
  */
 async function gotIt(ctx: QueryCtx, s: Doc<"sessions">, d: Doc<"drawings">) {
-  const [teams, rows, drawer] = await Promise.all([
+  const [teams, rows, team, players] = await Promise.all([
     sessionTeams(ctx, s._id),
     ctx.db
       .query("guesses")
       .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", d.key))
       .collect(),
-    ctx.db.get(d.drawer),
+    teamOf(ctx, d),
+    sessionAttendance(ctx, s._id),
   ]);
-  const drawerTeam = teams.find((t) => t._id === drawer?.teamId)?._id ?? null;
+  const drawerTeam = teams.find((t) => t._id === team)?._id ?? null;
+  const canGuess = new Set(players.filter((a) => a.teamId && !a.officer).map((a) => a.teamId));
+  const guessing = teams.filter((t) => t._id !== drawerTeam && canGuess.has(t._id)).length;
   const names = new Map(teams.map((t) => [t._id, t.name]));
   const right = rows
     .filter((r) => r.at !== undefined && names.has(r.teamId) && r.teamId !== drawerTeam)
@@ -128,7 +140,7 @@ async function gotIt(ctx: QueryCtx, s: Doc<"sessions">, d: Doc<"drawings">) {
   const got = right
     .filter((r, i) => right.findIndex((o) => o.teamId === r.teamId) === i)
     .map((r) => ({ ...r, at: r.at!, name: names.get(r.teamId)! }));
-  return { teams, drawerTeam, got };
+  return { teams, drawerTeam, guessing, got };
 }
 
 /** The drawing on the TV, for the drawer's phone (by its token) or an officer (no token), the only ones who draw on it. */
@@ -154,7 +166,14 @@ export const start = mutation({
     const n = done.reduce((m, d) => Math.max(m, d.n), 0) + 1;
     const drawer = nextDrawer(await drawers(ctx, s, done), n);
     if (!drawer) throw new ConvexError("Nobody’s playing yet, so nobody can draw.");
-    await ctx.db.insert("drawings", { sessionId: s._id, n, key: drawKey(n), drawer: drawer._id, word: await newWord(ctx, s) });
+    await ctx.db.insert("drawings", {
+      sessionId: s._id,
+      n,
+      key: drawKey(n),
+      drawer: drawer._id,
+      team: drawer.teamId,
+      word: await newWord(ctx, s),
+    });
     return n;
   },
 });
@@ -169,7 +188,7 @@ export const switchDrawer = mutation({
     const a = await ctx.db.get(attendanceId);
     if (!a || a.sessionId !== s._id || !inTeamPool(a) || !a.teamId) throw new ConvexError("Pick someone who’s playing tonight.");
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so the drawer stays.");
-    await ctx.db.patch(d._id, { drawer: a._id, word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1 });
+    await ctx.db.patch(d._id, { drawer: a._id, team: a.teamId, word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1, skips: 0 });
     await removeInk(ctx, d);
     for (const g of await ctx.db
       .query("guesses")
@@ -187,7 +206,8 @@ export const skip = mutation({
     if (over(s, d.key)) throw new ConvexError("This drawing is over.");
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so it stays.");
-    await ctx.db.patch(d._id, { word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1 });
+    if (token && (d.skips ?? 0) >= MAX_SKIPS) throw new ConvexError("That’s two skips. Give this one a go, or ask an officer.");
+    await ctx.db.patch(d._id, { word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1, skips: (d.skips ?? 0) + (token ? 1 : 0) });
     await removeInk(ctx, d);
   },
 });
@@ -207,7 +227,8 @@ export const ink = mutation({
   handler: async (ctx, { drawingId, token, rev, stroke, color, size, points }) => {
     const { d, s } = await myDrawing(ctx, drawingId, token);
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
-    if (!COLORS.includes(color) || !SIZES.includes(size) || stroke.length > 40) throw new ConvexError("Pick a pen from the choices.");
+    if (!COLORS.includes(color) || !SIZES.includes(size) || stroke.length > STROKE_MAX)
+      throw new ConvexError("Pick a pen from the choices.");
     if (
       !points.length ||
       points.length % 2 ||
@@ -227,6 +248,7 @@ export const ink = mutation({
 export const undo = mutation({
   args: { drawingId: v.id("drawings"), token: v.optional(v.string()), stroke: v.string() },
   handler: async (ctx, { drawingId, token, stroke }) => {
+    if (stroke.length > STROKE_MAX) throw new ConvexError("That’s not a stroke on this drawing.");
     const { d, s } = await myDrawing(ctx, drawingId, token);
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
     await removeInk(ctx, d, [stroke]);
@@ -237,6 +259,8 @@ export const undo = mutation({
 export const clear = mutation({
   args: { drawingId: v.id("drawings"), token: v.optional(v.string()), mine: v.optional(v.array(v.string())) },
   handler: async (ctx, { drawingId, token, mine }) => {
+    if (mine && (mine.length > 50 || mine.some((id) => id.length > STROKE_MAX)))
+      throw new ConvexError("That’s not this drawing’s strokes.");
     const { d, s } = await myDrawing(ctx, drawingId, token);
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Pens down.");
     await removeInk(ctx, d, undefined, mine);
@@ -284,7 +308,7 @@ export const guess = mutation({
     if (!d) throw new ConvexError("That drawing isn’t up anymore.");
     if (!isOpen(s, d.key)) throw new ConvexError("Time’s up. Guesses are closed.");
     if (d.drawer === a._id) throw new ConvexError("You’re the one drawing!");
-    if ((await ctx.db.get(d.drawer))?.teamId === teamId) throw new ConvexError("Your team is drawing this one.");
+    if ((await teamOf(ctx, d)) === teamId) throw new ConvexError("Your team is drawing this one.");
     const t = text.trim();
     if (!t) throw new ConvexError("Type a guess first.");
     if (t.length > GUESS_MAX) throw new ConvexError("That guess is too long.");
@@ -295,7 +319,7 @@ export const guess = mutation({
     if (rows.some((r) => r.at !== undefined)) throw new ConvexError("Already got it!");
     const mine = rows.find((r) => r.attendanceId === a._id);
     const now = Date.now();
-    if (mine && now - mine.lastAt < GUESS_GAP_MS) throw new ConvexError("Easy: one guess a second.");
+    if (mine && now - mine.lastAt < GUESS_GAP_MS) throw new ConvexError("Easy: one guess every 2 seconds.");
     if (mine && mine.tries >= MAX_GUESSES) throw new ConvexError("That’s plenty of guesses for this one.");
     const kind = checkGuess(t, d.word);
     const patch = { tries: (mine?.tries ?? 0) + 1, lastAt: now, ...(kind === "right" && { at: now }) };
@@ -316,7 +340,7 @@ export const board = query({
     const c = s && drawCard(s);
     const d = s && c && (await drawingAt(ctx, s._id, c.n));
     if (!s || !d) return null;
-    const { teams, drawerTeam, got } = await gotIt(ctx, s, d);
+    const { teams, drawerTeam, guessing, got } = await gotIt(ctx, s, d);
     const scored = (s.scored ?? []).includes(d.key);
     const t0 = cardStart(s, d.key);
     const points = new Map((d.results ?? []).map((r) => [r.teamId, r.points]));
@@ -328,7 +352,7 @@ export const board = query({
       drawerTeam,
       blanks: blanks(d.word),
       word: over(s, d.key) ? d.word : null,
-      guessing: teams.filter((t) => t._id !== drawerTeam).length,
+      guessing,
       got: await Promise.all(
         got.map(async (g) => ({
           teamId: g.teamId,
@@ -407,13 +431,13 @@ export const host = query({
 async function scoreDrawing(ctx: MutationCtx, s: Doc<"sessions">, n: number, scored: string[], double: boolean) {
   const d = await drawingAt(ctx, s._id, n);
   if (!d) return scored;
-  const { teams, drawerTeam, got } = await gotIt(ctx, s, d);
+  const { drawerTeam, guessing, got } = await gotIt(ctx, s, d);
   const r = drawAwardsFor({
     key: d.key,
     double,
     scored,
     drawer: drawerTeam,
-    guessing: teams.filter((t) => t._id !== drawerTeam).length,
+    guessing,
     got: got.map((g) => g.teamId),
   });
   if (!r) return scored;

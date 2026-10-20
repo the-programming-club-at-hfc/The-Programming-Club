@@ -219,7 +219,7 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
           {(officer || wrongAccount) && (
             <p className="mt-2 text-dim">
               {officer
-                ? `You’re checking in as ${account.email}, an officer. You’ll play like everyone else; switch to Just hosting anytime to run the night off the teams. Joining someone else on this phone? Sign out first.`
+                ? `You’re checking in as ${account.email}, an officer. You’ll play like everyone else (in Pictionary you draw but don’t guess, since the host page shows the word); switch to Just hosting anytime. Joining someone else on this phone? Sign out first.`
                 : `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`}
             </p>
           )}
@@ -417,7 +417,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     >
       <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
         {game && (
-          <div className="theme-pine flex items-center gap-3 rounded-[10px] p-2 pr-4 lg:hidden">
+          <div className="theme-pine sticky top-2 z-20 flex items-center gap-3 rounded-[10px] p-2 pr-4 lg:hidden">
             <div className={`tile ${t.tile} size-11 shrink-0 rounded-[6px]`}>
               <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
             </div>
@@ -429,6 +429,11 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
               </p>
             </div>
             {me.team && <p className="narrow text-3xl leading-none font-extrabold">{me.team.score}</p>}
+            {hosting && (
+              <Link to="/hello-world/host" className="btn btn-sm">
+                Host
+              </Link>
+            )}
             {timed && (
               <p className={`narrow border-l border-line pl-3 text-3xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>{clock}</p>
             )}

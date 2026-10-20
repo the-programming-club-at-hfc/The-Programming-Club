@@ -15,13 +15,8 @@ export const WEEKS: Week[] = [
     kind: "match",
     title: "Tech Pictionary",
     pitch:
-      "Everyone takes a turn drawing a secret tech word on their phone, live on the TV, while the room races to guess it on theirs. No letters, numbers, or symbols. The faster people get it, the more you both score.",
-    games: [
-      "Guess the Language (warm-up)",
-      "Tech Pictionary: round 1",
-      "Tech Pictionary: round 2",
-      "Final round, double points: Tech Pictionary, round 3",
-    ],
+      "Everyone takes a turn drawing a secret tech word on their phone, live on the TV, while the room races to guess it on theirs. No letters, numbers, or symbols. Guess it first for the most points, and the drawer scores when the room gets it.",
+    games: ["Guess the Language (warm-up)", "Tech Pictionary", "Tech Pictionary, part 2", "Final round, double points: Tech Pictionary"],
     showXp: 3,
   },
   {
@@ -381,12 +376,12 @@ export const GAMES: Game[] = [
       "The site picks who draws, taking turns, and sends them a secret word on their phone. The word never goes on the TV.",
       "Draw it on your phone, or walk up to the officer tablet: both draw on the same picture, live on the TV. No letters, numbers, or symbols.",
       "Everyone else types guesses on their phone. Wrong guesses never show up anywhere, and a near miss gets a private “So close!”. On team nights, the drawer’s team sits that one out.",
-      "After 75 seconds (or once everyone has it), the word goes up and the points add up on their own.",
+      "After 75 seconds (or once everyone has it), an officer reveals the word and the points add up on their own.",
     ],
     scoring:
       "3 points for the first to guess it, 2 for everyone else who does. The drawer gets 2 if anyone guesses it, 3 if at least half the room does.",
     variants: [],
-    tip: "Draw the big shape first, then the details. Stuck on a word? Skip it from your phone for a new one, until someone has guessed it.",
+    tip: "Draw the big shape first, then the details. Stuck on a word? Skip it from your phone for a new one (twice a drawing), until someone has guessed it.",
   },
   {
     id: "lang",
@@ -489,7 +484,7 @@ export const PREP: string[] = [
   "Code Relay or Cup nights: make sure every team computer has an editor or onecompiler.com open.",
   "Fix it for real and puzzle nights (Spooky Bugs, the Midseason Cup, Code Relay, the Final): players use their join page: a phone answers puzzles, and a laptop gets the full editor (join again on it with the same HawkMail). Lab computers in use open programmingclub.dev/hello-world/fix and type the key from a phone (also on /host). Python loads by itself.",
   "Puzzle nights: try the puzzle at /hello-world/test first, so you know the example and how part 2 twists part 1.",
-  "Tech Pictionary nights: charge the officer tablet, sign in on it, and open programmingclub.dev/hello-world/draw. Set it where drawers can walk up to it.",
+  "Tech Pictionary nights: charge the officer tablet, sign in on it, and open programmingclub.dev/hello-world/draw. Set its screen timeout to 10 minutes so it doesn’t lock between drawings, and set it where drawers can walk up to it.",
 ];
 export const NEWCOMERS: string[] = [
   "Point them at the QR code on the TV. Joining takes about 20 seconds.",

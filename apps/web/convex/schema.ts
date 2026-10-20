@@ -243,9 +243,14 @@ export default defineSchema({
     n: v.number(),
     key: v.string(),
     drawer: v.id("attendance"),
+    // The drawer's team when the drawing went up (or was handed over), so moving the drawer to another team mid-drawing
+    // can't turn a team that already guessed it into the drawer's.
+    team: v.optional(v.id("teams")),
     word: v.string(),
     // Goes up each time the word changes (skip, switch drawer), so ink from before never lands on the new canvas.
     rev: v.optional(v.number()),
+    // Skips from the drawer's phone; a new drawer starts at 0.
+    skips: v.optional(v.number()),
     // Strokes undone or cleared, so ink still on its way for them is dropped instead of drawing fragments back.
     gone: v.optional(v.array(v.string())),
     // Set when the drawing is scored, for every team that got points. `points` includes double points.

@@ -89,6 +89,7 @@ export function useNewDrawing() {
 export function DrawHost({ live }: { live: Live }) {
   const data = useQuery(api.drawings.host);
   const skip = useMutation(api.drawings.skip);
+  const setScreen = useMutation(api.sessions.setScreen);
   const switchDrawer = useMutation(api.drawings.switchDrawer);
   const timer = useMutation(api.sessions.timer);
   const remaining = useRemaining(live.timer);
@@ -114,6 +115,12 @@ export function DrawHost({ live }: { live: Live }) {
       </div>
       {d && !d.over && (
         <>
+          {/* The scoreboard or join screen went up mid-drawing: phones and the tablet stop drawing until it's back. */}
+          {live.screen.mode !== "draw" && (
+            <button className="btn btn-coin mt-3 w-full" onClick={() => run(setScreen({ screen: { ...live.screen, mode: "draw" } }))}>
+              Put the drawing back on the TV
+            </button>
+          )}
           <WordPeek word={d.word} />
           <div className="mt-2 flex flex-wrap gap-2">
             <button
@@ -208,7 +215,7 @@ export function NextPanel({
   const wiki = useQuery(api.wiki.board, waiting && s.mode === "wiki" ? {} : "skip");
   const drawing = useQuery(api.drawings.board, waiting && s.mode === "draw" ? {} : "skip");
   // Who draws next, for the button.
-  const draws = useQuery(api.drawings.host, r?.kind === "pictionary" && step === "show" ? {} : "skip");
+  const draws = useQuery(api.drawings.host, r?.kind === "pictionary" && (step === "show" || step === "choose") ? {} : "skip");
   const allIn =
     allStars ||
     (teams > 0 &&
@@ -315,7 +322,7 @@ export function NextPanel({
       },
     };
   } else if (step === "choose") {
-    primary = { label: `Another ${thing}`, go: show };
+    primary = { label: r.kind === "pictionary" ? `Another drawing: ${draws?.next?.name ?? "next in turn"}` : `Another ${thing}`, go: show };
     alt = onward;
   } else primary = onward;
 
@@ -328,13 +335,22 @@ export function NextPanel({
     }
   };
 
-  // Space or → for the big button, N for the next round. Typing in a field, or a control with its own keys, is left alone.
+  // Space or → for the big button, N for the next round. Typing in a field, a control with its own keys, an open menu,
+  // and a phone's other panes (where this panel is hidden) are left alone.
   const keys = useRef({ primary, alt, busy, act });
   keys.current = { primary, alt, busy, act };
+  const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target instanceof HTMLElement ? e.target : null;
-      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || t?.closest("input, textarea, select, [contenteditable], [data-own-keys]"))
+      if (
+        e.repeat ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.altKey ||
+        t?.closest("input, textarea, select, summary, details[open], [contenteditable], [data-own-keys]") ||
+        !panel.current?.offsetParent
+      )
         return;
       const k = keys.current;
       const a = e.key === " " || e.key === "ArrowRight" ? k.primary : e.key === "n" || e.key === "N" ? k.alt : null;
@@ -354,7 +370,7 @@ export function NextPanel({
     !(r.kind === "wiki" || r.kind === "puzzle" || r.kind === "pictionary" || (r.kind === "deck" && r.game !== "relay"));
   const rules = r && GAMES.find((g) => g.id === (r.game ?? r.kind));
   return (
-    <section className={`card p-5 ring-2 ring-gold max-lg:p-4 ${className}`}>
+    <section ref={panel} className={`card p-5 ring-2 ring-gold max-lg:p-4 ${className}`}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-2xl max-lg:text-lg">Run the night</h2>
         <p className="text-dim">

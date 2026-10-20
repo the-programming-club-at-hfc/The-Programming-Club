@@ -67,8 +67,10 @@ export function Sketch({
   const cur = useRef<Stroke | null>(null);
   const tick = useRef<ReturnType<typeof setInterval>>(undefined);
   const lastSend = useRef<Promise<unknown>>(Promise.resolve());
-  // Once a pen has drawn here, touches are a resting palm, not ink.
-  const pen = useRef(false);
+  // While a pen is in use (touching or hovering in the last 2 seconds), touches are a resting palm, not ink. Put the pen
+  // down and a finger draws again.
+  const penAt = useRef(0);
+  const penNear = () => Date.now() - penAt.current < 2000;
 
   // Every ink row, block by block: a new row only resends the last block.
   const count = useQuery(api.drawings.inkBlocks, { drawingId }) ?? 0;
@@ -135,9 +137,9 @@ export function Sketch({
   }, [edit]);
 
   const down = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!edit || e.button > 0 || (e.pointerType === "touch" && pen.current)) return;
+    if (!edit || e.button > 0 || (e.pointerType === "touch" && penNear())) return;
     if (e.pointerType === "pen") {
-      pen.current = true;
+      penAt.current = Date.now();
       // A palm that landed before the pen gives way to it: its stroke goes, here and on the server.
       const palm = cur.current?.touch ? drop() : null;
       if (palm?.sent) undo({ drawingId, ...who, stroke: palm.id }).catch(() => undefined);
@@ -152,6 +154,7 @@ export function Sketch({
   };
 
   const move = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "pen") penAt.current = Date.now();
     const c = cur.current;
     if (!c || e.pointerId !== c.pointer) return;
     // Every point the pointer passed since the last event, where the browser keeps them (older Safari doesn't).
@@ -238,7 +241,12 @@ export function Sketch({
           </button>
           <button
             className="btn btn-sm"
-            onClick={() => confirm("Clear the whole drawing?") && act(clear({ drawingId, ...who, mine: own.slice(-50) }))}
+            onClick={() => {
+              if (!confirm("Clear the whole drawing?")) return;
+              // A stroke still being drawn (the pen still down, or another finger) goes too, here and on the server.
+              const c = drop();
+              act(clear({ drawingId, ...who, mine: [...own, ...(c ? [c.id] : [])].slice(-50) }));
+            }}
           >
             Clear
           </button>
@@ -305,6 +313,8 @@ export function PhoneDraw({
   const me = useQuery(api.drawings.mine, { token });
   const skip = useMutation(api.drawings.skip);
   const [error, setError] = useState("");
+  // One skip at a time, so a double tap never skips twice.
+  const [skipping, setSkipping] = useState(false);
   const key = drawKey(live.screen.drawing ?? 0);
   const b = board?.key === key ? board : null;
   const m = me?.key === key ? me : null;
@@ -318,14 +328,15 @@ export function PhoneDraw({
   if (!b) return null;
   const done = !!live.screen.revealed || b.scored;
   const result = done && m?.points ? `+${m.points}` : null;
-  // As big as fits on a short screen with the word and tools in view; phones stay full width. On a wide screen (a tablet in
-  // landscape, a laptop), the word, canvas, and guess box share one column as wide as the canvas can be (and no wider than
-  // the room beside the join page's left column, or a 44rem canvas), with the drawer's tools beside the canvas.
+  // As big as fits on a short screen with the word and tools in view, but never under 16rem (a phone on its side scrolls
+  // instead); phones stay full width. On a wide screen (a tablet in landscape, a laptop), the word, canvas, and guess box
+  // share one column as wide as the canvas can be (and no wider than the room beside the join page's left column, or a
+  // 44rem canvas), with the drawer's tools beside the canvas.
   const canvas = (room: string) => `mx-auto aspect-[4/3] w-full border-[1.5px] border-line ${room}`;
 
   if (m?.drawer)
     return (
-      <div ref={top} className="scroll-mt-3 space-y-3 lg:w-[min((100dvh-12.5rem)*4/3+6.75rem,100vw-26rem,50.75rem)]">
+      <div ref={top} className="scroll-mt-20 space-y-3 lg:w-[min((100dvh-12.5rem)*4/3+6.75rem,100vw-26rem,50.75rem)]">
         {/* One row: the word on the left, Skip on the right. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[10px] bg-sun p-4 text-[#12332b] lg:px-5 lg:py-3" role="status">
           <div className="min-w-0 flex-1">
@@ -336,7 +347,13 @@ export function PhoneDraw({
           {open && b.got.length === 0 && (
             <button
               className="btn btn-sm shrink-0"
-              onClick={() => skip({ drawingId: b._id, token }).catch((e: unknown) => setError(errorText(e)))}
+              disabled={skipping}
+              onClick={() => {
+                setSkipping(true);
+                skip({ drawingId: b._id, token })
+                  .catch((e: unknown) => setError(errorText(e)))
+                  .finally(() => setSkipping(false));
+              }}
             >
               Skip word
             </button>
@@ -350,7 +367,7 @@ export function PhoneDraw({
           rev={b.rev}
           edit={open}
           className="lg:flex lg:items-start lg:gap-3"
-          canvasClass={canvas("max-w-[calc((100dvh-21rem)*4/3)] lg:max-w-none lg:min-w-0 lg:flex-1")}
+          canvasClass={canvas("max-w-[max((100dvh-21rem)*4/3,16rem)] lg:max-w-none lg:min-w-0 lg:flex-1")}
           toolsClass="mt-2 flex flex-wrap items-center gap-2 lg:mt-0 lg:grid lg:w-24 lg:shrink-0 lg:grid-cols-2 lg:content-start lg:justify-items-center lg:[&>button:nth-last-of-type(-n+2)]:col-span-2 lg:[&>button:nth-last-of-type(-n+2)]:w-full lg:[&>p]:col-span-2"
         />
         {!done && (
@@ -363,9 +380,10 @@ export function PhoneDraw({
     );
 
   const got = m?.place ? `${w.You} got it! ${ordinal(m.place)}${m.by ? ` (${m.by})` : ""}` : null;
-  const status = got ?? (m?.teammate ? `${b.drawer} is drawing for ${w.you}` : done && playing ? "Not this time" : null);
+  const status =
+    got ?? (m?.teammate ? `${b.drawer} ${done ? "drew" : "is drawing"} for ${w.you}` : done && playing ? "Not this time" : null);
   return (
-    <div ref={top} className="scroll-mt-3 space-y-3 lg:w-[min((100dvh-13rem)*4/3,100vw-26rem,44rem)]">
+    <div ref={top} className="scroll-mt-20 space-y-3 lg:w-[min((100dvh-13rem)*4/3,100vw-26rem,44rem)]">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
         <p className="font-semibold wrap-anywhere">{done ? "The word was" : `${b.drawer} is drawing`}</p>
         {done && b.word ? (
@@ -381,8 +399,8 @@ export function PhoneDraw({
           {m?.teammate && !done && <p className="mt-2 font-semibold">Sit this one out and cheer them on.</p>}
         </div>
       )}
-      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[calc((100dvh-16rem)*4/3)] lg:max-w-none")} />
-      {officer && !done ? (
+      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[max((100dvh-16rem)*4/3,16rem)] lg:max-w-none")} />
+      {officer && playing && !done ? (
         <p className="text-sm text-dim">Officers see the word, so you draw but don’t guess.</p>
       ) : (
         playing &&
@@ -390,7 +408,8 @@ export function PhoneDraw({
         !m.teammate &&
         !got &&
         !done &&
-        (open ? <GuessBox token={token} card={key} /> : <p className="font-semibold">Time’s up.</p>)
+        // A new word (a skip) starts a fresh box, so a "So close!" for the old word goes.
+        (open ? <GuessBox key={b.rev} token={token} card={key} /> : <p className="font-semibold">Time’s up.</p>)
       )}
     </div>
   );

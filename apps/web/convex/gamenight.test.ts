@@ -1061,7 +1061,8 @@ describe("Tech Pictionary", () => {
   test("the word never reaches the TV or a guesser: only the drawer's phone and officers", async () => {
     const o = setup();
     const tokens = await soloNight(o, 4);
-    const d = await newDrawing(o);
+    // A set word: a random one could be "key", which every JSON reply has as a field name.
+    const d = await newDrawing(o, "spreadsheet");
     const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
     const word = JSON.stringify(d.word);
     expect(JSON.stringify(await o.t.query(api.sessions.live, {}))).not.toContain(word);
@@ -1089,11 +1090,11 @@ describe("Tech Pictionary", () => {
     const guess = (token: string, text: string) => o.t.mutation(api.drawings.guess, { token, card: d.key, text });
     later(5);
     expect(await guess(a, "printer")).toBe("wrong");
-    later(1);
+    later(2);
     expect(await guess(a, "keybord")).toBe("close");
-    await expect(guess(a, "keyboard")).rejects.toThrow("one guess a second");
+    await expect(guess(a, "keyboard")).rejects.toThrow("one guess every 2 seconds");
     await expect(guess(a, "x".repeat(61))).rejects.toThrow("too long");
-    later(1);
+    later(2);
     expect(await guess(a, " Key-Boards ")).toBe("right");
     await expect(guess(a, "keyboard")).rejects.toThrow("Already got it");
     await expect(guess(d.drawer.token, "keyboard")).rejects.toThrow("the one drawing");
@@ -1104,8 +1105,8 @@ describe("Tech Pictionary", () => {
 
     const board = (await o.t.query(api.drawings.board, {}))!;
     expect(board.got.map((g) => [g.by, g.ms])).toEqual([
-      ["Student " + (tokens.indexOf(a) + 1), 7_000],
-      ["Student " + (tokens.indexOf(b) + 1), 12_000],
+      ["Student " + (tokens.indexOf(a) + 1), 9_000],
+      ["Student " + (tokens.indexOf(b) + 1), 14_000],
     ]);
     expect([board.guessing, board.results]).toEqual([3, null]);
     expect((await o.t.query(api.drawings.mine, { token: b }))!).toEqual({
@@ -1310,6 +1311,54 @@ describe("Tech Pictionary", () => {
     const drawers = new Set([d.drawer._id]);
     for (let i = 0; i < 3; i++) drawers.add((await newDrawing(o)).drawer._id);
     expect(drawers.has((await o.attendance()).find((a) => a.token === ada)!._id)).toBe(true);
+  });
+
+  test("playing officers can't guess, so they don't count toward half the room for the drawer's bonus", async () => {
+    const o = setup();
+    const code = await o.startNight(2);
+    const tokens = [];
+    for (let i = 1; i <= 3; i++) tokens.push(await o.join(code, student(i)));
+    // Two officers playing: one signed in, one by typing an officer email. Each is a team of their own.
+    await o.officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    await o.join(code, { name: "Grace", email: GRACE });
+    let d = await newDrawing(o, "mouse");
+    while (d.drawer.officer) d = await newDrawing(o, "mouse");
+    const board = (await o.t.query(api.drawings.board, {}))!;
+    // Two students can guess; the officers' teams aren't counted.
+    expect(board.guessing).toBe(2);
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: "mouse" });
+    await reveal(o, d.n);
+    // 1 of 2 is half, so the drawer gets 3, not 2.
+    expect((await o.t.query(api.players.me, { token: d.drawer.token }))!.team!.score).toBe(3);
+  });
+
+  test("a drawer's phone gets two skips a drawing; an officer can always skip; malformed stroke ids are turned away", async () => {
+    const o = setup();
+    await soloNight(o, 3);
+    const d = await newDrawing(o);
+    const skip = (token?: string) => o.t.mutation(api.drawings.skip, { drawingId: d.id, token });
+    await skip(d.drawer.token);
+    await skip(d.drawer.token);
+    await expect(skip(d.drawer.token)).rejects.toThrow("two skips");
+    await o.officer.mutation(api.drawings.skip, { drawingId: d.id });
+    const long = "x".repeat(41);
+    await expect(o.t.mutation(api.drawings.undo, { drawingId: d.id, token: d.drawer.token, stroke: long })).rejects.toThrow("not a stroke");
+    await expect(o.t.mutation(api.drawings.clear, { drawingId: d.id, token: d.drawer.token, mine: [long] })).rejects.toThrow("strokes");
+  });
+
+  test("moving the drawer to a team that already got it doesn't take that team's guess away", async () => {
+    const o = setup();
+    const { teams } = await o.nightWithTeams(6, 2);
+    const d = await newDrawing(o, "printer");
+    const mine = teams.find((tm) => tm._id === d.drawer.teamId)!;
+    const x = teams.find((tm) => tm !== mine)!;
+    expect(await o.t.mutation(api.drawings.guess, { token: x.tokens[0], card: d.key, text: "printer" })).toBe("right");
+    await o.officer.mutation(api.teams.move, { attendanceId: d.drawer._id, teamId: x._id });
+    expect((await o.t.query(api.drawings.board, {}))!.got.map((g) => g.teamId)).toEqual([x._id]);
+    // The drawing stays with the team it went up with: x keeps its 3, and the drawer's points go to that team.
+    await reveal(o, d.n);
+    expect([await o.score(x._id), await o.score(mine._id)]).toEqual([3, 3]);
   });
 
   test("a drawing left behind scores when another drawing, card, or round goes up, so teams aren't stuck", async () => {
