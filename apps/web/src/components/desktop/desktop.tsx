@@ -3,7 +3,7 @@
 // Phones get a home screen of app icons, and each app opens full screen.
 import { Show, SignInButton, UserButton } from "@clerk/tanstack-react-start";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { InstagramGlyph, InstagramLink } from "#/components/instagram";
 import { useLikelyOfficer } from "#/components/officer";
@@ -17,8 +17,11 @@ import type { App, AppId } from "./apps";
 type Pt = { x: number; y: number };
 /** Windows animate between states; the state only changes once the animation ends. */
 type Phase = "opening" | "closing" | "minimizing" | "restoring" | "zooming";
-/** Array order is stacking order; `n` is opening order, which the taskbar keeps. `delay` holds the first windows until startup finishes. */
-type Win = { id: AppId; n: number; pos?: Pt; min?: boolean; max?: boolean; phase?: Phase; fly?: Pt; delay?: number };
+/**
+ * Array order is stacking order; `n` is opening order, which the taskbar keeps. `delay` holds the first windows until startup finishes.
+ * `tile` places the two startup windows side by side (0 left, 1 right) instead of at their usual spots, where they'd overlap.
+ */
+type Win = { id: AppId; n: number; pos?: Pt; min?: boolean; max?: boolean; phase?: Phase; fly?: Pt; delay?: number; tile?: 0 | 1 };
 let opened = 0;
 /** The startup animation plays on the first load only, not when coming back from another page. Set in an effect, so never on the server. */
 let booted = false;
@@ -70,8 +73,14 @@ export function Desktop() {
       n: ++opened,
       phase: "opening",
       delay: boot ? 700 + i * 120 : 0,
+      tile: routeApp ? undefined : id === "about" ? 0 : 1,
     })),
   );
+  // Too narrow to tile the startup pair: keep Meetings in the taskbar rather than under welcome.txt.
+  useLayoutEffect(() => {
+    if (matchMedia("(max-width: 56rem)").matches)
+      setWins((ws) => ws.map((w) => (w.tile === 1 ? { ...w, min: true, phase: undefined } : w)));
+  }, []);
   const [startOpen, setStartOpen] = useState(false);
   const iconApps = useIconApps();
   const october = isHalloweenMonth();
@@ -225,6 +234,17 @@ export function Desktop() {
   );
 }
 
+// Two equal windows centered in the space right of the icons, 1rem apart. On narrow screens they shrink to 19rem,
+// then the right one slides left over the first rather than off the edge.
+const TILE_W = "min(28rem, max(19rem, (100% - 18rem) / 2))";
+const TILE_X = `16rem + max(0rem, (100% - 18rem - 2 * ${TILE_W}) / 2)`;
+const tiled = (i: 0 | 1): CSSProperties => ({
+  left: i ? `min(${TILE_X} + ${TILE_W} + 1rem, 100% - ${TILE_W} - 1rem)` : `calc(${TILE_X})`,
+  top: "1.5rem",
+  width: TILE_W,
+  maxHeight: "calc(100% - 2.5rem)",
+});
+
 function Window({
   app,
   win,
@@ -273,8 +293,10 @@ function Window({
     ? { left: 0, top: 0, width: "100%", height: "100%" }
     : win.pos
       ? { left: win.pos.x, top: win.pos.y, width: app.width, maxHeight: `calc(100% - ${win.pos.y}px - 1rem)` }
-      : // Clear the icon columns (two once officers see the Dashboard) so a fresh window never covers them.
-        { left: `max(16rem, ${app.at.left}%)`, top: `${app.at.top}%`, width: app.width, maxHeight: `calc(${100 - app.at.top}% - 1rem)` };
+      : win.tile !== undefined
+        ? tiled(win.tile)
+        : // Clear the icon columns (two once officers see the Dashboard) so a fresh window never covers them.
+          { left: `max(16rem, ${app.at.left}%)`, top: `${app.at.top}%`, width: app.width, maxHeight: `calc(${100 - app.at.top}% - 1rem)` };
   const fly = win.fly ? { "--fx": `${win.fly.x}px`, "--fy": `${win.fly.y}px` } : {};
 
   return (

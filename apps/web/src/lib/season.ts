@@ -18,10 +18,11 @@ export const CLUB = {
 
 // The club's public Google Calendar. These are links out; the website doesn't sync with it.
 export const CALENDAR = {
-  view: "https://calendar.google.com/calendar/embed?src=c_8c33a8b2e7481df59d3e5692a3b8991bfed47a3aa62ffa94c1cdc6ddff226967%40group.calendar.google.com&ctz=America%2FDetroit",
   subscribe:
     "https://calendar.google.com/calendar/u/0?cid=Y184YzMzYThiMmU3NDgxZGY1OWQzZTU2OTJhM2I4OTkxYmZlZDQ3YTNhYTYyZmZhOTRjMWNkYzZkZGZmMjI2OTY3QGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20",
-  ics: "https://calendar.google.com/calendar/ical/c_8c33a8b2e7481df59d3e5692a3b8991bfed47a3aa62ffa94c1cdc6ddff226967%40group.calendar.google.com/public/basic.ics",
+  /** Opens Apple Calendar or Outlook to subscribe. */
+  webcal:
+    "webcal://calendar.google.com/calendar/ical/c_8c33a8b2e7481df59d3e5692a3b8991bfed47a3aa62ffa94c1cdc6ddff226967%40group.calendar.google.com/public/basic.ics",
 };
 
 export const INSTAGRAM_URL = `https://www.instagram.com/${CLUB.instagram}/`;

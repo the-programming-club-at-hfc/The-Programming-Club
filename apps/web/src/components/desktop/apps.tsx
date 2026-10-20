@@ -120,9 +120,25 @@ function Meetings() {
           </div>
         </div>
       )}
+      {/* Up top, so it's in view when the window opens; the season list below can run long. */}
+      <h3 className="text-sm font-bold text-dim">Add to your calendar</h3>
+      <div className="mt-2 mb-5 grid grid-cols-2 gap-2">
+        <a href={CALENDAR.subscribe} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
+          Google ↗
+        </a>
+        <a href={CALENDAR.webcal} className="btn btn-sm">
+          Apple / Outlook
+        </a>
+      </div>
       {isHalloweenMonth() && costume && (
         <p className="mb-4 text-sm font-semibold text-[#c2410c]">Come to {costume.title} in costume for +3 XP.</p>
       )}
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-bold text-dim">This season</h3>
+        <Link to="/hello-world/season" className="link text-sm">
+          Every week’s games
+        </Link>
+      </div>
       <ol className="divide-y divide-line">
         {plan.map((w, i) => {
           const past = next ? i < next.i : now !== null;
@@ -138,24 +154,6 @@ function Meetings() {
           );
         })}
       </ol>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <a href={CALENDAR.subscribe} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
-          Subscribe ↗
-        </a>
-        <a href={CALENDAR.view} target="_blank" rel="noreferrer" className="btn btn-sm">
-          View calendar ↗
-        </a>
-        <Link to="/hello-world/season" className="link px-1 text-sm">
-          See every week’s games
-        </Link>
-      </div>
-      <p className="mt-2 text-xs text-dim">
-        Apple or Outlook? Subscribe with the{" "}
-        <a href={CALENDAR.ics} className="link">
-          iCal link
-        </a>
-        .
-      </p>
     </div>
   );
 }
