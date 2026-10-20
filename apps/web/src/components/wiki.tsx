@@ -25,11 +25,11 @@ export const WikiPair = ({ from, to }: { from: string; to: string }) => (
   <div className="grid grid-cols-2 gap-[3px]">
     <div className="bg-mist p-5">
       <p className="text-sm text-dim">Start here</p>
-      <p className="mt-1 text-2xl font-extrabold">{from}</p>
+      <p className="mt-1 text-xl font-extrabold wrap-anywhere sm:text-2xl">{from}</p>
     </div>
     <div className="tile tile-sky p-5">
       <p className="text-sm">Get to</p>
-      <p className="mt-1 text-2xl font-extrabold">{to}</p>
+      <p className="mt-1 text-xl font-extrabold wrap-anywhere sm:text-2xl">{to}</p>
     </div>
   </div>
 );

@@ -7,6 +7,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { fmtClock } from "./game";
 import { ordinal } from "./ui";
 import { COLORS, GUESS_MAX, H, MAX_INK_POINTS, SIZES, W, inkPath } from "#/lib/draw";
 import { answersOpen, drawKey } from "#/lib/grading";
@@ -291,16 +292,19 @@ export function PhoneDraw({
   token,
   live,
   open,
+  remaining,
   playing,
   officer,
 }: {
   token: string;
   live: Live;
   open: boolean;
+  remaining: number;
   playing: boolean;
   officer: boolean;
 }) {
   const board = useQuery(api.drawings.board);
+  const top = useRef<HTMLDivElement>(null);
   const me = useQuery(api.drawings.mine, { token });
   const skip = useMutation(api.drawings.skip);
   const [error, setError] = useState("");
@@ -308,15 +312,31 @@ export function PhoneDraw({
   const b = board?.key === key ? board : null;
   const m = me?.key === key ? me : null;
   const w = teamWords(live.teamSize === 1);
+  const id = b?._id;
+  // A new drawing scrolls up to fill the screen if it doesn't fit below the name and score; the clock comes along.
+  useEffect(() => {
+    const el = top.current;
+    if (id && el && el.getBoundingClientRect().bottom > innerHeight) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [id]);
   if (!b) return null;
   const done = !!live.screen.revealed || b.scored;
   const result = done && m?.points ? `+${m.points}` : null;
+  const clock = !done && live.timer.startedAt && (
+    <p className={`narrow ml-auto text-3xl leading-none font-extrabold ${open && remaining <= 10_000 ? "text-signal" : ""}`}>
+      {fmtClock(remaining)}
+    </p>
+  );
+  // As big as fits on a short, wide screen (a tablet or laptop) with the word and tools in view; phones stay full width.
+  const canvas = (room: string) => `mx-auto aspect-[4/3] w-full border-[1.5px] border-line ${room}`;
 
   if (m?.drawer)
     return (
-      <div className="space-y-3">
+      <div ref={top} className="scroll-mt-3 space-y-3">
         <div className="rounded-[10px] bg-sun p-5 text-[#12332b]" role="status">
-          <p className="font-semibold">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
+          <div className="flex items-start gap-3">
+            <p className="font-semibold">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
+            {clock}
+          </div>
           <p className="mt-1 text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{m.word}</p>
           {result && <p className="mt-2 text-2xl font-extrabold">{result}</p>}
           {open && b.got.length === 0 && (
@@ -329,7 +349,14 @@ export function PhoneDraw({
           )}
           {error && <p className="mt-2 text-sm font-semibold">{error}</p>}
         </div>
-        <Sketch key={`${b._id}:${b.rev}`} drawingId={b._id} token={token} rev={b.rev} edit={open} />
+        <Sketch
+          key={`${b._id}:${b.rev}`}
+          drawingId={b._id}
+          token={token}
+          rev={b.rev}
+          edit={open}
+          canvasClass={canvas("max-w-[calc((100dvh-15rem)*4/3)]")}
+        />
         {!done && (
           <p className="text-sm text-dim">
             Draw here, or walk up to the officer tablet: it draws on this same picture. No letters, numbers, or symbols.
@@ -342,9 +369,10 @@ export function PhoneDraw({
   const got = m?.place ? `${w.You} got it! ${ordinal(m.place)}${m.by ? ` (${m.by})` : ""}` : null;
   const status = got ?? (m?.teammate ? `${b.drawer} is drawing for ${w.you}` : done && playing ? "Not this time" : null);
   return (
-    <div className="space-y-3">
+    <div ref={top} className="scroll-mt-3 space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <p className="font-semibold">{done ? "The word was" : `${b.drawer} is drawing`}</p>
+        <p className="font-semibold wrap-anywhere">{done ? "The word was" : `${b.drawer} is drawing`}</p>
+        {clock}
         {done && b.word ? (
           <p className="w-full text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
         ) : (
@@ -358,7 +386,7 @@ export function PhoneDraw({
           {m?.teammate && !done && <p className="mt-2 font-semibold">Sit this one out and cheer them on.</p>}
         </div>
       )}
-      <Sketch key={b._id} drawingId={b._id} />
+      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[calc((100dvh-13rem)*4/3)]")} />
       {officer && !done ? (
         <p className="text-sm text-dim">Officers see the word, so you draw but don’t guess.</p>
       ) : (

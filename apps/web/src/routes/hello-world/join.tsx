@@ -82,7 +82,7 @@ function Join() {
           See this week’s game
         </Link>
         <p className="mt-8">
-          <InstagramLink className="link" />
+          <InstagramLink className="link py-2.5" />
         </p>
       </Center>
     );
@@ -108,7 +108,7 @@ function NightOver({ me }: { me: Me }) {
   const t = me.tonight;
   return (
     <Center>
-      <p className="text-dim">
+      <p className="text-dim wrap-anywhere">
         Week {me.week} is over. Thanks, {me.name}!
       </p>
       {t ? (
@@ -127,7 +127,7 @@ function NightOver({ me }: { me: Me }) {
         See the scores
       </Link>
       <p className="mt-8 text-dim">Got photos from tonight? Tag us.</p>
-      <InstagramLink className="link mt-1" />
+      <InstagramLink className="link py-2.5" />
     </Center>
   );
 }
@@ -217,7 +217,7 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
   const askName = !officer && !(member && account.name);
   return (
     <Wrap className="flex min-h-dvh max-w-xl flex-col py-5">
-      <form onSubmit={submit} className="flex flex-1 flex-col gap-4">
+      <form onSubmit={submit} className="flex flex-1 flex-col gap-4 [&_input,&_textarea]:scroll-mb-36">
         <div>
           <h1 className="text-[clamp(2.2rem,10vw,3.2rem)] leading-[0.9] lowercase">{officer ? "officer check-in" : "join the game"}</h1>
           {(officer || wrongAccount) && (
@@ -335,14 +335,14 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
           <p className="mt-2 text-center text-sm text-dim">
             {isAuthenticated ? (
               <SignOutButton redirectUrl={here}>
-                <button type="button" className="link">
+                <button type="button" className="link py-2.5">
                   Not you? Sign out
                 </button>
               </SignOutButton>
             ) : (
               <SignInButton mode="modal" withSignUp forceRedirectUrl={here} initialValues={{ emailAddress: profile.email || undefined }}>
                 {/* Keeps the name typed so far for after signing in. */}
-                <button type="button" className="link" onClick={() => localStorage.setItem("hwc.profile", JSON.stringify(profile))}>
+                <button type="button" className="link py-2.5" onClick={() => localStorage.setItem("hwc.profile", JSON.stringify(profile))}>
                   Sign in with your HawkMail to join in one tap next time
                 </button>
               </SignInButton>
@@ -381,7 +381,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const py = usePython(work && teamComputer);
   const wide = work && s.mode === "card" && (s.game === "fix" || s.game === "puzzle");
   const phoneView = !laptop && (
-    <button className="link mb-3 text-sm text-dim" onClick={() => setFullFor(null)}>
+    <button className="link mb-1 py-2.5 text-sm text-dim" onClick={() => setFullFor(null)}>
       Back to the phone view
     </button>
   );
@@ -390,14 +390,14 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       <p className="text-sm text-dim">
         Week {live.week}: {wk.title}
       </p>
-      <h1 className="mt-0.5 text-[clamp(2rem,8vw,3rem)] lowercase">{me.name}</h1>
+      <h1 className="mt-0.5 text-[clamp(2rem,8vw,3rem)] lowercase wrap-anywhere">{me.name}</h1>
       {me.practice && <p className="mt-2 font-semibold text-pine">Practice night: nothing tonight counts toward XP.</p>}
 
       <div className="mt-4 grid grid-cols-[auto_1fr] gap-[3px]">
         <div className={`tile ${t.tile} w-16 sm:w-32`}>
           <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
         </div>
-        <div className="theme-pine p-4 sm:p-6">
+        <div className="theme-pine min-w-0 p-4 sm:p-6">
           {me.officer && !me.playing ? (
             <>
               <p className="text-dim">Officer</p>
@@ -410,16 +410,16 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           ) : me.team ? (
             <>
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="text-dim">{w.yourTeam}</p>
-                  <h2 className="mt-1 text-2xl sm:text-3xl">{me.team.name}</h2>
+                  <h2 className="mt-1 text-2xl wrap-anywhere sm:text-3xl">{me.team.name}</h2>
                   <p className="mt-2 font-semibold">
                     {ordinal(me.team.rank)} of {me.team.of}
                   </p>
                 </div>
                 <p className="narrow text-6xl leading-none font-extrabold sm:text-7xl">{me.team.score}</p>
               </div>
-              {!solo && <p className="mt-3 border-t border-line pt-2 text-sm text-dim">{me.team.members.join(", ")}</p>}
+              {!solo && <p className="mt-3 border-t border-line pt-2 text-sm text-dim wrap-anywhere">{me.team.members.join(", ")}</p>}
               {/* Only for a lab computer at /hello-world/fix: this page does it all, on a phone or a laptop. */}
               {me.team.key && teamComputer && (
                 <p className="mt-1 text-xs text-dim">
@@ -529,12 +529,13 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             token={token}
             live={live}
             open={phoneOpen(live, drawKey(s.drawing), remaining)}
+            remaining={remaining}
             playing={!!me.team}
             officer={me.officer}
           />
         </div>
       )}
-      {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold">{s.message}</p>}
+      {s.mode === "message" && s.message && <p className="card mt-5 p-6 text-2xl font-bold wrap-anywhere">{s.message}</p>}
 
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8 text-sm text-dim">
         {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
@@ -546,10 +547,10 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             {me.weeks === 1 ? "" : "s"}
           </p>
         )}
-        <button onClick={onSwitch} className="link">
+        <button onClick={onSwitch} className="link py-2.5 wrap-anywhere">
           Not {me.name}? Switch player
         </button>
-        <InstagramLink className="w-full justify-center border-t border-line pt-3" />
+        <InstagramLink className="w-full justify-center border-t border-line pt-3 pb-2" />
       </div>
     </Wrap>
   );
@@ -702,7 +703,7 @@ function FixStatus({ live, index, teamId, onOpen }: { live: Live; index: number;
         {mine?.result?.first && <p className="mt-2 font-semibold">{w.first} to fix it.</p>}
       </div>
       {!done && (
-        <button className="link text-sm text-dim" onClick={onOpen}>
+        <button className="link py-2.5 text-sm text-dim" onClick={onOpen}>
           On a tablet? Open the full fix here
         </button>
       )}
@@ -781,18 +782,18 @@ function PuzzleStatus({
       {!done && (
         <>
           <details>
-            <summary className="cursor-pointer font-bold">The example</summary>
+            <summary className="cursor-pointer py-2 font-bold">The example</summary>
             <div className="mt-2">
               <PuzzleExample p={p} part2={n > 0} />
             </div>
           </details>
           <details>
-            <summary className="cursor-pointer font-bold">My puzzle input</summary>
+            <summary className="cursor-pointer py-2 font-bold">My puzzle input</summary>
             <div className="mt-2">
               <InputBox input={input} solo={w.solo} />
             </div>
           </details>
-          <button className="link text-sm text-dim" onClick={onOpen}>
+          <button className="link py-2.5 text-sm text-dim" onClick={onOpen}>
             Open the full puzzle here, with a Python editor
           </button>
         </>

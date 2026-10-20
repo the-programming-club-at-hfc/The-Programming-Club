@@ -187,7 +187,7 @@ export function CardView({
               Hints: <strong>1.</strong> {p.hint[0]} <strong>2.</strong> {p.hint[1]}
             </p>
             <details className="text-sm">
-              <summary className="cursor-pointer font-bold">A Python solution</summary>
+              <summary className="cursor-pointer py-2 font-bold">A Python solution</summary>
               <Code code={p.solution} className="mt-2" />
             </details>
           </div>
