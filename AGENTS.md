@@ -17,3 +17,7 @@ On the owner's machine (Juan's), these CLIs are installed and authenticated. Use
 - Officer access comes from `OFFICER_EMAILS` on each Convex deployment (`bunx convex env get|set OFFICER_EMAILS --deployment <name>`). Never put real emails or other personal data in the repo: it's public.
 - Clerk's agent skills (`clerk/skills`, unlicensed) aren't committed. Restore them locally from `skills-lock.json` with `bunx skills add clerk/skills`.
 - Confirm before anything destructive or production-facing: deleting resources, rotating keys, production env changes, production deploys.
+
+## Screenshots in PR descriptions
+
+Put them on the `pr-assets` branch, never on a branch of their own: it's an orphan branch (no shared history with `main`) with a folder per PR (`pr-12/`), and a ruleset blocks deleting or force-pushing it. Add a commit with a `pr-<n>/` folder on top of the branch tip (`git hash-object`/`mktree`/`commit-tree` works without touching the checkout), push it, and link images by that commit's SHA so later pushes never change an old PR: `https://raw.githubusercontent.com/the-programming-club-at-hfc/The-Programming-Club/<sha>/pr-<n>/<file>.png`.
