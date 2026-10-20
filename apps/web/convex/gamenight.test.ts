@@ -119,8 +119,11 @@ describe("joining", () => {
   test("officers check in playing, signed in or by typing their email, and Just hosting takes them off the teams", async () => {
     const { t, officer, signedInStudent, startNight, join, attendance, host } = setup();
     const code = await startNight();
-    await expect(signedInStudent.mutation(api.players.checkInOfficer, student(1))).rejects.toThrow("Only club officers");
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await expect(signedInStudent.mutation(api.players.checkInOfficer, { name: "Student 1" })).rejects.toThrow("Only club officers");
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
+    // An officer's phone checks in its own account, never an email typed on it: someone else signs out and joins.
+    const row = (await attendance()).find((a) => a.token === ada)!;
+    expect((await t.run((ctx) => ctx.db.get(row.playerId)))!.email).toBe(ADA);
     // Grace isn't signed in on her phone, so she uses the normal join form.
     const grace = await join(code, { name: "Grace", email: GRACE });
     for (const token of [ada, grace]) {
@@ -161,7 +164,7 @@ describe("teams", () => {
     const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 7; i++) await join(code, student(i));
-    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA }));
+    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada" }));
     await host(await join(code, { name: "Grace", email: GRACE }));
 
     for (const [size, count, sizes] of [
@@ -206,7 +209,7 @@ describe("teams", () => {
     // Same name, different person: numbered so the TV can tell them apart.
     await join(code, { name: "Student 1", email: "other1@hawkmail.hfcc.edu" });
     await host(await join(code, { name: "Grace", email: GRACE }));
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await host(ada);
     const live = (await t.query(api.sessions.live, {}))!;
     expect([live.autoTeams, live.teamSize]).toEqual([true, 1]);
@@ -228,7 +231,7 @@ describe("teams", () => {
     const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 5; i++) await join(code, student(i));
-    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA }));
+    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada" }));
     await officer.mutation(api.teams.make, { size: 2 });
     expect(await teams()).toHaveLength(2);
     const scored = (await teams())[0]._id;
@@ -310,7 +313,7 @@ describe("teams", () => {
     const { t, officer, startNight, join, teams } = setup();
     const code = await startNight();
     await join(code, student(1));
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await t.mutation(api.players.setPlaying, { token: ada, playing: true });
     const mine = async () => (await t.query(api.players.me, { token: ada }))!.team;
     await officer.mutation(api.teams.score, { teamId: (await mine())!._id, delta: 4 });
@@ -373,7 +376,7 @@ describe("teams", () => {
     const code = await startNight();
     await join(code, student(1));
     await officer.mutation(api.teams.make, { size: 2 });
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await t.mutation(api.players.setPlaying, { token: ada, playing: true });
     const team = (await attendance()).find((a) => a.token === ada)!.teamId!;
     await officer.mutation(api.teams.score, { teamId: team, delta: 3 });
@@ -446,7 +449,7 @@ describe("teams", () => {
     const code = await startNight();
     const tokens = [];
     for (let i = 1; i <= 4; i++) tokens.push(await join(code, student(i)));
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await officer.mutation(api.teams.make, { size: 2 });
 
     await expect(t.mutation(api.players.setPlaying, { token: tokens[0], playing: true })).rejects.toThrow("Only officers");
@@ -478,7 +481,7 @@ describe("teams", () => {
   test("an officer who isn't playing can't answer for a team", async () => {
     const { t, officer, nightWithTeams, show, host } = setup();
     await nightWithTeams(4);
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await host(ada);
     await show({ mode: "card", game: "output", index: 0 });
     await expect(t.mutation(api.answers.pick, { token: ada, card: "output:0", choice: OUTPUTS[0].answer })).rejects.toThrow(
@@ -696,7 +699,7 @@ describe("points", () => {
     const { t, officer, startNight, join, show, score, host } = setup();
     const code = await startNight();
     const [ann, ben] = [await join(code, student(1)), await join(code, student(2))];
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await host(ada);
     const live = (await t.query(api.sessions.live, {}))!;
     const teamOf = async (token: string) => (await t.query(api.players.me, { token }))!.team!._id;
@@ -836,7 +839,7 @@ describe("ending the night", () => {
     const { t, officer, nightWithTeams, attendance, score, host } = setup();
     const { code, teams } = await nightWithTeams(8);
     const [a, b, c, d] = teams;
-    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await host(ada);
     const grace = await t.mutation(api.players.join, { code, name: "Grace", email: GRACE, broughtBy: "Student 1" });
     await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // a new team, with 0 points
@@ -1297,7 +1300,7 @@ describe("Tech Pictionary", () => {
   test("officers see the word, so a playing officer can draw but not guess", async () => {
     const o = setup();
     await soloNight(o, 2);
-    const ada = await o.officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    const ada = await o.officer.mutation(api.players.checkInOfficer, { name: "Ada" });
     await o.t.mutation(api.players.setPlaying, { token: ada, playing: true });
     // If Ada drew the first one, start another so she's a guesser.
     let d = await newDrawing(o, "laptop");

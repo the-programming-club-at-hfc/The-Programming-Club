@@ -177,10 +177,6 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
     setFirstPhone(!Object.keys(localStorage).some((k) => k.startsWith("hwc.token.")));
   }, []);
 
-  useEffect(() => {
-    if (officer && account.email) setProfile((p) => (p.email ? p : { ...p, email: account.email }));
-  }, [officer, account?.email]);
-
   async function submit(e: { preventDefault: () => void }) {
     e.preventDefault();
     setError("");
@@ -188,11 +184,11 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
     try {
       const extras = { broughtBy: broughtBy || undefined, idea: (firstPhone && idea) || undefined };
       const token = officer
-        ? await checkInOfficer(profile)
+        ? await checkInOfficer({ name: profile.name })
         : member
           ? await joinSignedIn({ code, name: account.name ? undefined : profile.name, ...extras })
           : await join({ code, ...profile, ...extras });
-      if (!member) localStorage.setItem("hwc.profile", JSON.stringify(profile));
+      if (!member && !officer) localStorage.setItem("hwc.profile", JSON.stringify(profile));
       localStorage.setItem(tokenKey(sessionId), token);
       onJoined(token);
     } catch (err) {
@@ -223,7 +219,7 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
           {(officer || wrongAccount) && (
             <p className="mt-2 text-dim">
               {officer
-                ? "You’re signed in as an officer. You’ll play like everyone else; switch to Just hosting anytime to run the night off the teams."
+                ? `You’re checking in as ${account.email}, an officer. You’ll play like everyone else; switch to Just hosting anytime to run the night off the teams. Joining someone else on this phone? Sign out first.`
                 : `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`}
             </p>
           )}
@@ -272,7 +268,7 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
             />
           </label>
         )}
-        {!member && (
+        {!member && !officer && (
           <label className="block">
             <span className="font-bold">HawkMail</span> <span className="text-sm text-dim">Keeps your XP together week to week.</span>
             <input
