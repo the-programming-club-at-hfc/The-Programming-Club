@@ -380,13 +380,17 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const work = !!me.team && (laptop || (!!card && fullFor === card));
   const py = usePython(work && teamComputer);
   const wide = work && s.mode === "card" && (s.game === "fix" || s.game === "puzzle");
-  // On a wide screen (a tablet in landscape, a laptop) with a game up: the player card on the left, the game beside it.
-  const split =
-    !wide &&
-    ((s.mode === "card" && !!s.game && s.index !== undefined) ||
-      (s.mode === "wiki" && (!!s.wikiReady || (!!s.wikiFrom && !!s.wikiTo))) ||
-      (s.mode === "draw" && s.drawing !== undefined) ||
-      (s.mode === "message" && !!s.message));
+  // A game is up: phones and portrait tablets trade the big name and player card for one slim bar so the game gets the
+  // screen, and wide screens (a tablet in landscape, a laptop) put the player card on the left with the game beside it.
+  const game =
+    (s.mode === "card" && !!s.game && s.index !== undefined) ||
+    (s.mode === "wiki" && (!!s.wikiReady || (!!s.wikiFrom && !!s.wikiTo))) ||
+    (s.mode === "draw" && s.drawing !== undefined) ||
+    (s.mode === "message" && !!s.message);
+  const split = !wide && game;
+  const timed = !!live.timer.startedAt || s.mode === "timer";
+  const clock = remaining === 0 && live.timer.startedAt ? "time" : fmtClock(remaining);
+  const hosting = me.officer && !me.playing;
   // The game's column is as wide as it needs (a drawing sizes itself to the screen), and the pair sits centered.
   const columns = s.mode === "draw" ? "lg:grid-cols-[20rem_auto]" : "lg:grid-cols-[20rem_minmax(0,52rem)]";
   const phoneView = !laptop && (
@@ -416,7 +420,25 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"}`}
     >
       <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
-        <div className={split ? "lg:sticky lg:top-5" : ""}>
+        {game && (
+          <div className="theme-pine flex items-center gap-3 rounded-[10px] p-2 pr-4 lg:hidden">
+            <div className={`tile ${t.tile} size-11 shrink-0 rounded-[6px]`}>
+              <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
+            </div>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate font-bold">{me.team ? me.team.name : hosting ? "Just hosting" : me.name}</p>
+              <p className="truncate text-sm text-dim">
+                {me.team ? `${ordinal(me.team.rank)} of ${me.team.of}` : hosting ? "Off the teams" : w.waiting}
+                {me.practice && " · practice"}
+              </p>
+            </div>
+            {me.team && <p className="narrow text-3xl leading-none font-extrabold">{me.team.score}</p>}
+            {timed && (
+              <p className={`narrow border-l border-line pl-3 text-3xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>{clock}</p>
+            )}
+          </div>
+        )}
+        <div className={`${split ? "lg:sticky lg:top-5" : ""} ${game ? "hidden lg:block" : ""}`}>
           <p className="text-sm text-dim">
             Week {live.week}: {wk.title}
           </p>
@@ -428,7 +450,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
               <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
             </div>
             <div className={`theme-pine min-w-0 p-4 sm:p-6 ${split ? "lg:p-4" : ""}`}>
-              {me.officer && !me.playing ? (
+              {hosting ? (
                 <>
                   <p className="text-dim">Officer</p>
                   <h2 className={`mt-1 text-2xl sm:text-3xl ${split ? "lg:text-2xl" : ""}`}>You’re just hosting</h2>
@@ -468,17 +490,17 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
             </div>
           </div>
 
-          {(live.timer.startedAt || s.mode === "timer") && (
+          {timed && (
             <p
               className={`narrow mt-5 text-center text-7xl leading-none font-extrabold ${split ? "lg:mt-3" : ""} ${hot ? "text-signal" : ""}`}
             >
-              {remaining === 0 && live.timer.startedAt ? "time" : fmtClock(remaining)}
+              {clock}
             </p>
           )}
           {split && footer("mt-4 hidden lg:flex")}
         </div>
 
-        <div className={`min-w-0 ${split ? "lg:[&>:first-child]:mt-0" : ""}`}>
+        <div className={`min-w-0 ${game ? "[&>:first-child]:mt-3" : ""} ${split ? "lg:[&>:first-child]:mt-0" : ""}`}>
           {s.mode === "card" && s.game && s.index !== undefined && (
             <div className="mt-5">
               {isAnswerGame(s.game) && me.team ? (
@@ -566,7 +588,6 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 token={token}
                 live={live}
                 open={phoneOpen(live, drawKey(s.drawing), remaining)}
-                remaining={remaining}
                 playing={!!me.team}
                 officer={me.officer}
               />

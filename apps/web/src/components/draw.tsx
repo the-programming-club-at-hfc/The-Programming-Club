@@ -7,7 +7,6 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { fmtClock } from "./game";
 import { ordinal } from "./ui";
 import { COLORS, GUESS_MAX, H, MAX_INK_POINTS, SIZES, W, inkPath } from "#/lib/draw";
 import { answersOpen, drawKey } from "#/lib/grading";
@@ -292,14 +291,12 @@ export function PhoneDraw({
   token,
   live,
   open,
-  remaining,
   playing,
   officer,
 }: {
   token: string;
   live: Live;
   open: boolean;
-  remaining: number;
   playing: boolean;
   officer: boolean;
 }) {
@@ -313,7 +310,7 @@ export function PhoneDraw({
   const m = me?.key === key ? me : null;
   const w = teamWords(live.teamSize === 1);
   const id = b?._id;
-  // A new drawing scrolls up to fill the screen if it doesn't fit below the name and score; the clock comes along.
+  // A new drawing scrolls into view if it doesn't fit below the bar at the top.
   useEffect(() => {
     const el = top.current;
     if (id && el && el.getBoundingClientRect().bottom > innerHeight) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -321,38 +318,30 @@ export function PhoneDraw({
   if (!b) return null;
   const done = !!live.screen.revealed || b.scored;
   const result = done && m?.points ? `+${m.points}` : null;
-  // Wide screens keep the join page's big clock beside the drawing, so this one is for phones and portrait tablets.
-  const clock = !done && live.timer.startedAt && (
-    <p className={`narrow ml-auto text-3xl leading-none font-extrabold lg:hidden ${open && remaining <= 10_000 ? "text-signal" : ""}`}>
-      {fmtClock(remaining)}
-    </p>
-  );
   // As big as fits on a short screen with the word and tools in view; phones stay full width. On a wide screen (a tablet in
   // landscape, a laptop), the word, canvas, and guess box share one column as wide as the canvas can be (and no wider than
-  // the room beside the join page's left column, or a 44rem canvas), with the drawer's tools beside the canvas like the officer tablet's.
+  // the room beside the join page's left column, or a 44rem canvas), with the drawer's tools beside the canvas.
   const canvas = (room: string) => `mx-auto aspect-[4/3] w-full border-[1.5px] border-line ${room}`;
 
   if (m?.drawer)
     return (
       <div ref={top} className="scroll-mt-3 space-y-3 lg:w-[min((100dvh-12.5rem)*4/3+6.75rem,100vw-26rem,50.75rem)]">
-        <div className="flex flex-wrap items-center gap-x-4 rounded-[10px] bg-sun p-5 text-[#12332b] lg:flex-nowrap lg:py-3" role="status">
-          <div className="w-full min-w-0 lg:w-auto lg:flex-1">
-            <div className="flex items-start gap-3">
-              <p className="font-semibold">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
-              {clock}
-            </div>
-            <p className="mt-1 text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{m.word}</p>
+        {/* One row: the word on the left, Skip on the right. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[10px] bg-sun p-4 text-[#12332b] lg:px-5 lg:py-3" role="status">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold sm:text-base">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
+            <p className="mt-1 text-3xl leading-none font-extrabold tracking-[-0.03em] break-words sm:text-4xl">{m.word}</p>
           </div>
-          {result && <p className="mt-2 text-2xl font-extrabold lg:mt-0">{result}</p>}
+          {result && <p className="text-2xl font-extrabold">{result}</p>}
           {open && b.got.length === 0 && (
             <button
-              className="btn btn-sm mt-3 lg:mt-0"
+              className="btn btn-sm shrink-0"
               onClick={() => skip({ drawingId: b._id, token }).catch((e: unknown) => setError(errorText(e)))}
             >
-              Skip this word
+              Skip word
             </button>
           )}
-          {error && <p className="mt-2 w-full text-sm font-semibold">{error}</p>}
+          {error && <p className="w-full text-sm font-semibold">{error}</p>}
         </div>
         <Sketch
           key={`${b._id}:${b.rev}`}
@@ -377,13 +366,12 @@ export function PhoneDraw({
   const status = got ?? (m?.teammate ? `${b.drawer} is drawing for ${w.you}` : done && playing ? "Not this time" : null);
   return (
     <div ref={top} className="scroll-mt-3 space-y-3 lg:w-[min((100dvh-13rem)*4/3,100vw-26rem,44rem)]">
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 lg:justify-start">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
         <p className="font-semibold wrap-anywhere">{done ? "The word was" : `${b.drawer} is drawing`}</p>
-        {clock}
         {done && b.word ? (
           <p className="w-full text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
         ) : (
-          <Blanks text={b.blanks} className="w-full text-3xl font-extrabold lg:w-auto" />
+          <Blanks text={b.blanks} className="text-3xl font-extrabold" />
         )}
       </div>
       {status && (
