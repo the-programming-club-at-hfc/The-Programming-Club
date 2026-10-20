@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { ExportButton, OfficerGate } from "#/components/officer";
 import { ideasText } from "#/lib/ideas";
 import { likelyWeek, useSchedule } from "#/lib/schedule";
-import { CLUB, fmtDate } from "#/lib/season";
+import { CLUB, fmtDate, roomFor } from "#/lib/season";
 import { api } from "../../../convex/_generated/api";
 
 export function Dashboard() {
@@ -63,7 +63,8 @@ function Overview() {
               Up next: Week {upcoming}, {plan[upcoming - 1]?.title}
             </p>
             <p className="mt-1 text-sm text-dim">
-              {fmtDate(plan[upcoming - 1].start, { weekday: "long", month: "long", day: "numeric" })}, {CLUB.time}, {CLUB.room}
+              {fmtDate(plan[upcoming - 1].start, { weekday: "long", month: "long", day: "numeric" })}, {CLUB.time},{" "}
+              {roomFor(plan[upcoming - 1].start)}
             </p>
           </div>
         )}

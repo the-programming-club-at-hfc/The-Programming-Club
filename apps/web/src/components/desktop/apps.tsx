@@ -8,7 +8,7 @@ import { Disclaimer } from "#/components/site";
 import { GAME_TILE, Picto, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
-import { CLUB, OFFICERS, fmtDate, isHalloweenMonth } from "#/lib/season";
+import { CALENDAR, CLUB, OFFICERS, fmtDate, isHalloweenMonth, roomFor } from "#/lib/season";
 import { api } from "../../../convex/_generated/api";
 import { Dashboard } from "./dashboard";
 
@@ -115,7 +115,7 @@ function Meetings() {
             </p>
             <p className="text-lg leading-tight font-extrabold">{plan[next.i].title}</p>
             <p className="text-sm">
-              {fmtDate(plan[next.i].start, { weekday: "long", month: "long", day: "numeric" })}, {CLUB.time}, {CLUB.room}
+              {fmtDate(plan[next.i].start, { weekday: "long", month: "long", day: "numeric" })}, {CLUB.time}, {roomFor(plan[next.i].start)}
             </p>
           </div>
         </div>
@@ -138,9 +138,24 @@ function Meetings() {
           );
         })}
       </ol>
-      <Link to="/hello-world/season" className="link mt-4 inline-block text-sm">
-        See every week’s games
-      </Link>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <a href={CALENDAR.subscribe} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
+          Subscribe ↗
+        </a>
+        <a href={CALENDAR.view} target="_blank" rel="noreferrer" className="btn btn-sm">
+          View calendar ↗
+        </a>
+        <Link to="/hello-world/season" className="link ml-auto text-sm">
+          See every week’s games
+        </Link>
+      </div>
+      <p className="mt-2 text-xs text-dim">
+        Apple or Outlook? Subscribe with the{" "}
+        <a href={CALENDAR.ics} className="link">
+          iCal link
+        </a>
+        .
+      </p>
     </div>
   );
 }

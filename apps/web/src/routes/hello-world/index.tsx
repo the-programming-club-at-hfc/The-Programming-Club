@@ -4,7 +4,7 @@ import { InstagramLink } from "#/components/instagram";
 import { AgendaList, GAME_TILE, HourDial, Picto, Wrap, weekTile } from "#/components/ui";
 import { GAMES, MATCH_AGENDA } from "#/lib/content";
 import { nextMeeting, useSchedule } from "#/lib/schedule";
-import { CLUB, fmtDate } from "#/lib/season";
+import { CLUB, fmtDate, roomFor } from "#/lib/season";
 
 export const Route = createFileRoute("/hello-world/")({ component: Home });
 
@@ -137,6 +137,7 @@ function Home() {
               <p className="mt-1 font-semibold">
                 {CLUB.time}, {next.live ? "right now" : countdown(plan[next.i].start.getTime(), now!)}
               </p>
+              <p className="text-dim">{roomFor(plan[next.i].start)}</p>
             </div>
           </Wrap>
         </section>

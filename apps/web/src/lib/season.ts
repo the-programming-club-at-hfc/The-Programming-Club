@@ -16,6 +16,14 @@ export const CLUB = {
   timeZone: "America/Detroit",
 };
 
+// The club's public Google Calendar. These are links out; the website doesn't sync with it.
+export const CALENDAR = {
+  view: "https://calendar.google.com/calendar/embed?src=c_8c33a8b2e7481df59d3e5692a3b8991bfed47a3aa62ffa94c1cdc6ddff226967%40group.calendar.google.com&ctz=America%2FDetroit",
+  subscribe:
+    "https://calendar.google.com/calendar/u/0?cid=Y184YzMzYThiMmU3NDgxZGY1OWQzZTU2OTJhM2I4OTkxYmZlZDQ3YTNhYTYyZmZhOTRjMWNkYzZkZGZmMjI2OTY3QGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20",
+  ics: "https://calendar.google.com/calendar/ical/c_8c33a8b2e7481df59d3e5692a3b8991bfed47a3aa62ffa94c1cdc6ddff226967%40group.calendar.google.com/public/basic.ics",
+};
+
 export const INSTAGRAM_URL = `https://www.instagram.com/${CLUB.instagram}/`;
 
 /** HFC student (@hawkmail.hfcc.edu) and staff (@hfcc.edu) emails: the only ones members join with, since the club is HFC-only. */
@@ -42,6 +50,12 @@ export const WEEK_STARTS = [
   "2026-11-25T17:00:00-05:00",
   "2026-12-02T17:00:00-05:00",
 ].map((s) => new Date(s));
+
+// One-off room changes, by meeting date in Detroit. Every other week meets in CLUB.room.
+const ROOM_CHANGES: Record<string, string> = { "2026-10-21": "Gaming Room (E-180)" };
+
+/** Where the meeting on this date is held. */
+export const roomFor = (start: Date) => ROOM_CHANGES[start.toLocaleDateString("en-CA", { timeZone: CLUB.timeZone })] ?? CLUB.room;
 
 export function fmtDate(d: Date, opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" }) {
   return d.toLocaleDateString("en-US", { ...opts, timeZone: CLUB.timeZone });
