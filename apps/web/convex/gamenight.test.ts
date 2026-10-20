@@ -132,6 +132,11 @@ describe("joining", () => {
       [true, false, undefined],
       [true, false, undefined],
     ]);
+    // Students aren't officers, so they get no Playing / Just hosting switch, and the server refuses one anyway.
+    const ann = await join(code, student(1));
+    const me = (await t.query(api.players.me, { token: ann }))!;
+    expect([me.officer, me.playing, !!me.team]).toEqual([false, false, true]);
+    await expect(t.mutation(api.players.setPlaying, { token: ann, playing: false })).rejects.toThrow("Only officers");
   });
 
   test("first time means no earlier real night: practice nights don't count", async () => {
