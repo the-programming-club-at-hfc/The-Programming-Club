@@ -223,7 +223,7 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
           {(officer || wrongAccount) && (
             <p className="mt-2 text-dim">
               {officer
-                ? "You’re signed in as an officer. You’ll be counted here and kept off the teams so you can run the night."
+                ? "You’re signed in as an officer. You’ll play like everyone else; switch to Just hosting anytime to run the night off the teams."
                 : `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`}
             </p>
           )}
@@ -387,6 +387,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
       (s.mode === "wiki" && (!!s.wikiReady || (!!s.wikiFrom && !!s.wikiTo))) ||
       (s.mode === "draw" && s.drawing !== undefined) ||
       (s.mode === "message" && !!s.message));
+  // The game's column is as wide as it needs (a drawing sizes itself to the screen), and the pair sits centered.
+  const columns = s.mode === "draw" ? "lg:grid-cols-[20rem_auto]" : "lg:grid-cols-[20rem_minmax(0,52rem)]";
   const phoneView = !laptop && (
     <button className="link mb-1 py-2.5 text-sm text-dim" onClick={() => setFullFor(null)}>
       Back to the phone view
@@ -396,7 +398,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     <div className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-dim ${className}`}>
       {!me.officer && me.team && w.teamUp && <p className="w-full">{w.teamUp}</p>}
       {me.officer ? (
-        <PlayTonight token={token} playing={me.playing} when={w.officerPlays} />
+        <PlayTonight token={token} playing={me.playing} />
       ) : (
         <p>
           Season XP: <strong className="narrow text-xl text-ink">{me.seasonXp}</strong> across {me.weeks} week
@@ -410,13 +412,15 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     </div>
   );
   return (
-    <Wrap className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}>
-      <div className={split ? "lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-10" : ""}>
+    <Wrap
+      className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"}`}
+    >
+      <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
         <div className={split ? "lg:sticky lg:top-5" : ""}>
           <p className="text-sm text-dim">
             Week {live.week}: {wk.title}
           </p>
-          <h1 className="mt-0.5 text-[clamp(2rem,8vw,3rem)] lowercase wrap-anywhere">{me.name}</h1>
+          <h1 className={`mt-0.5 text-[clamp(2rem,8vw,3rem)] lowercase wrap-anywhere ${split ? "lg:text-4xl" : ""}`}>{me.name}</h1>
           {me.practice && <p className="mt-2 font-semibold text-pine">Practice night: nothing tonight counts toward XP.</p>}
 
           <div className="mt-4 grid grid-cols-[auto_1fr] gap-[3px]">
@@ -427,8 +431,10 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
               {me.officer && !me.playing ? (
                 <>
                   <p className="text-dim">Officer</p>
-                  <h2 className={`mt-1 text-2xl sm:text-3xl ${split ? "lg:text-2xl" : ""}`}>You’re running tonight</h2>
-                  <p className={`mt-2 text-dim ${split ? "lg:hidden" : ""}`}>Checked in and off the teams.</p>
+                  <h2 className={`mt-1 text-2xl sm:text-3xl ${split ? "lg:text-2xl" : ""}`}>You’re just hosting</h2>
+                  <p className={`mt-2 text-dim ${split ? "lg:hidden" : ""}`}>
+                    Checked in and off the teams. Switch to Playing below to join in.
+                  </p>
                   <Link to="/hello-world/host" className="btn btn-primary mt-4 w-full">
                     Open host controls
                   </Link>
@@ -576,22 +582,31 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   );
 }
 
-/** An officer's switch for nights when a team is short: on puts them on the smallest team (their own, solo). */
-function PlayTonight({ token, playing, when }: { token: string; playing: boolean; when: string }) {
+/** An officer's Playing / Just hosting switch. Officers check in playing; hosting takes them off the teams. */
+function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
   const setPlaying = useMutation(api.players.setPlaying);
   const [error, setError] = useState("");
   return (
-    <label className="flex items-center gap-2 font-semibold text-ink">
-      <input
-        type="checkbox"
-        className="size-5 accent-pine"
-        checked={playing}
-        onChange={(e) => sender(setError)(setPlaying({ token, playing: e.target.checked }))}
-      />
-      Play tonight
-      {!playing && <span className="font-normal text-dim">({when})</span>}
-      {error && <span className="font-normal text-signal">{error}</span>}
-    </label>
+    <div className="flex flex-wrap items-center gap-2">
+      <div role="group" aria-label="Tonight" className="inline-flex rounded-[6px] bg-mist p-1">
+        {(
+          [
+            [true, "Playing"],
+            [false, "Just hosting"],
+          ] as const
+        ).map(([on, label]) => (
+          <button
+            key={String(on)}
+            className={`min-h-10 rounded-[4px] px-3 font-semibold ${on === playing ? "bg-ink text-paper" : "text-ink"}`}
+            aria-pressed={on === playing}
+            onClick={() => on !== playing && sender(setError)(setPlaying({ token, playing: on }))}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {error && <span className="text-signal">{error}</span>}
+    </div>
   );
 }
 

@@ -107,7 +107,7 @@ export const joinSignedIn = mutation({
   },
 });
 
-/** A signed-in officer checks in to run the night: counted present, off the teams. */
+/** A signed-in officer checks in: counted present and playing, until they switch to "Just hosting". */
 export const checkInOfficer = mutation({
   args: { name: v.string(), email: v.string() },
   handler: async (ctx, { name, email }) => {
@@ -120,7 +120,7 @@ export const checkInOfficer = mutation({
   },
 });
 
-/** An officer's "Play tonight" switch: on puts them on a team the way joining does, off takes them back off the teams. */
+/** An officer's Playing / Just hosting switch: playing puts them on a team the way joining does, hosting takes them off. */
 export const setPlaying = mutation({
   args: { token: v.string(), playing: v.boolean() },
   handler: async (ctx, { token, playing }) => {

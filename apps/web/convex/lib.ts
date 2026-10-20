@@ -122,7 +122,8 @@ export async function teamFor(ctx: MutationCtx, session: Doc<"sessions">, name: 
 }
 
 /** Add a player to the session (or return their existing spot), on a team as teamFor decides.
- *  Officers (signed in, or by an email on OFFICER_EMAILS) check in to run the night, off the teams. */
+ *  Officers (signed in, or by an email on OFFICER_EMAILS) check in playing, like everyone else; "Just hosting" on their
+ *  join page takes them off the teams. */
 export async function addToSession(
   ctx: MutationCtx,
   session: Doc<"sessions">,
@@ -159,7 +160,7 @@ export async function addToSession(
     .collect();
   const prior = (await Promise.all(history.map((h) => ctx.db.get(h.sessionId)))).some((s) => s && !s.practice);
 
-  const teamId = officer ? undefined : await teamFor(ctx, session, player.name);
+  const teamId = await teamFor(ctx, session, player.name);
 
   const token = randomToken();
   await ctx.db.insert("attendance", {
@@ -172,7 +173,7 @@ export async function addToSession(
     broughtBy: broughtBy?.trim().slice(0, 40) || undefined,
     showXp: WEEKS[session.week - 1]?.showXp ?? 3,
     bonusXp: 0,
-    ...(officer && { officer: true, playing: false }),
+    ...(officer && { officer: true, playing: true }),
   });
   return token;
 }

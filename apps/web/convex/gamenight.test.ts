@@ -67,7 +67,9 @@ function setup() {
 
   const show = (screen: Doc<"sessions">["screen"]) => officer.mutation(api.sessions.setScreen, { screen });
 
-  return { t, officer, signedInStudent, attendance, teams, score, startNight, join, nightWithTeams, show };
+  // "Just hosting": an officer off the teams to run the night. Officers check in playing.
+  const host = (token: string) => t.mutation(api.players.setPlaying, { token, playing: false });
+  return { t, officer, signedInStudent, attendance, teams, score, startNight, join, nightWithTeams, show, host };
 }
 
 beforeEach(() => at(0));
@@ -114,8 +116,8 @@ describe("joining", () => {
     expect(await attendance()).toHaveLength(1);
   });
 
-  test("officers check in off the teams, signed in or by typing their email", async () => {
-    const { t, officer, signedInStudent, startNight, join, attendance } = setup();
+  test("officers check in playing, signed in or by typing their email, and Just hosting takes them off the teams", async () => {
+    const { t, officer, signedInStudent, startNight, join, attendance, host } = setup();
     const code = await startNight();
     await expect(signedInStudent.mutation(api.players.checkInOfficer, student(1))).rejects.toThrow("Only club officers");
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
@@ -123,7 +125,8 @@ describe("joining", () => {
     const grace = await join(code, { name: "Grace", email: GRACE });
     for (const token of [ada, grace]) {
       const me = (await t.query(api.players.me, { token }))!;
-      expect([me.officer, me.playing, me.team]).toEqual([true, false, null]);
+      expect([me.officer, me.playing, !!me.team]).toEqual([true, true, true]);
+      await host(token);
     }
     expect((await attendance()).map((a) => [a.officer, a.playing, a.teamId])).toEqual([
       [true, false, undefined],
@@ -149,12 +152,12 @@ describe("joining", () => {
 });
 
 describe("teams", () => {
-  test("Make teams splits students evenly and leaves officers out", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+  test("Make teams splits students evenly and leaves hosting officers out", async () => {
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 7; i++) await join(code, student(i));
-    await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
-    await join(code, { name: "Grace", email: GRACE });
+    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA }));
+    await host(await join(code, { name: "Grace", email: GRACE }));
 
     for (const [size, count, sizes] of [
       [3, 3, [2, 2, 3]],
@@ -178,13 +181,13 @@ describe("teams", () => {
     expect(live.teams.flatMap((tm) => tm.members)).toHaveLength(7);
   });
 
-  test("late joiners: students go on the smallest team with room, officers stay off", async () => {
-    const { officer, startNight, join, attendance, teams } = setup();
+  test("late joiners: students go on the smallest team with room, hosting officers stay off", async () => {
+    const { officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 7; i++) await join(code, student(i));
     await officer.mutation(api.teams.make, { size: 3 }); // 3 + 2 + 2
     await join(code, student(8));
-    await join(code, { name: "Grace", email: GRACE });
+    await host(await join(code, { name: "Grace", email: GRACE }));
     const att = await attendance();
     const sizes = (await teams()).map((tm) => att.filter((a) => a.teamId === tm._id).length);
     expect(sizes.sort()).toEqual([2, 3, 3]);
@@ -192,13 +195,14 @@ describe("teams", () => {
   });
 
   test("solo by default: each joiner gets a team of their own, named after them", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 3; i++) await join(code, student(i));
     // Same name, different person: numbered so the TV can tell them apart.
     await join(code, { name: "Student 1", email: "other1@hawkmail.hfcc.edu" });
-    await join(code, { name: "Grace", email: GRACE });
+    await host(await join(code, { name: "Grace", email: GRACE }));
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await host(ada);
     const live = (await t.query(api.sessions.live, {}))!;
     expect([live.autoTeams, live.teamSize]).toEqual([true, 1]);
     expect(live.teams.map((tm) => [tm.name, tm.members]).sort(([a], [b]) => (a < b ? -1 : 1))).toEqual([
@@ -209,17 +213,17 @@ describe("teams", () => {
     ]);
     expect((await attendance()).filter((a) => a.officer).map((a) => a.teamId)).toEqual([undefined, undefined]);
     expect(new Set((await teams()).map((tm) => tm.key)).size).toBe(4);
-    // Play tonight puts an officer on a team of their own too.
+    // Playing puts an officer on a team of their own too.
     await t.mutation(api.players.setPlaying, { token: ada, playing: true });
     const team = (await t.query(api.players.me, { token: ada }))!.team!;
     expect([team.name, team.members]).toEqual(["Ada", ["Ada"]]);
   });
 
   test("Make teams with size 1: everyone solo with their own points, and late joiners get their own", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     for (let i = 1; i <= 5; i++) await join(code, student(i));
-    await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await host(await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA }));
     await officer.mutation(api.teams.make, { size: 2 });
     expect(await teams()).toHaveLength(2);
     const scored = (await teams())[0]._id;
@@ -387,12 +391,12 @@ describe("teams", () => {
   });
 
   test("auto teams fill teams up to the last Make teams size", async () => {
-    const { t, officer, startNight, join, attendance, teams } = setup();
+    const { t, officer, startNight, join, attendance, teams, host } = setup();
     const code = await startNight();
     // Picking teams of 2 before anyone joins sets the night's size.
     await officer.mutation(api.teams.make, { size: 2 });
     for (let i = 1; i <= 7; i++) await join(code, student(i));
-    await join(code, { name: "Grace", email: GRACE });
+    await host(await join(code, { name: "Grace", email: GRACE }));
     const att = await attendance();
     const sizes = (await teams()).map((tm) => att.filter((a) => a.teamId === tm._id).length);
     expect(sizes.sort()).toEqual([1, 2, 2, 2]);
@@ -467,9 +471,10 @@ describe("teams", () => {
   });
 
   test("an officer who isn't playing can't answer for a team", async () => {
-    const { t, officer, nightWithTeams, show } = setup();
+    const { t, officer, nightWithTeams, show, host } = setup();
     await nightWithTeams(4);
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await host(ada);
     await show({ mode: "card", game: "output", index: 0 });
     await expect(t.mutation(api.answers.pick, { token: ada, card: "output:0", choice: OUTPUTS[0].answer })).rejects.toThrow(
       "not on a team",
@@ -683,10 +688,11 @@ describe("points", () => {
   });
 
   test("puzzles from the join page on a solo night: each player answers for themselves, from their own input", async () => {
-    const { t, officer, startNight, join, show, score } = setup();
+    const { t, officer, startNight, join, show, score, host } = setup();
     const code = await startNight();
     const [ann, ben] = [await join(code, student(1)), await join(code, student(2))];
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await host(ada);
     const live = (await t.query(api.sessions.live, {}))!;
     const teamOf = async (token: string) => (await t.query(api.players.me, { token }))!.team!._id;
     const [annTeam, benTeam] = [await teamOf(ann), await teamOf(ben)];
@@ -822,10 +828,11 @@ describe("ending the night", () => {
   });
 
   test("place XP by rank (ties share), nothing for 0 points or for officers running the night, who stay off the leaderboard", async () => {
-    const { t, officer, nightWithTeams, attendance, score } = setup();
+    const { t, officer, nightWithTeams, attendance, score, host } = setup();
     const { code, teams } = await nightWithTeams(8);
     const [a, b, c, d] = teams;
     const ada = await officer.mutation(api.players.checkInOfficer, { name: "Ada", email: ADA });
+    await host(ada);
     const grace = await t.mutation(api.players.join, { code, name: "Grace", email: GRACE, broughtBy: "Student 1" });
     await t.mutation(api.players.setPlaying, { token: grace, playing: true }); // a new team, with 0 points
     // c and d tie for 3rd with 0 points, which earns nothing.

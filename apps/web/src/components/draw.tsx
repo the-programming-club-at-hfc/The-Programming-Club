@@ -327,28 +327,32 @@ export function PhoneDraw({
       {fmtClock(remaining)}
     </p>
   );
-  // As big as fits on a short, wide screen (a tablet or laptop) with the word and tools in view; phones stay full width.
+  // As big as fits on a short screen with the word and tools in view; phones stay full width. On a wide screen (a tablet in
+  // landscape, a laptop), the word, canvas, and guess box share one column as wide as the canvas can be (and no wider than
+  // the room beside the join page's left column, or a 44rem canvas), with the drawer's tools beside the canvas like the officer tablet's.
   const canvas = (room: string) => `mx-auto aspect-[4/3] w-full border-[1.5px] border-line ${room}`;
 
   if (m?.drawer)
     return (
-      <div ref={top} className="scroll-mt-3 space-y-3">
-        <div className="rounded-[10px] bg-sun p-5 text-[#12332b]" role="status">
-          <div className="flex items-start gap-3">
-            <p className="font-semibold">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
-            {clock}
+      <div ref={top} className="scroll-mt-3 space-y-3 lg:w-[min((100dvh-12.5rem)*4/3+6.75rem,100vw-26rem,50.75rem)]">
+        <div className="flex flex-wrap items-center gap-x-4 rounded-[10px] bg-sun p-5 text-[#12332b] lg:flex-nowrap lg:py-3" role="status">
+          <div className="w-full min-w-0 lg:w-auto lg:flex-1">
+            <div className="flex items-start gap-3">
+              <p className="font-semibold">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
+              {clock}
+            </div>
+            <p className="mt-1 text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{m.word}</p>
           </div>
-          <p className="mt-1 text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{m.word}</p>
-          {result && <p className="mt-2 text-2xl font-extrabold">{result}</p>}
+          {result && <p className="mt-2 text-2xl font-extrabold lg:mt-0">{result}</p>}
           {open && b.got.length === 0 && (
             <button
-              className="btn btn-sm mt-3"
+              className="btn btn-sm mt-3 lg:mt-0"
               onClick={() => skip({ drawingId: b._id, token }).catch((e: unknown) => setError(errorText(e)))}
             >
               Skip this word
             </button>
           )}
-          {error && <p className="mt-2 text-sm font-semibold">{error}</p>}
+          {error && <p className="mt-2 w-full text-sm font-semibold">{error}</p>}
         </div>
         <Sketch
           key={`${b._id}:${b.rev}`}
@@ -356,7 +360,9 @@ export function PhoneDraw({
           token={token}
           rev={b.rev}
           edit={open}
-          canvasClass={canvas("max-w-[calc((100dvh-21rem)*4/3)]")}
+          className="lg:flex lg:items-start lg:gap-3"
+          canvasClass={canvas("max-w-[calc((100dvh-21rem)*4/3)] lg:max-w-none lg:min-w-0 lg:flex-1")}
+          toolsClass="mt-2 flex flex-wrap items-center gap-2 lg:mt-0 lg:grid lg:w-24 lg:shrink-0 lg:grid-cols-2 lg:content-start lg:justify-items-center lg:[&>button:nth-last-of-type(-n+2)]:col-span-2 lg:[&>button:nth-last-of-type(-n+2)]:w-full lg:[&>p]:col-span-2"
         />
         {!done && (
           <p className="text-sm text-dim">
@@ -370,14 +376,14 @@ export function PhoneDraw({
   const got = m?.place ? `${w.You} got it! ${ordinal(m.place)}${m.by ? ` (${m.by})` : ""}` : null;
   const status = got ?? (m?.teammate ? `${b.drawer} is drawing for ${w.you}` : done && playing ? "Not this time" : null);
   return (
-    <div ref={top} className="scroll-mt-3 space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+    <div ref={top} className="scroll-mt-3 space-y-3 lg:w-[min((100dvh-13rem)*4/3,100vw-26rem,44rem)]">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 lg:justify-start">
         <p className="font-semibold wrap-anywhere">{done ? "The word was" : `${b.drawer} is drawing`}</p>
         {clock}
         {done && b.word ? (
           <p className="w-full text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
         ) : (
-          <Blanks text={b.blanks} className="w-full text-3xl font-extrabold" />
+          <Blanks text={b.blanks} className="w-full text-3xl font-extrabold lg:w-auto" />
         )}
       </div>
       {status && (
@@ -387,7 +393,7 @@ export function PhoneDraw({
           {m?.teammate && !done && <p className="mt-2 font-semibold">Sit this one out and cheer them on.</p>}
         </div>
       )}
-      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[calc((100dvh-16rem)*4/3)]")} />
+      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[calc((100dvh-16rem)*4/3)] lg:max-w-none")} />
       {officer && !done ? (
         <p className="text-sm text-dim">Officers see the word, so you draw but don’t guess.</p>
       ) : (
