@@ -145,7 +145,7 @@ function Meetings() {
         <a href={CALENDAR.view} target="_blank" rel="noreferrer" className="btn btn-sm">
           View calendar ↗
         </a>
-        <Link to="/hello-world/season" className="link ml-auto text-sm">
+        <Link to="/hello-world/season" className="link px-1 text-sm">
           See every week’s games
         </Link>
       </div>
