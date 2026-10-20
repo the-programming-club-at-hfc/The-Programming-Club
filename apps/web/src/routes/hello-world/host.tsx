@@ -41,9 +41,10 @@ const Panel = ({
   children: React.ReactNode;
   className?: string;
 }) => (
-  <section className={`card p-5 ${className}`}>
+  // On a phone a pane is already the frame, so panels lose their card and their headings shrink.
+  <section className={`card p-5 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none ${className}`}>
     <div className="mb-3 flex items-center justify-between gap-3">
-      <h2 className="text-2xl">{title}</h2>
+      <h2 className="text-2xl max-lg:text-lg">{title}</h2>
       {action}
     </div>
     {children}
@@ -52,7 +53,7 @@ const Panel = ({
 
 function Host() {
   return (
-    <Wrap className="py-8">
+    <Wrap className="py-8 max-lg:pt-0">
       <OfficerGate redirect="/hello-world/host" purpose="run tonight’s game">
         <Console />
       </OfficerGate>
@@ -94,10 +95,14 @@ function Running({
   }, [label, playing]);
   const deck = useRef<HTMLDivElement>(null);
   const setRound = useMutation(api.sessions.setRound);
+  // On a phone, one pane at a time, picked in the bar at the top; on a big screen, everything at once.
+  const [pane, setPane] = useState<Pane>("run");
+  const on = (p: Pane) => (pane === p ? "" : "max-lg:hidden");
   return (
     <>
+      <PhoneBar live={live} pane={pane} setPane={setPane} />
       <Header live={live} />
-      <NextPanel live={live} lineup={lineup} used={used} shown={shown} className="mt-6" />
+      <NextPanel live={live} lineup={lineup} used={used} shown={shown} className={`mt-6 ${on("run")}`} />
       <LineupPanel
         week={live.week}
         playing={playing}
@@ -107,20 +112,32 @@ function Running({
           const t = tabFor(item.label);
           if (!t) return;
           setTab(t);
-          // The game's controls are further down the page, so bring them into view.
+          // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
+          setPane("games");
           deck.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }}
-        className="mt-6"
+        className={`mt-6 ${on("run")}`}
       />
+      {/* On a phone the two columns step aside (display: contents), so only the pane's own panels take up room. */}
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        <div className="space-y-6">
-          {(week.kind === "kickoff" || live.screen.mode === "slides") && <SlidesPanel live={live} />}
-          <ScreenPanel live={live} />
-          <TimerPanel live={live} />
-          <TeamsPanel live={live} keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}} />
+        <div className="space-y-6 max-lg:contents">
+          {(week.kind === "kickoff" || live.screen.mode === "slides") && (
+            <div className={on("tv")}>
+              <SlidesPanel live={live} />
+            </div>
+          )}
+          <div className={on("tv")}>
+            <ScreenPanel live={live} />
+          </div>
+          <div className={on("tv")}>
+            <TimerPanel live={live} />
+          </div>
+          <div className={on("scores")}>
+            <TeamsPanel live={live} keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}} />
+          </div>
         </div>
-        <div className="space-y-6">
-          <div ref={deck} className="scroll-mt-6">
+        <div className="space-y-6 max-lg:contents">
+          <div ref={deck} className={`scroll-mt-6 max-lg:scroll-mt-32 ${on("games")}`}>
             <DeckPanel
               live={live}
               tab={tab}
@@ -130,10 +147,101 @@ function Running({
               pick={label && tabFor(label) === tab && tab === "puzzle" ? puzzleForLabel(label) : undefined}
             />
           </div>
-          <PlayersPanel live={live} rows={rows} sessionId={live._id} />
+          <div className={on("players")}>
+            <PlayersPanel live={live} rows={rows} sessionId={live._id} />
+          </div>
         </div>
       </div>
     </>
+  );
+}
+
+type Pane = "run" | "scores" | "games" | "tv" | "players";
+const PANES: [Pane, string][] = [
+  ["run", "Run"],
+  ["scores", "Scores"],
+  ["games", "Games"],
+  ["tv", "TV"],
+  ["players", "Players"],
+];
+
+/** On a phone, pinned to the top: the night, the join code, the clock (tap to start or pause), the rest under ⋯, and the
+ *  panes. The big screen's header does all this with room to spare. */
+function PhoneBar({ live, pane, setPane }: { live: Live; pane: Pane; setPane: (p: Pane) => void }) {
+  const end = useMutation(api.sessions.end);
+  const timer = useMutation(api.sessions.timer);
+  const remaining = useRemaining(live.timer);
+  const code = useJoinCode();
+  const plan = useSchedule();
+  const running = !!live.timer.startedAt;
+  const links = [
+    ["/hello-world/kickoff", "Kickoff slides"],
+    ["/hello-world/schedule", "Plan the season"],
+    ["/hello-world/kit", "Game plan"],
+    ["/hello-world/test", "Test the decks"],
+  ] as const;
+  return (
+    <div className="sticky top-0 z-40 -mx-5 border-b border-line bg-paper/95 px-5 pt-3 backdrop-blur-md lg:hidden">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-xs font-bold text-pine">
+            Week {live.week}
+            {live.practice ? " · practice" : ""}
+          </p>
+          <p className="truncate font-extrabold">{plan[live.week - 1]?.title}</p>
+        </div>
+        <p className="narrow text-2xl font-extrabold tracking-[0.15em]" title="Join code">
+          {code}
+        </p>
+        <button
+          className={`btn btn-sm narrow min-w-24 text-lg tabular-nums ${running && remaining <= 10_000 ? "text-signal" : ""}`}
+          onClick={() => run(timer({ action: "toggle" }))}
+          aria-label={running ? "Pause the timer" : "Start the timer"}
+        >
+          {running ? "❚❚" : "▶"} {running && remaining === 0 ? "TIME" : fmtClock(remaining)}
+        </button>
+        <details className="relative">
+          <summary className="btn btn-sm list-none [&::-webkit-details-marker]:hidden" aria-label="More">
+            ⋯
+          </summary>
+          <div className="card absolute right-0 z-50 mt-2 grid w-60 gap-1 p-2 shadow-lg">
+            <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="btn btn-sm justify-start">
+              Open TV view
+            </a>
+            {links.map(([to, label]) => (
+              <Link key={to} to={to} className="btn btn-sm justify-start">
+                {label}
+              </Link>
+            ))}
+            <button
+              className="btn btn-sm btn-neon justify-start"
+              onClick={() => confirm("End the night? Place XP goes out from the current standings.") && run(end())}
+            >
+              End night
+            </button>
+            <span className="px-2 pt-1">
+              <UserButton />
+            </span>
+          </div>
+        </details>
+      </div>
+      <nav className="mt-1 grid grid-cols-5" role="tablist" aria-label="Host controls">
+        {PANES.map(([p, label]) => (
+          <button
+            key={p}
+            role="tab"
+            aria-selected={pane === p}
+            className={`border-b-[3px] py-2.5 text-sm font-bold ${pane === p ? "border-ink text-ink" : "border-transparent text-dim"}`}
+            onClick={() => {
+              setPane(p);
+              scrollTo({ top: 0 });
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+    </div>
   );
 }
 
@@ -142,7 +250,7 @@ function Header({ live }: { live: Live }) {
   const plan = useSchedule();
   const code = useJoinCode();
   return (
-    <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
+    <header className="flex flex-wrap items-center gap-x-6 gap-y-3 max-lg:hidden">
       <div className="min-w-0">
         <p className="font-bold text-pine">
           Week {live.week}
@@ -410,9 +518,6 @@ const MODES = [
 function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | null> }) {
   const make = useMutation(api.teams.make);
   const add = useMutation(api.teams.add);
-  const score = useMutation(api.teams.score);
-  const rename = useMutation(api.teams.rename);
-  const remove = useMutation(api.teams.remove);
   const setDouble = useMutation(api.sessions.setDouble);
   const resetScores = useMutation(api.teams.resetScores);
   const setAuto = useMutation(api.teams.setAuto);
@@ -429,36 +534,41 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
 
   return (
     <Panel title="Teams & scores">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="How tonight is played">
-        {MODES.map(([size, label]) => (
-          <button
-            key={size}
-            className={`btn btn-sm ${live.teamSize === size ? "btn-on" : ""}`}
-            onClick={() => setMode(size)}
-            disabled={live.unrevealed.length > 0}
-            aria-pressed={live.teamSize === size}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="How tonight is played" className="inline-flex rounded-[6px] bg-mist p-1">
+          {MODES.map(([size, label]) => (
+            <button
+              key={size}
+              className={`min-h-10 rounded-[4px] px-3 text-sm font-semibold disabled:opacity-50 ${live.teamSize === size ? "bg-ink text-paper" : "text-ink"}`}
+              onClick={() => setMode(size)}
+              disabled={live.unrevealed.length > 0}
+              aria-pressed={live.teamSize === size}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          className={`btn btn-sm ${live.double ? "btn-on" : ""}`}
+          onClick={() => run(setDouble({ on: !live.double }))}
+          aria-pressed={live.double}
+        >
+          Double points
+        </button>
+        <button
+          className={`btn btn-sm ${live.autoTeams ? "btn-on" : ""}`}
+          onClick={() => run(setAuto({ on: !live.autoTeams }))}
+          aria-pressed={live.autoTeams}
+        >
+          Auto teams
+        </button>
         {!w.solo && (
           <button className="btn btn-sm" onClick={() => run(add())}>
             Add team
           </button>
         )}
-        <button className={`btn btn-sm ${live.double ? "btn-on" : ""}`} onClick={() => run(setDouble({ on: !live.double }))}>
-          {live.double ? "Double points: on" : "Double points"}
-        </button>
-        <button className={`btn btn-sm ${live.autoTeams ? "btn-on" : ""}`} onClick={() => run(setAuto({ on: !live.autoTeams }))}>
-          {live.autoTeams ? "Auto teams: on" : "Auto teams: off"}
-        </button>
       </div>
-      <p className="mt-2 text-sm text-dim">
-        <strong className="text-ink">Tonight: {MODES[live.teamSize - 1][1].toLowerCase()}.</strong>{" "}
-        {live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff} Pressing a mode, even tonight’s, remakes every team. Nobody loses points.
-      </p>
+      <p className="mt-2 text-sm text-dim">{live.autoTeams ? w.autoOn(live.teamSize) : w.autoOff}</p>
       {live.unrevealed.length > 0 && (
         <p className="mt-1 text-sm font-semibold">
           Finish the round first: reveal {live.unrevealed.map(cardName).join(", ")} (put it back on the TV if it’s gone), then you can
@@ -468,55 +578,9 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
       {live.teams.length === 0 ? (
         <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>
       ) : (
-        <ol className="mt-3 divide-y-2 divide-grid/60">
+        <ol className="mt-3 divide-y divide-line">
           {live.teams.map((t) => (
-            <li key={t._id} className="py-3">
-              <div className="flex items-baseline gap-3">
-                <button
-                  className="text-left font-bold text-xl font-bold hover:text-pine"
-                  title="Rename"
-                  onClick={() => {
-                    const name = prompt("Team name", t.name);
-                    if (name) void run(rename({ teamId: t._id, name }));
-                  }}
-                >
-                  {t.name}
-                </button>
-                {t.members.join(", ") !== t.name && <span className="text-sm text-dim">{t.members.join(", ") || "empty"}</span>}
-                {keys[t._id] && (
-                  <span className="chip text-sm" title={w.keyTitle}>
-                    {keys[t._id]}
-                  </span>
-                )}
-                <span className="ml-auto narrow font-extrabold text-3xl text-ink tabular-nums">{t.score}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {[1, 2, 3, 5].map((n) => (
-                  <button key={n} className="btn btn-sm" onClick={() => run(score({ teamId: t._id, delta: n }))}>
-                    +{live.double ? n * 2 : n}
-                  </button>
-                ))}
-                <button className="btn btn-sm" onClick={() => run(score({ teamId: t._id, delta: -1 }))} aria-label="Minus one">
-                  −1
-                </button>
-                <button
-                  className="btn btn-sm"
-                  title="Any amount, e.g. −2 to undo a mistake"
-                  onClick={() => {
-                    const n = Number(prompt(`Points for ${t.name} (use a minus sign to take away)`)?.replace("−", "-"));
-                    if (Number.isInteger(n) && n !== 0) void run(score({ teamId: t._id, delta: n }));
-                  }}
-                >
-                  ±…
-                </button>
-                <button
-                  className="btn btn-sm ml-auto text-dim"
-                  onClick={() => confirm(`Remove ${t.name}? Its players go back to no team.`) && run(remove({ teamId: t._id }))}
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
+            <TeamRow key={t._id} t={t} double={live.double} teamKey={keys[t._id]} keyTitle={w.keyTitle} />
           ))}
         </ol>
       )}
@@ -526,6 +590,93 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         </button>
       )}
     </Panel>
+  );
+}
+
+/** A team: its name (tap to rename) and score, +1 +2 +3 at hand, and the rest under ⋯. One line on a big screen; on a
+ *  phone, the buttons get their own row with room for thumbs. */
+function TeamRow({
+  t,
+  double,
+  teamKey,
+  keyTitle,
+}: {
+  t: Live["teams"][number];
+  double: boolean;
+  teamKey?: string | null;
+  keyTitle: string;
+}) {
+  const score = useMutation(api.teams.score);
+  const rename = useMutation(api.teams.rename);
+  const remove = useMutation(api.teams.remove);
+  const [more, setMore] = useState(false);
+  const add = (n: number) => run(score({ teamId: t._id, delta: n }));
+  const members = t.members.join(", ");
+  return (
+    <li className="py-2.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-lg font-bold">{t.name}</p>
+          {members !== t.name && <p className="truncate text-xs text-dim">{members || "empty"}</p>}
+        </div>
+        {teamKey && (
+          <span className="chip text-sm" title={keyTitle}>
+            {teamKey}
+          </span>
+        )}
+        <span className="narrow w-12 text-right text-3xl font-extrabold text-ink tabular-nums">{t.score}</span>
+        <div className="flex w-full gap-1.5 sm:w-auto">
+          {[1, 2, 3].map((n) => (
+            <button key={n} className="btn btn-sm min-h-11 flex-1 sm:flex-none" onClick={() => add(n)}>
+              +{double ? n * 2 : n}
+            </button>
+          ))}
+          <button
+            className={`btn btn-sm min-h-11 flex-1 sm:flex-none ${more ? "btn-on" : ""}`}
+            onClick={() => setMore(!more)}
+            aria-expanded={more}
+            aria-label={`More for ${t.name}`}
+          >
+            ⋯
+          </button>
+        </div>
+      </div>
+      {more && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button className="btn btn-sm" onClick={() => add(5)}>
+            +{double ? 10 : 5}
+          </button>
+          <button className="btn btn-sm" onClick={() => add(-1)} aria-label="Minus one">
+            −1
+          </button>
+          <button
+            className="btn btn-sm"
+            title="Any amount, e.g. −2 to undo a mistake"
+            onClick={() => {
+              const n = Number(prompt(`Points for ${t.name} (use a minus sign to take away)`)?.replace("−", "-"));
+              if (Number.isInteger(n) && n !== 0) void add(n);
+            }}
+          >
+            Other amount…
+          </button>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              const name = prompt("Team name", t.name);
+              if (name) void run(rename({ teamId: t._id, name }));
+            }}
+          >
+            Rename
+          </button>
+          <button
+            className="btn btn-sm ml-auto text-dim"
+            onClick={() => confirm(`Remove ${t.name}? Its players go back to no team.`) && run(remove({ teamId: t._id }))}
+          >
+            Remove
+          </button>
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -721,12 +872,12 @@ function DeckPanel({
 }) {
   return (
     <Panel title="Games" className="">
-      <div className="flex flex-wrap gap-1 border-b-4 border-line pb-2">
+      <div className="-mx-4 flex gap-1 overflow-x-auto border-b-4 border-line px-4 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {TABS.map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`px-3 py-1.5 font-bold ${tab === id ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
+            className={`shrink-0 px-3 py-2 font-bold whitespace-nowrap ${tab === id ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
           >
             {label}
           </button>

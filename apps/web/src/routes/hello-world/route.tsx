@@ -31,20 +31,22 @@ function Layout() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const bare = ["/hello-world/tv", "/hello-world/kickoff", "/hello-world/join", "/hello-world/draw"].some((p) => path.startsWith(p));
   if (bare) return <Outlet />;
+  // The host console on a phone has its own bar at the top, so the site's header and footer step aside there.
+  const chrome = path.startsWith("/hello-world/host") ? "max-lg:hidden" : "";
   return (
     <>
-      <Nav />
+      <Nav className={chrome} />
       <main id="main">
         <Outlet />
       </main>
-      <Footer />
+      <Footer className={chrome} />
     </>
   );
 }
 
-function Nav() {
+function Nav({ className }: { className: string }) {
   return (
-    <header className="no-print sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md">
+    <header className={`no-print sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md ${className}`}>
       <div className="mx-auto flex h-16 w-[min(1240px,100%-2.5rem)] items-center gap-6">
         <Link to="/hello-world" className="flex items-center gap-3 text-[1.15rem] font-extrabold tracking-[-0.03em] whitespace-nowrap">
           <span className="grid grid-cols-3 gap-[2px]" aria-hidden>
@@ -74,9 +76,9 @@ function Nav() {
   );
 }
 
-function Footer() {
+function Footer({ className }: { className: string }) {
   return (
-    <footer className="no-print theme-pine mt-32">
+    <footer className={`no-print theme-pine mt-32 ${className}`}>
       <div className="flex" aria-hidden>
         {STRIP.map((t) => (
           <span key={t} className={`tile ${t} h-2 flex-1`} />

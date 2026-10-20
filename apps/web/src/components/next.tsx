@@ -354,9 +354,9 @@ export function NextPanel({
     !(r.kind === "wiki" || r.kind === "puzzle" || r.kind === "pictionary" || (r.kind === "deck" && r.game !== "relay"));
   const rules = r && GAMES.find((g) => g.id === (r.game ?? r.kind));
   return (
-    <section className={`card p-5 ring-2 ring-gold ${className}`}>
+    <section className={`card p-5 ring-2 ring-gold max-lg:p-4 ${className}`}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-2xl">Run the night</h2>
+        <h2 className="text-2xl max-lg:text-lg">Run the night</h2>
         <p className="text-dim">
           {r ? (
             <>
@@ -440,7 +440,7 @@ export function NextPanel({
           )}
         </p>
         {primary && primary.keys !== false && (
-          <p className="text-xs">
+          <p className="text-xs max-lg:hidden">
             Keys: Space or → for “{primary.label}”{alt && alt.keys !== false ? `, N for “${alt.label}”` : ""}.
           </p>
         )}
