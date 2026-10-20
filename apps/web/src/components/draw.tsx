@@ -321,8 +321,9 @@ export function PhoneDraw({
   if (!b) return null;
   const done = !!live.screen.revealed || b.scored;
   const result = done && m?.points ? `+${m.points}` : null;
+  // Wide screens keep the join page's big clock beside the drawing, so this one is for phones and portrait tablets.
   const clock = !done && live.timer.startedAt && (
-    <p className={`narrow ml-auto text-3xl leading-none font-extrabold ${open && remaining <= 10_000 ? "text-signal" : ""}`}>
+    <p className={`narrow ml-auto text-3xl leading-none font-extrabold lg:hidden ${open && remaining <= 10_000 ? "text-signal" : ""}`}>
       {fmtClock(remaining)}
     </p>
   );
