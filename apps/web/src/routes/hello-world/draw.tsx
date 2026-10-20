@@ -80,7 +80,8 @@ function Pad() {
         edit={open}
         className="flex min-h-0 flex-1 gap-3 bg-mist p-3"
         canvasClass="h-full min-w-0 flex-1"
-        toolsClass="flex w-24 shrink-0 flex-col items-center gap-2"
+        // Two columns, so every tool fits under a tablet browser's tab and bookmark bars; Undo and Clear span both.
+        toolsClass="grid w-24 shrink-0 grid-cols-2 content-start justify-items-center gap-2 [&>button:nth-last-of-type(-n+2)]:col-span-2 [&>button:nth-last-of-type(-n+2)]:w-full [&>p]:col-span-2"
       />
     </>
   );
