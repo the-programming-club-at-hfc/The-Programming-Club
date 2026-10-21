@@ -52,7 +52,8 @@ function Scores() {
             </thead>
             <tbody>
               {board.map((p, i) => {
-                const rank = 1 + board.filter((o) => o.xp > p.xp).length;
+                // Ties share a place and the next score is still the next place (1st, 2nd, 2nd, 3rd), as in the rules.
+                const rank = 1 + new Set(board.filter((o) => o.xp > p.xp).map((o) => o.xp)).size;
                 return (
                   // Every cell is top-aligned on a 2.5rem first line, so the rank and numbers stay level with the name when the breakdown opens.
                   <tr key={p.name + i} className="border-t border-line align-top">
