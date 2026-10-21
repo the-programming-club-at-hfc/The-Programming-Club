@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { bonusList, inTeamPool } from "./lib";
+import { isOfficerEmail } from "./officers";
 
 /** Season high scores: XP per player with each night's show-up, place, and bonus XP (and what each bonus was for). Names only.
  *  Practice nights don't count, and officers only when they played. */
@@ -12,9 +13,7 @@ export const leaderboard = query({
       string,
       { week: number; show: number; place: number; bonus: number; bonuses: { xp: number; why: string }[] }[]
     >();
-    const officers = new Set<string>();
     for (const a of await ctx.db.query("attendance").collect()) {
-      if (a.officer) officers.add(a.playerId);
       const week = weekOf.get(a.sessionId);
       if (week === undefined || !inTeamPool(a)) continue;
       byPlayer.set(a.playerId, [
@@ -28,8 +27,8 @@ export const leaderboard = query({
       .map((p) => {
         const nights = byPlayer.get(p._id)!.sort((a, b) => a.week - b.week);
         const xp = nights.reduce((n, x) => n + x.show + x.place + x.bonus, 0);
-        // Officers wear Officer instead of Founder or Rookie.
-        const officer = officers.has(p._id);
+        // Officers and the advisor (OFFICER_EMAILS) wear Officer instead of Founder or Rookie. Only the flag leaves, never the email.
+        const officer = isOfficerEmail(p.email);
         const first = nights[0].week;
         return { name: p.name, xp, weeks: nights.length, officer, founder: !officer && first === 1, rookie: !officer && first > 1, nights };
       })
