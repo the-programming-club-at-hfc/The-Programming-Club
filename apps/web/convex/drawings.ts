@@ -156,6 +156,15 @@ async function myDrawing(ctx: MutationCtx, drawingId: Id<"drawings">, token: str
 
 const over = (s: Doc<"sessions">, key: string) => !!s.screen.revealed || (s.scored ?? []).includes(key);
 
+/** A new word or drawer starts the guessing over: tries on the old word don't count toward the limit. */
+async function clearGuesses(ctx: MutationCtx, s: Doc<"sessions">, d: Doc<"drawings">) {
+  for (const g of await ctx.db
+    .query("guesses")
+    .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", d.key))
+    .collect())
+    await ctx.db.delete(g._id);
+}
+
 /** A new drawing: the next drawer in turn and a fresh word. Then /host puts it on the TV and starts its clock. */
 export const start = mutation({
   args: {},
@@ -190,11 +199,7 @@ export const switchDrawer = mutation({
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so the drawer stays.");
     await ctx.db.patch(d._id, { drawer: a._id, team: a.teamId, word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1, skips: 0 });
     await removeInk(ctx, d);
-    for (const g of await ctx.db
-      .query("guesses")
-      .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", d.key))
-      .collect())
-      await ctx.db.delete(g._id);
+    await clearGuesses(ctx, s, d);
   },
 });
 
@@ -209,6 +214,7 @@ export const skip = mutation({
     if (token && (d.skips ?? 0) >= MAX_SKIPS) throw new ConvexError("That’s two skips. Give this one a go, or ask an officer.");
     await ctx.db.patch(d._id, { word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1, skips: (d.skips ?? 0) + (token ? 1 : 0) });
     await removeInk(ctx, d);
+    await clearGuesses(ctx, s, d);
   },
 });
 
@@ -221,6 +227,10 @@ export const ownWord = mutation({
   handler: async (ctx, { drawingId, word }) => {
     const { d, s } = await myDrawing(ctx, drawingId, undefined);
     const w = word
+      // A phone's curly quotes and dashes, as plain ones.
+      .replace(/[‘’]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/[–—]/g, "-")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .trim()
@@ -231,11 +241,7 @@ export const ownWord = mutation({
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so it stays.");
     await ctx.db.patch(d._id, { word: w, rev: (d.rev ?? 0) + 1 });
     await removeInk(ctx, d);
-    for (const g of await ctx.db
-      .query("guesses")
-      .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", d.key))
-      .collect())
-      await ctx.db.delete(g._id);
+    await clearGuesses(ctx, s, d);
   },
 });
 

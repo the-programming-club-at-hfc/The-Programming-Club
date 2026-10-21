@@ -550,6 +550,8 @@ describe("parking the clock", () => {
     expect(parkClock(parked, at(70_000, { to: "output:1" }))).toEqual({ ...running, remainingMs: 20_000, startedAt: 70_000 });
     // Another card going up instead: just a stopped clock.
     expect(parkClock(parked, at(40_000, { to: "bug:3" }))).toEqual({ ...running, remainingMs: 20_000, startedAt: undefined });
+    // Straight from one card to the next (the deck's Next ›), the clock is left as it was.
+    expect(parkClock(running, at(10_000, { to: "bug:3" }))).toBe(running);
     // Back for its reveal, it stays stopped.
     expect(parkClock(parked, at(70_000, { to: "output:1", revealed: true }))).toEqual({
       ...running,

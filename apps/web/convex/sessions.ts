@@ -199,11 +199,8 @@ async function putScreen(ctx: MutationCtx, before: Doc<"sessions">, screen: Doc<
   const w = showCard({ ...settled(s, now), up, now, double: s.double });
   const hold = screen.mode === "timer" || !!s.timer.card?.startsWith("wiki:");
   const timer = parkClock(s.timer, { to: up, hold, revealed: !!screen.revealed, now });
-  // Back from being parked: the time away doesn't count against the card's early bonus or finish times.
-  const back = s.timer.parked && !timer.parked && s.timer.parkedAt !== undefined && w.card?.key === s.timer.card;
-  const win = back && w.card ? { ...w.card, at: w.card.at + now - s.timer.parkedAt! } : w.card;
-  Object.assign(next, { card: win, played: w.played, timer });
-  await ctx.db.patch(s._id, { screen, shown: next.shown, card: win, played: w.played, timer });
+  Object.assign(next, { card: w.card, played: w.played, timer });
+  await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played, timer });
   // Revealing scores phone answers, Fix it for real fixes, puzzle stars, a Wiki Race, or a drawing, once per card.
   await scoreReveal(ctx, next);
   await scoreFixReveal(ctx, next);

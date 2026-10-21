@@ -606,13 +606,12 @@ describe("points", () => {
     await expect(pick()).rejects.toThrow("closed");
   });
 
-  test("time parked doesn't count against the early bonus; the big timer keeps the clock; Start while parked keeps its card", async () => {
+  test("the big timer keeps the clock running; Start while parked keeps the clock on its card", async () => {
     const { t, officer, nightWithTeams, show } = setup();
     const { teams } = await nightWithTeams(4);
     const card = "output:1";
     const live = async () => (await t.query(api.sessions.live, {}))!;
     await show({ mode: "card", game: "output", index: 1 });
-    const start = (await live()).card!.at;
     await officer.mutation(api.sessions.timer, { action: "set", seconds: 30, autostart: true });
     later(5);
     // The big timer shows the card's clock: it keeps running.
@@ -622,7 +621,6 @@ describe("points", () => {
     await show({ ...(await live()).screen, mode: "scoreboard" });
     later(60);
     await show({ ...(await live()).screen, mode: "card" });
-    expect((await live()).card!.at).toBe(start + 60_000);
     // Start pressed while it's parked: it runs off the TV but still closes the card at 0:00.
     later(5);
     await show({ ...(await live()).screen, mode: "scoreboard" });
@@ -1442,6 +1440,8 @@ describe("Tech Pictionary", () => {
     const own = (word: string) => o.officer.mutation(api.drawings.ownWord, { drawingId: d.id, word });
     const guess = (text: string) => o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text });
     await expect(own("日本")).rejects.toThrow("plain letters");
+    await own("Moore’s law");
+    expect((await o.t.query(api.drawings.mine, { token: d.drawer.token }))!.word).toBe("Moore's law");
     await own("C++");
     expect((await o.t.query(api.drawings.board, {}))!.blanks).toBe("_++");
     expect(await guess("python")).toBe("wrong");

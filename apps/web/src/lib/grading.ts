@@ -329,16 +329,16 @@ export function showCard(o: { card?: CardWindow; played: CardWindow[]; up?: stri
 }
 
 /**
- * The clock as the TV changes. A card's (or drawing's) running clock parks when the card leaves the TV with time left
- * (scores, the join screen, slides, a message), since nobody can answer it meanwhile, and runs again when the card
- * comes back unrevealed (another card going up instead ends the parking). `to` is the answerable card going up; `hold` keeps the clock running (the big timer shows it,
- * and a Wiki Race goes on on team computers).
+ * The clock as the TV changes. A card's (or drawing's) running clock parks when the card leaves the TV for a screen
+ * with no card (scores, the join screen, slides, a message), since nobody can answer it meanwhile, and runs again when
+ * the card comes back unrevealed; another card going up instead ends the parking. `to` is the answerable card going
+ * up; `hold` keeps the clock running (the big timer shows it, and a Wiki Race goes on on team computers). The early
+ * bonus still counts from when the card first went up.
  */
 export function parkClock<T extends Clock>(t: T, o: { to?: string; hold: boolean; revealed: boolean; now: number }): T {
-  if (!o.hold && t.card && t.card !== o.to && t.startedAt !== undefined && clockLeft(t, o.now) > 0)
+  if (!o.hold && o.to === undefined && t.card && t.startedAt !== undefined && clockLeft(t, o.now) > 0)
     return { ...t, remainingMs: clockLeft(t, o.now), startedAt: undefined, parked: true, parkedAt: o.now };
   if (t.parked && o.to === t.card) return { ...t, startedAt: o.revealed ? undefined : o.now, parked: undefined, parkedAt: undefined };
-  // Another card took its place: it's just a stopped clock now.
   if (t.parked && o.to !== undefined) return { ...t, parked: undefined, parkedAt: undefined };
   return t;
 }
