@@ -54,6 +54,13 @@ export function Sketch({
   const clear = useMutation(api.drawings.clear);
   const who = token ? { token } : {};
   const [color, setColor] = useState(COLORS[0]);
+  // Clear takes two taps, not a confirm(): a browser dialog throws the tablet out of full screen.
+  const [clearing, setClearing] = useState(false);
+  useEffect(() => {
+    if (!clearing) return;
+    const id = setTimeout(() => setClearing(false), 3000);
+    return () => clearTimeout(id);
+  }, [clearing]);
   const [size, setSize] = useState(SIZES[1]);
   const [error, setError] = useState("");
   // Finished strokes from this device, shown until the server has them all.
@@ -240,15 +247,16 @@ export function Sketch({
             Undo
           </button>
           <button
-            className="btn btn-sm"
+            className={`btn btn-sm ${clearing ? "bg-signal text-white" : ""}`}
             onClick={() => {
-              if (!confirm("Clear the whole drawing?")) return;
+              if (!clearing) return setClearing(true);
+              setClearing(false);
               // A stroke still being drawn (the pen still down, or another finger) goes too, here and on the server.
               const c = drop();
               act(clear({ drawingId, ...who, mine: [...own, ...(c ? [c.id] : [])].slice(-50) }));
             }}
           >
-            Clear
+            {clearing ? "Tap again" : "Clear"}
           </button>
           {error && <p className="w-full text-sm font-semibold text-signal">{error}</p>}
         </div>
