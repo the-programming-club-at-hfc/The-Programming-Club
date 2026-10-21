@@ -54,13 +54,8 @@ export function Sketch({
   const clear = useMutation(api.drawings.clear);
   const who = token ? { token } : {};
   const [color, setColor] = useState(COLORS[0]);
-  // Clear takes two taps, not a confirm(): a browser dialog throws the tablet out of full screen.
-  const [clearing, setClearing] = useState(false);
-  useEffect(() => {
-    if (!clearing) return;
-    const id = setTimeout(() => setClearing(false), 3000);
-    return () => clearTimeout(id);
-  }, [clearing]);
+  // Clear asks in the page's own dialog, not confirm(): a browser dialog throws the tablet out of full screen.
+  const ask = useRef<HTMLDialogElement>(null);
   const [size, setSize] = useState(SIZES[1]);
   const [error, setError] = useState("");
   // Finished strokes from this device, shown until the server has them all.
@@ -246,20 +241,38 @@ export function Sketch({
           <button className="btn btn-sm" disabled={!last} onClick={() => last && act(undo({ drawingId, ...who, stroke: last }), [last])}>
             Undo
           </button>
-          <button
-            className={`btn btn-sm ${clearing ? "bg-signal text-white" : ""}`}
-            onClick={() => {
-              if (!clearing) return setClearing(true);
-              setClearing(false);
-              // A stroke still being drawn (the pen still down, or another finger) goes too, here and on the server.
-              const c = drop();
-              act(clear({ drawingId, ...who, mine: [...own, ...(c ? [c.id] : [])].slice(-50) }));
-            }}
-          >
-            {clearing ? "Tap again" : "Clear"}
+          <button className="btn btn-sm" onClick={() => ask.current?.showModal()}>
+            Clear
           </button>
           {error && <p className="w-full text-sm font-semibold text-signal">{error}</p>}
         </div>
+      )}
+      {edit && (
+        <dialog
+          ref={ask}
+          className="m-auto w-[min(24rem,calc(100%-2rem))] rounded-[10px] bg-paper p-6 text-ink backdrop:bg-black/50"
+          // A tap outside the box backs out.
+          onClick={(e) => e.target === e.currentTarget && ask.current?.close()}
+        >
+          <p className="text-2xl font-extrabold">Clear the whole drawing?</p>
+          <p className="mt-1 text-dim">It clears on the TV too.</p>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button className="btn" onClick={() => ask.current?.close()}>
+              Keep it
+            </button>
+            <button
+              className="btn bg-signal text-white"
+              onClick={() => {
+                ask.current?.close();
+                // A stroke still being drawn (the pen still down, or another finger) goes too, here and on the server.
+                const c = drop();
+                act(clear({ drawingId, ...who, mine: [...own, ...(c ? [c.id] : [])].slice(-50) }));
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        </dialog>
       )}
     </div>
   );
