@@ -301,8 +301,9 @@ export interface Clock {
   remainingMs: number;
   startedAt?: number;
   card?: string;
-  /** Paused because its card left the TV mid-play; it runs again when the card comes back. */
+  /** Paused because its card left the TV mid-play (at `parkedAt`); it runs again when the card comes back. */
   parked?: boolean;
+  parkedAt?: number;
 }
 
 /** Milliseconds left at `now`. Goes below 0 once a running clock has run out. */
@@ -328,14 +329,17 @@ export function showCard(o: { card?: CardWindow; played: CardWindow[]; up?: stri
 }
 
 /**
- * The clock as the TV changes. A card's running clock parks when the card leaves the TV with time left (scores, the
- * join screen, a message), since nobody can answer it meanwhile, and runs again when the card comes back unrevealed.
- * `from` and `to` are the answerable card before and after the change.
+ * The clock as the TV changes. A card's (or drawing's) running clock parks when the card leaves the TV with time left
+ * (scores, the join screen, slides, a message), since nobody can answer it meanwhile, and runs again when the card
+ * comes back unrevealed (another card going up instead ends the parking). `to` is the answerable card going up; `hold` keeps the clock running (the big timer shows it,
+ * and a Wiki Race goes on on team computers).
  */
-export function parkClock<T extends Clock>(t: T, o: { from?: string; to?: string; revealed: boolean; now: number }): T {
-  if (o.from && o.from !== o.to && t.card === o.from && t.startedAt !== undefined && clockLeft(t, o.now) > 0)
-    return { ...t, remainingMs: clockLeft(t, o.now), startedAt: undefined, parked: true };
-  if (t.parked && o.to === t.card) return { ...t, startedAt: o.revealed ? undefined : o.now, parked: undefined };
+export function parkClock<T extends Clock>(t: T, o: { to?: string; hold: boolean; revealed: boolean; now: number }): T {
+  if (!o.hold && t.card && t.card !== o.to && t.startedAt !== undefined && clockLeft(t, o.now) > 0)
+    return { ...t, remainingMs: clockLeft(t, o.now), startedAt: undefined, parked: true, parkedAt: o.now };
+  if (t.parked && o.to === t.card) return { ...t, startedAt: o.revealed ? undefined : o.now, parked: undefined, parkedAt: undefined };
+  // Another card took its place: it's just a stopped clock now.
+  if (t.parked && o.to !== undefined) return { ...t, parked: undefined, parkedAt: undefined };
   return t;
 }
 
@@ -437,7 +441,12 @@ export const DRAW_SECONDS = 75;
 export const drawKey = (n: number) => `draw:${n}`;
 
 /** A guess (or the word) as it's compared: case, spaces, and punctuation don't matter. */
-export const guessKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+export const guessKey = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 
 /** Letters to add, drop, or change to turn one string into the other. */
 export function editDistance(a: string, b: string) {
@@ -459,7 +468,8 @@ export function checkGuess(guess: string, word: string): "right" | "close" | "wr
   const g = guessKey(guess);
   const w = guessKey(word);
   if (!g) return "wrong";
-  const plural = /s$/.test(w) && !/(ss|us)$/.test(w);
+  // "bugs" takes "bug", but a short word like "JS" never takes "J".
+  const plural = w.length >= 4 && /s$/.test(w) && !/(ss|us)$/.test(w);
   if ([w, `${w}s`, `${w}es`].includes(g) || (plural && g === w.slice(0, -1))) return "right";
   return editDistance(g, w) <= (w.length >= 5 ? 2 : 1) ? "close" : "wrong";
 }

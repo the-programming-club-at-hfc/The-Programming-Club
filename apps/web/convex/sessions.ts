@@ -197,9 +197,13 @@ async function putScreen(ctx: MutationCtx, before: Doc<"sessions">, screen: Doc<
   const now = Date.now();
   const up = upCard(next)?.key;
   const w = showCard({ ...settled(s, now), up, now, double: s.double });
-  const timer = parkClock(s.timer, { from: upCard(s)?.key, to: up, revealed: !!screen.revealed, now });
-  Object.assign(next, { card: w.card, played: w.played, timer });
-  await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played, timer });
+  const hold = screen.mode === "timer" || !!s.timer.card?.startsWith("wiki:");
+  const timer = parkClock(s.timer, { to: up, hold, revealed: !!screen.revealed, now });
+  // Back from being parked: the time away doesn't count against the card's early bonus or finish times.
+  const back = s.timer.parked && !timer.parked && s.timer.parkedAt !== undefined && w.card?.key === s.timer.card;
+  const win = back && w.card ? { ...w.card, at: w.card.at + now - s.timer.parkedAt! } : w.card;
+  Object.assign(next, { card: win, played: w.played, timer });
+  await ctx.db.patch(s._id, { screen, shown: next.shown, card: win, played: w.played, timer });
   // Revealing scores phone answers, Fix it for real fixes, puzzle stars, a Wiki Race, or a drawing, once per card.
   await scoreReveal(ctx, next);
   await scoreFixReveal(ctx, next);
@@ -262,10 +266,12 @@ export const timer = mutation({
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     const now = Date.now();
-    // Any clock button takes over from a parked clock.
-    const t = { ...s.timer, parked: undefined };
+    const t = { ...s.timer };
     const remaining = Math.max(0, clockLeft(t, now));
-    const card = upCard(s)?.key;
+    // Start on a parked clock keeps it on its card, off the TV or not, so the card still closes at 0:00.
+    const card = upCard(s)?.key ?? (action === "toggle" && t.parked ? t.card : undefined);
+    // A clock button takes over from a parked clock; +30s keeps it parked, to run again when its card comes back.
+    if (action !== "add" && action !== "relay") Object.assign(t, { parked: undefined, parkedAt: undefined });
     let { card: w, played } = settled(s, now);
     switch (action) {
       case "set": {

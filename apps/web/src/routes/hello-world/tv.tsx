@@ -274,6 +274,8 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
           Join at <strong className="text-ink">{origin.replace(/^https?:\/\//, "")}/join</strong>
         </span>
         <CodeSquares code={code} className="text-[2vw]" />
+        {/* A card off the TV mid-play: its clock waits for it. */}
+        {s.mode !== "timer" && live.timer.parked && <span className="text-dim">paused</span>}
         {s.mode !== "timer" && (running || remaining !== live.timer.durationMs) && (
           <span
             className={`narrow min-w-[4ch] text-right text-[2.8vw] leading-none font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}

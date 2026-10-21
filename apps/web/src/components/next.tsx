@@ -96,15 +96,25 @@ export function DrawHost({ live }: { live: Live }) {
   const ownWord = useMutation(api.drawings.ownWord);
   const remaining = useRemaining(live.timer);
   const [own, setOwn] = useState("");
+  const [saving, setSaving] = useState(false);
   if (!data) return null;
   const d = data.current;
+  // Changing the word or drawer waits for the drawing to be back on the TV, where phones and the tablet can draw it.
+  const onTv = live.screen.mode === "draw";
+  const useOwn = async (drawingId: Id<"drawings">, word: string) => {
+    setSaving(true);
+    try {
+      await ownWord({ drawingId, word });
+      // Keep anything typed while it saved.
+      setOwn((cur) => (cur === word ? "" : cur));
+      await fresh();
+    } finally {
+      setSaving(false);
+    }
+  };
   const fresh = () => timer({ action: "set", seconds: DRAW_SECONDS, relay: false, autostart: true });
   // Someone new gets a new word and a fresh clock.
-  const handTo = (id: Id<"attendance">) =>
-    d &&
-    run(
-      switchDrawer({ drawingId: d._id, attendanceId: id }).then(fresh),
-    );
+  const handTo = (id: Id<"attendance">) => d && run(switchDrawer({ drawingId: d._id, attendanceId: id }).then(fresh));
   return (
     <div className="mt-4 border-4 border-line p-3">
       <div className="flex flex-wrap items-baseline gap-x-3">
@@ -127,7 +137,7 @@ export function DrawHost({ live }: { live: Live }) {
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               className="btn btn-sm"
-              disabled={!drawOpen(live, d.key, remaining) || d.got > 0}
+              disabled={!onTv || !drawOpen(live, d.key, remaining) || d.got > 0}
               onClick={() => run(skip({ drawingId: d._id }))}
             >
               Skip this word
@@ -135,7 +145,7 @@ export function DrawHost({ live }: { live: Live }) {
             <select
               className="field w-auto py-1 text-sm"
               value=""
-              disabled={d.got > 0}
+              disabled={!onTv || d.got > 0}
               onChange={(e) => e.target.value && handTo(e.target.value as Id<"attendance">)}
               aria-label="Switch drawer"
             >
@@ -154,20 +164,22 @@ export function DrawHost({ live }: { live: Live }) {
             className="mt-2 flex gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (own.trim()) void run(ownWord({ drawingId: d._id, word: own }).then(() => (setOwn(""), fresh())));
+              if (own.trim() && !saving) void run(useOwn(d._id, own));
             }}
           >
+            {/* Dotted out like a password, since guessers walk past; press and hold the word above to check it. */}
             <input
-              className="field min-w-0 py-1 text-sm"
+              className="field min-w-0 py-1 text-base [-webkit-text-security:disc]"
               value={own}
               onChange={(e) => setOwn(e.target.value)}
               placeholder="Or give them your own word"
               aria-label="Your own word"
               maxLength={WORD_MAX}
               autoComplete="off"
-              disabled={d.got > 0}
+              spellCheck={false}
+              disabled={!onTv || d.got > 0}
             />
-            <button className="btn btn-sm shrink-0" disabled={d.got > 0 || !own.trim()}>
+            <button className="btn btn-sm shrink-0" disabled={!onTv || d.got > 0 || !own.trim() || saving}>
               Use it
             </button>
           </form>

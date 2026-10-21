@@ -19,6 +19,7 @@ import {
   fixAwardsFor,
   grade,
   isFreshStart,
+  parkClock,
   puzzleAwardsFor,
   sameOutput,
   searchLanguages,
@@ -537,6 +538,34 @@ describe("Wiki Race", () => {
   });
 });
 
+describe("parking the clock", () => {
+  const running = { durationMs: 30_000, remainingMs: 30_000, startedAt: 0, card: "output:1" };
+  const at = (now: number, o: { to?: string; hold?: boolean; revealed?: boolean } = {}) => ({ hold: false, revealed: false, ...o, now });
+
+  test("a card's running clock parks when the card leaves the TV, and runs again when it comes back", () => {
+    const parked = parkClock(running, at(10_000));
+    expect(parked).toEqual({ ...running, remainingMs: 20_000, startedAt: undefined, parked: true, parkedAt: 10_000 });
+    // Another screen meanwhile leaves it parked.
+    expect(parkClock(parked, at(40_000))).toBe(parked);
+    expect(parkClock(parked, at(70_000, { to: "output:1" }))).toEqual({ ...running, remainingMs: 20_000, startedAt: 70_000 });
+    // Another card going up instead: just a stopped clock.
+    expect(parkClock(parked, at(40_000, { to: "bug:3" }))).toEqual({ ...running, remainingMs: 20_000, startedAt: undefined });
+    // Back for its reveal, it stays stopped.
+    expect(parkClock(parked, at(70_000, { to: "output:1", revealed: true }))).toEqual({
+      ...running,
+      remainingMs: 20_000,
+      startedAt: undefined,
+    });
+  });
+
+  test("the big timer, a Wiki Race, a clock that ran out, and one for no card keep going", () => {
+    expect(parkClock(running, at(10_000, { hold: true }))).toBe(running);
+    expect(parkClock(running, at(31_000))).toBe(running);
+    expect(parkClock({ ...running, card: undefined }, at(10_000))).toEqual({ ...running, card: undefined });
+    expect(parkClock(running, at(10_000, { to: "output:1" }))).toBe(running);
+  });
+});
+
 describe("Tech Pictionary", () => {
   test("guesses ignore case, spaces, and punctuation, and plurals count but cut-short words don't", () => {
     expect(checkGuess("Wifi", "Wi-Fi")).toBe("right");
@@ -548,6 +577,10 @@ describe("Tech Pictionary", () => {
     expect(checkGuess("magnifying glasses", "magnifying glass")).toBe("right");
     expect(checkGuess("magnifying glas", "magnifying glass")).toBe("close");
     expect(checkGuess("bugs", "bug")).toBe("right");
+    // A short word ending in s isn't a plural, and accents fold to plain letters (an officer's own word).
+    expect(checkGuess("J", "JS")).toBe("close");
+    expect(checkGuess("cafe", "Café")).toBe("right");
+    expect(checkGuess("Résumé", "resume")).toBe("right");
     expect(checkGuess("3-D printers", "3D printer")).toBe("right");
     expect(checkGuess("", "bug")).toBe("wrong");
     expect(checkGuess("?!", "bug")).toBe("wrong");

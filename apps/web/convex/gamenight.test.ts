@@ -606,6 +606,33 @@ describe("points", () => {
     await expect(pick()).rejects.toThrow("closed");
   });
 
+  test("time parked doesn't count against the early bonus; the big timer keeps the clock; Start while parked keeps its card", async () => {
+    const { t, officer, nightWithTeams, show } = setup();
+    const { teams } = await nightWithTeams(4);
+    const card = "output:1";
+    const live = async () => (await t.query(api.sessions.live, {}))!;
+    await show({ mode: "card", game: "output", index: 1 });
+    const start = (await live()).card!.at;
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 30, autostart: true });
+    later(5);
+    // The big timer shows the card's clock: it keeps running.
+    await show({ ...(await live()).screen, mode: "timer" });
+    expect((await live()).timer.startedAt).not.toBe(undefined);
+    later(5);
+    await show({ ...(await live()).screen, mode: "scoreboard" });
+    later(60);
+    await show({ ...(await live()).screen, mode: "card" });
+    expect((await live()).card!.at).toBe(start + 60_000);
+    // Start pressed while it's parked: it runs off the TV but still closes the card at 0:00.
+    later(5);
+    await show({ ...(await live()).screen, mode: "scoreboard" });
+    await officer.mutation(api.sessions.timer, { action: "toggle" });
+    expect((await live()).timer.card).toBe(card);
+    later(17);
+    await show({ ...(await live()).screen, mode: "card" });
+    await expect(t.mutation(api.answers.pick, { token: teams[0].tokens[0], card, choice: OUTPUTS[1].answer })).rejects.toThrow("closed");
+  });
+
   test("a parked card that comes back for its reveal stays stopped", async () => {
     const { t, officer, nightWithTeams, show } = setup();
     await nightWithTeams(4);
@@ -1393,7 +1420,9 @@ describe("Tech Pictionary", () => {
     const own = (word: string) => o.officer.mutation(api.drawings.ownWord, { drawingId: d.id, word });
     const ink = { drawingId: d.id, rev: 0, stroke: "s1", color: COLORS[0], size: SIZES[0], points: [10, 10] };
     await o.t.mutation(api.drawings.ink, { ...ink, token: d.drawer.token });
-    await expect(o.signedInStudent.mutation(api.drawings.ownWord, { drawingId: d.id, word: "lasagna" })).rejects.toThrow("Only club officers");
+    await expect(o.signedInStudent.mutation(api.drawings.ownWord, { drawingId: d.id, word: "lasagna" })).rejects.toThrow(
+      "Only club officers",
+    );
     await expect(own(" ! ")).rejects.toThrow("Type a word");
     await expect(own("x".repeat(31))).rejects.toThrow("Type a word");
     await own("  Stack   Overflow ");
@@ -1403,6 +1432,24 @@ describe("Tech Pictionary", () => {
     later(5);
     expect(await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: "stackoverflow" })).toBe("right");
     await expect(own("lasagna")).rejects.toThrow("Someone already got this one");
+  });
+
+  test("an officer's own word: accents fold to plain letters, short tech words work, and guesses start over", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const d = await newDrawing(o);
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    const own = (word: string) => o.officer.mutation(api.drawings.ownWord, { drawingId: d.id, word });
+    const guess = (text: string) => o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text });
+    await expect(own("日本")).rejects.toThrow("plain letters");
+    await own("C++");
+    expect((await o.t.query(api.drawings.board, {}))!.blanks).toBe("_++");
+    expect(await guess("python")).toBe("wrong");
+    await own("Café");
+    expect((await o.t.query(api.drawings.board, {}))!.blanks).toBe("____");
+    expect(await o.t.run((ctx) => ctx.db.query("guesses").collect())).toEqual([]);
+    later(5);
+    expect(await guess("cafe")).toBe("right");
   });
 
   test("moving the drawer to a team that already got it doesn't take that team's guess away", async () => {

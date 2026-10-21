@@ -212,17 +212,30 @@ export const skip = mutation({
   },
 });
 
-/** An officer's own word for the drawing, on a clean canvas (the drawer saw the old one). Not once someone has it. */
+/**
+ * An officer's own word for the drawing, on a clean canvas with fresh guesses (the drawer saw the old word). Not once
+ * someone has it. Accents fold to plain letters, so the TV's blanks hide every letter and "cafe" gets "Café".
+ */
 export const ownWord = mutation({
   args: { drawingId: v.id("drawings"), word: v.string() },
   handler: async (ctx, { drawingId, word }) => {
     const { d, s } = await myDrawing(ctx, drawingId, undefined);
-    const w = word.trim().replace(/\s+/g, " ");
-    if (guessKey(w).length < 2 || w.length > WORD_MAX) throw new ConvexError(`Type a word or phrase, up to ${WORD_MAX} characters.`);
+    const w = word
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (/[^\x20-\x7e]/.test(w)) throw new ConvexError("Use plain letters, numbers, and punctuation.");
+    if (!guessKey(w) || w.length > WORD_MAX) throw new ConvexError(`Type a word or phrase, up to ${WORD_MAX} characters.`);
     if (over(s, d.key)) throw new ConvexError("This drawing is over.");
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so it stays.");
     await ctx.db.patch(d._id, { word: w, rev: (d.rev ?? 0) + 1 });
     await removeInk(ctx, d);
+    for (const g of await ctx.db
+      .query("guesses")
+      .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", d.key))
+      .collect())
+      await ctx.db.delete(g._id);
   },
 });
 

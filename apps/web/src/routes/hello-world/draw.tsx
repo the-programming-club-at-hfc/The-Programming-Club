@@ -57,6 +57,8 @@ function Pad() {
   const s = live?.screen;
   const cur = data?.current;
   const d = s?.mode === "draw" && cur?.n === s.drawing ? cur : null;
+  // The scores or a message are up mid-drawing: it's coming back, not over.
+  const paused = !!cur && !cur.over && s?.mode !== "draw" && s?.drawing === cur.n;
   if (!live || !d)
     return (
       <div className="grid flex-1 place-items-center text-center">
@@ -65,7 +67,8 @@ function Pad() {
             <Picto id="pictionary" className="absolute inset-[14%]" />
           </div>
           <h1 className="text-[clamp(2.4rem,6vw,3.6rem)] lowercase">
-            waiting for the next drawing<span className="blink"> _</span>
+            {paused ? "drawing paused" : "waiting for the next drawing"}
+            <span className="blink"> _</span>
           </h1>
         </div>
       </div>

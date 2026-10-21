@@ -381,8 +381,6 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   );
 }
 
-const ON_AIR = { card: "Challenge card", wiki: "Wiki Race", draw: "Drawing", message: "Message" };
-
 // The kickoff deck on the TV: always here on Week 1, and on any other night once the slides go up from "On the TV".
 function SlidesPanel({ live }: { live: Live }) {
   const setScreen = useMutation(api.sessions.setScreen);
@@ -420,6 +418,9 @@ function ScreenPanel({ live }: { live: Live }) {
   const s = live.screen;
   // The game the screen holds, up now or under the scores, join screen, slides, or a message.
   const held = s.drawing !== undefined ? "draw" : s.wikiFrom ? "wiki" : s.game && s.index !== undefined ? "card" : null;
+  // Named the way the Run the night panel names it.
+  const thing =
+    held === "draw" ? "drawing" : held === "wiki" ? "race" : s.game === "puzzle" ? "puzzle" : s.game === "relay" ? "problem" : "card";
   const modes = [
     ["lobby", "Join screen"],
     ["scoreboard", "Scoreboard"],
@@ -435,7 +436,7 @@ function ScreenPanel({ live }: { live: Live }) {
             onClick={() => live.screen.mode !== held && show({ ...live.screen, mode: held })}
             aria-pressed={live.screen.mode === held}
           >
-            {live.screen.mode === held ? ON_AIR[held] : `Back to the ${held === "wiki" ? "Wiki Race" : ON_AIR[held].toLowerCase()}`}
+            {live.screen.mode === held ? `The ${thing}` : `Back to the ${thing}`}
           </button>
         )}
         {modes.map(([mode, label]) => (
@@ -453,7 +454,7 @@ function ScreenPanel({ live }: { live: Live }) {
         >
           Kickoff slides
         </button>
-        {live.screen.mode === "message" && <span className="btn btn-sm btn-on pointer-events-none">{ON_AIR.message}</span>}
+        {live.screen.mode === "message" && <span className="btn btn-sm btn-on pointer-events-none">Message</span>}
       </div>
       <form
         className="mt-3 flex gap-2"

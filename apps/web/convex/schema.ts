@@ -51,8 +51,10 @@ export const timerV = v.object({
   relay: v.boolean(),
   // The answerable card ("game:index") this run is timing, so a clock started for another screen never closes it.
   card: v.optional(v.string()),
-  // Paused because its card left the TV mid-play (scores, join screen, a message): it runs again when the card comes back.
+  // Paused because its card left the TV mid-play (scores, join screen, a message), at `parkedAt`: it runs again when the
+  // card comes back, and the time away doesn't count against the card's early bonus or finish times.
   parked: v.optional(v.boolean()),
+  parkedAt: v.optional(v.number()),
 });
 
 // One showing of an answerable card: when its clock started (early bonus) and when it ran out (answers stay closed).
