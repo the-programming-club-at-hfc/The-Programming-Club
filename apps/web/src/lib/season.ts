@@ -53,7 +53,7 @@ export const WEEK_STARTS = [
 ].map((s) => new Date(s));
 
 // One-off room changes, by meeting date in Detroit. Every other week meets in CLUB.room.
-const ROOM_CHANGES: Record<string, string> = { "2026-10-21": "Gaming Room (E-180)" };
+const ROOM_CHANGES: Record<string, string> = { "2026-10-21": "Gaming Room (E-180)", "2026-10-28": "Gaming Room (E-180)" };
 
 /** Where the meeting on this date is held. */
 export const roomFor = (start: Date) => ROOM_CHANGES[start.toLocaleDateString("en-CA", { timeZone: CLUB.timeZone })] ?? CLUB.room;
