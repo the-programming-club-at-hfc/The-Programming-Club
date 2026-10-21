@@ -12,7 +12,9 @@ export const leaderboard = query({
       string,
       { week: number; show: number; place: number; bonus: number; bonuses: { xp: number; why: string }[] }[]
     >();
+    const officers = new Set<string>();
     for (const a of await ctx.db.query("attendance").collect()) {
+      if (a.officer) officers.add(a.playerId);
       const week = weekOf.get(a.sessionId);
       if (week === undefined || !inTeamPool(a)) continue;
       byPlayer.set(a.playerId, [
@@ -26,7 +28,10 @@ export const leaderboard = query({
       .map((p) => {
         const nights = byPlayer.get(p._id)!.sort((a, b) => a.week - b.week);
         const xp = nights.reduce((n, x) => n + x.show + x.place + x.bonus, 0);
-        return { name: p.name, xp, weeks: nights.length, founder: nights[0].week === 1, rookie: nights[0].week > 1, nights };
+        // Officers wear Officer instead of Founder or Rookie.
+        const officer = officers.has(p._id);
+        const first = nights[0].week;
+        return { name: p.name, xp, weeks: nights.length, officer, founder: !officer && first === 1, rookie: !officer && first > 1, nights };
       })
       .sort((a, b) => b.xp - a.xp || b.weeks - a.weeks || a.name.localeCompare(b.name));
   },

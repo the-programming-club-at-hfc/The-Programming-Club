@@ -72,6 +72,7 @@ function Scores() {
                         <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
                           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             {p.name}
+                            {p.officer && <span className="chip font-semibold">Officer</span>}
                             {p.founder && <span className="chip font-semibold">Founder</span>}
                             {p.rookie && <span className="chip bg-meadow/25 font-semibold">Rookie</span>}
                           </span>

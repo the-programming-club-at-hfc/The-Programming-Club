@@ -1026,6 +1026,19 @@ describe("ending the night", () => {
     expect((await t.query(api.stats.leaderboard, {})).map((r) => r.xp)).toEqual([6, 6, 5, 4, 3]);
   });
 
+  test("a playing officer is on the board as Officer, not Founder or Rookie", async () => {
+    const { t, officer, startNight, join } = setup();
+    const code = await startNight();
+    await officer.mutation(api.players.checkInOfficer, { name: "Ada" }); // officers check in playing
+    await join(code, student(1));
+    await officer.mutation(api.sessions.end, {});
+    const board = await t.query(api.stats.leaderboard, {});
+    expect(board.map((r) => [r.name, r.officer, r.founder, r.rookie])).toEqual([
+      ["Ada", true, false, false],
+      [student(1).name, false, true, false],
+    ]);
+  });
+
   test("a night that switched solo to teams: place XP still goes by each player's own points", async () => {
     const { t, officer, startNight, join, attendance } = setup();
     const code = await startNight();
