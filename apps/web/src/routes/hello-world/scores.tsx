@@ -43,45 +43,65 @@ function Scores() {
               <tr className="text-left text-sm text-dim">
                 <th className="pb-3 font-normal">Rank</th>
                 <th className="pb-3 font-normal">Name</th>
-                <th className="pb-3 text-right font-normal">Weeks</th>
-                <th className="pb-3 text-right font-normal">XP</th>
+                <th className="pb-3 pl-6 text-right font-normal max-sm:hidden">Weeks</th>
+                <th className="pb-3 pl-4 text-right font-normal">XP</th>
               </tr>
             </thead>
             <tbody>
               {board.map((p, i) => {
                 const rank = 1 + board.filter((o) => o.xp > p.xp).length;
                 return (
-                  <tr key={p.name + i} className="border-t border-line">
-                    <td className="w-24 py-3.5">
-                      <span className="flex items-center gap-3">
-                        <span className="size-5 rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
+                  // Every cell is top-aligned on a 2.5rem first line, so the rank and numbers stay level with the name when the breakdown opens.
+                  <tr key={p.name + i} className="border-t border-line align-top">
+                    <td className="w-20 py-3.5 sm:w-24">
+                      <span className="flex h-10 items-center gap-3">
+                        <span
+                          className="size-5 shrink-0 rounded-full"
+                          style={{ background: MEDAL[rank - 1] ?? "transparent" }}
+                          aria-hidden
+                        />
                         <span className="narrow text-xl font-extrabold">{ordinal(rank)}</span>
                       </span>
                     </td>
                     <td className="py-3.5 text-lg font-bold">
                       {/* Where the XP came from, night by night. */}
                       <details className="group">
-                        <summary className="flex cursor-pointer flex-wrap items-center gap-2 select-none">
-                          {p.name}
-                          {p.founder && <span className="chip font-semibold">Founder</span>}
-                          {p.rookie && <span className="chip bg-meadow/25 font-semibold">Rookie</span>}
+                        <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            {p.name}
+                            {p.founder && <span className="chip font-semibold">Founder</span>}
+                            {p.rookie && <span className="chip bg-meadow/25 font-semibold">Rookie</span>}
+                          </span>
                           <span className="font-normal text-dim transition-transform group-open:rotate-90" aria-hidden>
                             ›
                           </span>
                         </summary>
-                        <ul className="mt-2 space-y-1 text-sm font-normal text-dim">
+                        <ul className="mt-2 border-l-2 border-line pl-3 text-sm font-normal">
                           {p.nights.map((n, j) => (
-                            <li key={j}>
-                              Week {n.week}: {n.show} for coming
-                              {n.place > 0 && `, +${n.place} for place`}
-                              {n.bonus > 0 && `, +${n.bonus} bonus`} = <strong className="text-ink">{n.show + n.place + n.bonus} XP</strong>
+                            <li key={j} className="flex items-baseline justify-between gap-4 py-1">
+                              <span>
+                                <span className="font-semibold">Week {n.week}</span>
+                                <span className="text-dim">
+                                  {" · "}
+                                  {n.show} coming
+                                  {n.place > 0 && ` · +${n.place} place`}
+                                  {n.bonus > 0 && ` · +${n.bonus} bonus`}
+                                </span>
+                              </span>
+                              <span className="narrow shrink-0 font-bold">{n.show + n.place + n.bonus} XP</span>
                             </li>
                           ))}
                         </ul>
                       </details>
                     </td>
-                    <td className="narrow py-3.5 text-right text-lg text-dim">{p.weeks}</td>
-                    <td className="narrow py-3.5 text-right text-3xl font-extrabold">{p.xp}</td>
+                    <td className="narrow py-3.5 pl-6 text-right text-lg leading-10 text-dim max-sm:hidden">{p.weeks}</td>
+                    <td className="py-3.5 pl-4 text-right">
+                      <span className="narrow block text-3xl leading-10 font-extrabold">{p.xp}</span>
+                      {/* No room for a Weeks column on a phone, so the count sits under the XP. */}
+                      <span className="block text-xs text-dim sm:hidden">
+                        {p.weeks} {p.weeks === 1 ? "week" : "weeks"}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
