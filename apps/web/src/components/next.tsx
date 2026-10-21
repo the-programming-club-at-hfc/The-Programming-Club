@@ -7,6 +7,7 @@ import { api } from "../../convex/_generated/api";
 import { DECKS, fmtClock, useRemaining } from "./game";
 import type { Screen } from "./game";
 import { drawOpen } from "./draw";
+import { WORD_MAX } from "#/lib/draw";
 import { run } from "./officer";
 import { BUGS, GAMES, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
@@ -92,16 +93,17 @@ export function DrawHost({ live }: { live: Live }) {
   const setScreen = useMutation(api.sessions.setScreen);
   const switchDrawer = useMutation(api.drawings.switchDrawer);
   const timer = useMutation(api.sessions.timer);
+  const ownWord = useMutation(api.drawings.ownWord);
   const remaining = useRemaining(live.timer);
+  const [own, setOwn] = useState("");
   if (!data) return null;
   const d = data.current;
+  const fresh = () => timer({ action: "set", seconds: DRAW_SECONDS, relay: false, autostart: true });
   // Someone new gets a new word and a fresh clock.
   const handTo = (id: Id<"attendance">) =>
     d &&
     run(
-      switchDrawer({ drawingId: d._id, attendanceId: id }).then(() =>
-        timer({ action: "set", seconds: DRAW_SECONDS, relay: false, autostart: true }),
-      ),
+      switchDrawer({ drawingId: d._id, attendanceId: id }).then(fresh),
     );
   return (
     <div className="mt-4 border-4 border-line p-3">
@@ -147,6 +149,28 @@ export function DrawHost({ live }: { live: Live }) {
                 ))}
             </select>
           </div>
+          {/* A word of the officer's own, e.g. tonight's topic: the drawer gets it on a clean canvas with a fresh clock. */}
+          <form
+            className="mt-2 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (own.trim()) void run(ownWord({ drawingId: d._id, word: own }).then(() => (setOwn(""), fresh())));
+            }}
+          >
+            <input
+              className="field min-w-0 py-1 text-sm"
+              value={own}
+              onChange={(e) => setOwn(e.target.value)}
+              placeholder="Or give them your own word"
+              aria-label="Your own word"
+              maxLength={WORD_MAX}
+              autoComplete="off"
+              disabled={d.got > 0}
+            />
+            <button className="btn btn-sm shrink-0" disabled={d.got > 0 || !own.trim()}>
+              Use it
+            </button>
+          </form>
           {d.got > 0 && <p className="mt-1 text-sm text-dim">Someone has it, so the word and the drawer stay.</p>}
         </>
       )}

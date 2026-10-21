@@ -6,8 +6,8 @@ import { requireOfficer } from "./officers";
 import { award, inTeamPool, openSession, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { PICTIONARY } from "../src/lib/content";
-import { COLORS, GUESS_MAX, H, INK_BLOCK, MAX_INK_POINTS, MAX_INK_ROWS, SIZES, W, blanks } from "../src/lib/draw";
-import { checkGuess, drawAwardsFor, drawKey } from "../src/lib/grading";
+import { COLORS, GUESS_MAX, H, INK_BLOCK, MAX_INK_POINTS, MAX_INK_ROWS, SIZES, W, WORD_MAX, blanks } from "../src/lib/draw";
+import { checkGuess, drawAwardsFor, drawKey, guessKey } from "../src/lib/grading";
 
 // Tech Pictionary: the server picks who draws and the word, the drawer's phone and the officer tablet draw on the same
 // picture, everyone else guesses on their phones, and the drawing is scored at the reveal (or when the night ends).
@@ -208,6 +208,20 @@ export const skip = mutation({
     if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so it stays.");
     if (token && (d.skips ?? 0) >= MAX_SKIPS) throw new ConvexError("That’s two skips. Give this one a go, or ask an officer.");
     await ctx.db.patch(d._id, { word: await newWord(ctx, s), rev: (d.rev ?? 0) + 1, skips: (d.skips ?? 0) + (token ? 1 : 0) });
+    await removeInk(ctx, d);
+  },
+});
+
+/** An officer's own word for the drawing, on a clean canvas (the drawer saw the old one). Not once someone has it. */
+export const ownWord = mutation({
+  args: { drawingId: v.id("drawings"), word: v.string() },
+  handler: async (ctx, { drawingId, word }) => {
+    const { d, s } = await myDrawing(ctx, drawingId, undefined);
+    const w = word.trim().replace(/\s+/g, " ");
+    if (guessKey(w).length < 2 || w.length > WORD_MAX) throw new ConvexError(`Type a word or phrase, up to ${WORD_MAX} characters.`);
+    if (over(s, d.key)) throw new ConvexError("This drawing is over.");
+    if ((await gotIt(ctx, s, d)).got.length) throw new ConvexError("Someone already got this one, so it stays.");
+    await ctx.db.patch(d._id, { word: w, rev: (d.rev ?? 0) + 1 });
     await removeInk(ctx, d);
   },
 });

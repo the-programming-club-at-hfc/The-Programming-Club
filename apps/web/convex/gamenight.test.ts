@@ -1385,6 +1385,26 @@ describe("Tech Pictionary", () => {
     await expect(o.t.mutation(api.drawings.clear, { drawingId: d.id, token: d.drawer.token, mine: [long] })).rejects.toThrow("strokes");
   });
 
+  test("an officer can give the drawer their own word, on a clean canvas, until someone has it", async () => {
+    const o = setup();
+    const tokens = await soloNight(o, 3);
+    const d = await newDrawing(o);
+    const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
+    const own = (word: string) => o.officer.mutation(api.drawings.ownWord, { drawingId: d.id, word });
+    const ink = { drawingId: d.id, rev: 0, stroke: "s1", color: COLORS[0], size: SIZES[0], points: [10, 10] };
+    await o.t.mutation(api.drawings.ink, { ...ink, token: d.drawer.token });
+    await expect(o.signedInStudent.mutation(api.drawings.ownWord, { drawingId: d.id, word: "lasagna" })).rejects.toThrow("Only club officers");
+    await expect(own(" ! ")).rejects.toThrow("Type a word");
+    await expect(own("x".repeat(31))).rejects.toThrow("Type a word");
+    await own("  Stack   Overflow ");
+    expect((await o.t.query(api.drawings.mine, { token: d.drawer.token }))!.word).toBe("Stack Overflow");
+    expect((await o.t.query(api.drawings.board, {}))!.blanks).toBe("_____ ________");
+    expect(await o.t.run((ctx) => ctx.db.query("strokes").collect())).toEqual([]);
+    later(5);
+    expect(await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: "stackoverflow" })).toBe("right");
+    await expect(own("lasagna")).rejects.toThrow("Someone already got this one");
+  });
+
   test("moving the drawer to a team that already got it doesn't take that team's guess away", async () => {
     const o = setup();
     const { teams } = await o.nightWithTeams(6, 2);

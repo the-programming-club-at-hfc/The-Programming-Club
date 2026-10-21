@@ -18,6 +18,9 @@ export const MAX_INK_POINTS = 400;
 /** The longest guess a phone can send. */
 export const GUESS_MAX = 60;
 
+/** The longest word or phrase an officer can set for a drawing. */
+export const WORD_MAX = 30;
+
 /** The word as blanks for the TV: each letter or digit a blank, spaces and punctuation as they are. */
 export const blanks = (word: string) => word.replace(/[a-z0-9]/gi, "_");
 
