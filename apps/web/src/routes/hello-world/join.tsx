@@ -219,7 +219,7 @@ function JoinForm({ initialCode, sessionId, onJoined }: { initialCode: string; s
           {(officer || wrongAccount) && (
             <p className="mt-2 text-dim">
               {officer
-                ? `You’re checking in as ${account.email}, an officer. You’ll play like everyone else (in Pictionary you draw but don’t guess, since the host page shows the word); switch to Just hosting anytime. Joining someone else on this phone? Sign out first.`
+                ? `You’re checking in as ${account.email}, an officer. You’ll play like everyone else (in Pictionary, don’t peek at the word on the host page); switch to Just hosting anytime. Joining someone else on this phone? Sign out first.`
                 : `You’re signed in as ${account.email}, which isn’t an HFC email. Sign out and sign in with your HawkMail, or join with it below.`}
             </p>
           )}
@@ -604,7 +604,6 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 live={live}
                 open={phoneOpen(live, drawKey(s.drawing), remaining)}
                 playing={!!me.team}
-                officer={me.officer}
                 side={bar("hidden short:flex")}
               />
             </div>

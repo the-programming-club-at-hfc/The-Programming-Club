@@ -1404,7 +1404,7 @@ describe("Tech Pictionary", () => {
     await expect(o.t.mutation(api.drawings.skip, { drawingId: d.id, token: d.drawer.token })).rejects.toThrow("Time’s up");
   });
 
-  test("officers see the word, so a playing officer can draw but not guess", async () => {
+  test("a playing officer can draw and guess", async () => {
     const o = setup();
     await soloNight(o, 2);
     const ada = await o.officer.mutation(api.players.checkInOfficer, { name: "Ada" });
@@ -1412,14 +1412,14 @@ describe("Tech Pictionary", () => {
     // If Ada drew the first one, start another so she's a guesser.
     let d = await newDrawing(o, "laptop");
     if (d.drawer.token === ada) d = await newDrawing(o, "laptop");
-    await expect(o.t.mutation(api.drawings.guess, { token: ada, card: d.key, text: "laptop" })).rejects.toThrow("draw but don’t guess");
+    expect((await o.t.mutation(api.drawings.guess, { token: ada, card: d.key, text: "laptop" }))).toBe("right");
     // She's still in the drawing rotation.
     const drawers = new Set([d.drawer._id]);
     for (let i = 0; i < 3; i++) drawers.add((await newDrawing(o)).drawer._id);
     expect(drawers.has((await o.attendance()).find((a) => a.token === ada)!._id)).toBe(true);
   });
 
-  test("playing officers can't guess, so they don't count toward half the room for the drawer's bonus", async () => {
+  test("playing officers guess, so they count toward half the room for the drawer's bonus", async () => {
     const o = setup();
     const code = await o.startNight(2);
     const tokens = [];
@@ -1430,13 +1430,13 @@ describe("Tech Pictionary", () => {
     let d = await newDrawing(o, "mouse");
     while (d.drawer.officer) d = await newDrawing(o, "mouse");
     const board = (await o.t.query(api.drawings.board, {}))!;
-    // Two students can guess; the officers' teams aren't counted.
-    expect(board.guessing).toBe(2);
+    // Two students and two officers can guess.
+    expect(board.guessing).toBe(4);
     const guesser = tokens.find((tk) => tk !== d.drawer.token)!;
     await o.t.mutation(api.drawings.guess, { token: guesser, card: d.key, text: "mouse" });
     await reveal(o, d.n);
-    // 1 of 2 is half, so the drawer gets 3, not 2.
-    expect((await o.t.query(api.players.me, { token: d.drawer.token }))!.team!.score).toBe(3);
+    // 1 of 4 is under half, so the drawer gets 2, not 3.
+    expect((await o.t.query(api.players.me, { token: d.drawer.token }))!.team!.score).toBe(2);
   });
 
   test("a drawer's phone gets two skips a drawing; an officer can always skip; malformed stroke ids are turned away", async () => {

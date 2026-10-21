@@ -117,8 +117,7 @@ const teamOf = async (ctx: QueryCtx, d: Doc<"drawings">) => d.team ?? (await ctx
 
 /**
  * The guessing teams that got a drawing, in order: each team's first right guess, leaving out teams that are gone and
- * the drawer's own. Also tonight's teams, the drawer's team, and how many teams can guess: not the drawer's, and not a
- * team of only officers, who see the word.
+ * the drawer's own. Also tonight's teams, the drawer's team, and how many teams can guess: everyone but the drawer's.
  */
 async function gotIt(ctx: QueryCtx, s: Doc<"sessions">, d: Doc<"drawings">) {
   const [teams, rows, team, players] = await Promise.all([
@@ -131,7 +130,7 @@ async function gotIt(ctx: QueryCtx, s: Doc<"sessions">, d: Doc<"drawings">) {
     sessionAttendance(ctx, s._id),
   ]);
   const drawerTeam = teams.find((t) => t._id === team)?._id ?? null;
-  const canGuess = new Set(players.filter((a) => a.teamId && !a.officer).map((a) => a.teamId));
+  const canGuess = new Set(players.filter((a) => a.teamId).map((a) => a.teamId));
   const guessing = teams.filter((t) => t._id !== drawerTeam && canGuess.has(t._id)).length;
   const names = new Map(teams.map((t) => [t._id, t.name]));
   const right = rows
@@ -334,7 +333,6 @@ export const guess = mutation({
     const s = a && (await ctx.db.get(a.sessionId));
     if (!a || !s || s.status !== "open") throw new ConvexError("This night has ended.");
     if (!a.teamId) throw new ConvexError("You’re not playing this round.");
-    if (a.officer) throw new ConvexError("Officers see the word, so you draw but don’t guess.");
     const teamId = a.teamId;
     const c = drawCard(s);
     const d = c?.key === card ? await drawingAt(ctx, s._id, c.n) : null;

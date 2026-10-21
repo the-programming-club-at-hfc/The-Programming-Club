@@ -341,14 +341,12 @@ export function PhoneDraw({
   live,
   open,
   playing,
-  officer,
   side,
 }: {
   token: string;
   live: Live;
   open: boolean;
   playing: boolean;
-  officer: boolean;
   side: ReactNode;
 }) {
   const board = useQuery(api.drawings.board);
@@ -459,17 +457,13 @@ export function PhoneDraw({
         canvasClass={canvas("max-w-[max((100dvh-16rem)*4/3,16rem)] lg:max-w-none")}
       />
       {/* On a phone on its side, the guess box tops the column: the keyboard covers the bottom half. */}
-      {officer && playing && !done ? (
-        <p className="text-sm text-dim short:order-first">Officers see the word, so you draw but don’t guess.</p>
-      ) : (
-        playing &&
+      {playing &&
         m &&
         !m.teammate &&
         !got &&
         !done &&
         // A new word (a skip) starts a fresh box, so a "So close!" for the old word goes.
-        (open ? <GuessBox key={b.rev} token={token} card={key} /> : <p className="font-semibold short:order-first">Time’s up.</p>)
-      )}
+        (open ? <GuessBox key={b.rev} token={token} card={key} /> : <p className="font-semibold short:order-first">Time’s up.</p>)}
       {side}
     </div>
   );
