@@ -580,6 +580,44 @@ describe("points", () => {
     await expect(t.mutation(api.answers.pick, { token: teams[1].tokens[0], card, choice: OUTPUTS[1].answer })).rejects.toThrow("closed");
   });
 
+  test("a card's clock parks while the scores or a message are up, and runs again when the card comes back", async () => {
+    const { t, officer, nightWithTeams, show } = setup();
+    const { teams } = await nightWithTeams(4);
+    const card = "output:1";
+    const pick = () => t.mutation(api.answers.pick, { token: teams[0].tokens[0], card, choice: OUTPUTS[1].answer });
+    const timer = async () => {
+      const { remainingMs, startedAt, parked } = (await t.query(api.sessions.live, {}))!.timer;
+      return { remainingMs, startedAt, parked };
+    };
+    await show({ mode: "card", game: "output", index: 1 });
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 30, autostart: true });
+    later(10);
+    await show({ ...(await t.query(api.sessions.live, {}))!.screen, mode: "scoreboard" });
+    expect(await timer()).toEqual({ remainingMs: 20_000, startedAt: undefined, parked: true });
+    // A big message keeps the card under it, so it's still the one to come back to.
+    later(60);
+    await show({ ...(await t.query(api.sessions.live, {}))!.screen, mode: "message", message: "Pizza's here" });
+    const { game, index } = (await t.query(api.sessions.live, {}))!.screen;
+    expect([game, index]).toEqual(["output", 1]);
+    await show({ ...(await t.query(api.sessions.live, {}))!.screen, mode: "card" });
+    expect(await timer()).toEqual({ remainingMs: 20_000, startedAt: now, parked: undefined });
+    await pick();
+    later(23);
+    await expect(pick()).rejects.toThrow("closed");
+  });
+
+  test("a parked card that comes back for its reveal stays stopped", async () => {
+    const { t, officer, nightWithTeams, show } = setup();
+    await nightWithTeams(4);
+    await show({ mode: "card", game: "output", index: 1 });
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 30, autostart: true });
+    later(5);
+    await show({ mode: "lobby", game: "output", index: 1 });
+    await show({ mode: "card", game: "output", index: 1, revealed: true });
+    const { remainingMs, startedAt, parked } = (await t.query(api.sessions.live, {}))!.timer;
+    expect({ remainingMs, startedAt, parked }).toEqual({ remainingMs: 25_000, startedAt: undefined, parked: undefined });
+  });
+
   test("Fix it for real: +3 per team that fixed it, +2 more for the first, through the team key", async () => {
     const { t, officer, nightWithTeams, show, score } = setup();
     const { teams } = await nightWithTeams(6);

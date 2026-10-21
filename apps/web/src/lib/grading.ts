@@ -301,6 +301,8 @@ export interface Clock {
   remainingMs: number;
   startedAt?: number;
   card?: string;
+  /** Paused because its card left the TV mid-play; it runs again when the card comes back. */
+  parked?: boolean;
 }
 
 /** Milliseconds left at `now`. Goes below 0 once a running clock has run out. */
@@ -323,6 +325,18 @@ export function showCard(o: { card?: CardWindow; played: CardWindow[]; up?: stri
   const leaving = o.card;
   const played = leaving ? [...o.played.filter((w) => w.key !== leaving.key), leaving] : o.played;
   return { card: o.up ? (played.find((w) => w.key === o.up) ?? { key: o.up, at: o.now, double: o.double }) : undefined, played };
+}
+
+/**
+ * The clock as the TV changes. A card's running clock parks when the card leaves the TV with time left (scores, the
+ * join screen, a message), since nobody can answer it meanwhile, and runs again when the card comes back unrevealed.
+ * `from` and `to` are the answerable card before and after the change.
+ */
+export function parkClock<T extends Clock>(t: T, o: { from?: string; to?: string; revealed: boolean; now: number }): T {
+  if (o.from && o.from !== o.to && t.card === o.from && t.startedAt !== undefined && clockLeft(t, o.now) > 0)
+    return { ...t, remainingMs: clockLeft(t, o.now), startedAt: undefined, parked: true };
+  if (t.parked && o.to === t.card) return { ...t, startedAt: o.revealed ? undefined : o.now, parked: undefined };
+  return t;
 }
 
 /** A clock that starts from full for the card on screen: a preset with autostart, or Start from full. Never +30s. */

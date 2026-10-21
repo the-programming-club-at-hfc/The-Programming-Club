@@ -8,7 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
 import { Blanks, Sketch } from "#/components/draw";
-import { InstagramQr } from "#/components/instagram";
+import { InstagramGlyph, InstagramQr } from "#/components/instagram";
 import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
@@ -664,11 +664,18 @@ function Lobby({ live, code, joinUrl }: { live: Live; code: string; joinUrl: str
             </li>
           ))}
         </ul>
-        {live.roster.some((p) => p.firstTime) && (
-          <p className="mt-auto flex items-center gap-[0.6vw] text-[1.3vw] text-dim">
-            <span className="size-[0.8vw] rounded-full bg-sky" aria-hidden /> First meeting. Say hi.
+        <div className="mt-auto flex items-center gap-[2vw] pt-[1vw] text-[1.3vw]">
+          {live.roster.some((p) => p.firstTime) && (
+            <p className="flex items-center gap-[0.6vw] text-dim">
+              <span className="size-[0.8vw] rounded-full bg-sky" aria-hidden /> First meeting. Say hi.
+            </p>
+          )}
+          {/* Words only: a second QR here would compete with the join one. */}
+          <p className="ml-auto flex items-center gap-[0.6vw] text-[1.6vw] font-bold">
+            <InstagramGlyph className="size-[1.2em]" />
+            <span className="underline decoration-sky decoration-[0.2vw] underline-offset-[0.4vw]">Follow @{CLUB.instagram}</span>
           </p>
-        )}
+        </div>
       </div>
     </div>
   );

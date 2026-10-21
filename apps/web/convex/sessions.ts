@@ -20,7 +20,7 @@ import { scorePuzzleReveal, scoreUnrevealedPuzzles } from "./puzzles";
 import { scoreWikiReveal } from "./wiki";
 import { drawCard, scoreDrawReveal, scoreUnrevealedDrawings } from "./drawings";
 import type { Doc } from "./_generated/dataModel";
-import { clockLeft, isFreshStart, settle, showCard, wikiKey } from "../src/lib/grading";
+import { clockLeft, isFreshStart, parkClock, settle, showCard, wikiKey } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
 
 /** The card (or race, or drawing) on the TV that teams answer against the clock. */
@@ -195,9 +195,11 @@ async function putScreen(ctx: MutationCtx, before: Doc<"sessions">, screen: Doc<
   const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
   // Each answerable card keeps its own window; anything else going up clears the current one.
   const now = Date.now();
-  const w = showCard({ ...settled(s, now), up: upCard(next)?.key, now, double: s.double });
-  Object.assign(next, { card: w.card, played: w.played });
-  await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played });
+  const up = upCard(next)?.key;
+  const w = showCard({ ...settled(s, now), up, now, double: s.double });
+  const timer = parkClock(s.timer, { from: upCard(s)?.key, to: up, revealed: !!screen.revealed, now });
+  Object.assign(next, { card: w.card, played: w.played, timer });
+  await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played, timer });
   // Revealing scores phone answers, Fix it for real fixes, puzzle stars, a Wiki Race, or a drawing, once per card.
   await scoreReveal(ctx, next);
   await scoreFixReveal(ctx, next);
@@ -260,7 +262,8 @@ export const timer = mutation({
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
     const now = Date.now();
-    const t = { ...s.timer };
+    // Any clock button takes over from a parked clock.
+    const t = { ...s.timer, parked: undefined };
     const remaining = Math.max(0, clockLeft(t, now));
     const card = upCard(s)?.key;
     let { card: w, played } = settled(s, now);

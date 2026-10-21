@@ -448,7 +448,8 @@ function ScreenPanel({ live }: { live: Live }) {
         className="mt-3 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (message.trim()) void show({ mode: "message", message: message.trim() });
+          // Over whatever is up, which comes back after: a card mid-play keeps its place and its clock parks.
+          if (message.trim()) void show({ ...live.screen, mode: "message", message: message.trim() });
         }}
       >
         <input

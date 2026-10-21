@@ -273,6 +273,8 @@ export function NextPanel({
           : r?.game === "relay"
             ? "problem"
             : "card";
+  // The TV screen this round's cards (or races, or drawings) play on.
+  const home = r?.kind === "wiki" ? "wiki" : r?.kind === "pictionary" ? "draw" : "card";
   const reveal: Action = {
     label:
       r?.kind === "wiki"
@@ -283,7 +285,7 @@ export function NextPanel({
             ? "Reveal the word and score"
             : "Reveal answer",
     go: async () => {
-      await setScreen({ screen: { ...s, mode: r?.kind === "wiki" ? "wiki" : r?.kind === "pictionary" ? "draw" : "card", revealed: true } });
+      await setScreen({ screen: { ...s, mode: home, revealed: true } });
       await pause();
     },
   };
@@ -306,6 +308,10 @@ export function NextPanel({
       label: `Start the race: ${fmtClock(wikiSeconds(!!s.wikiClicks) * 1000)}`,
       go: () => startRace(s),
     };
+  } else if ((step === "reveal" || step === "hint") && s.mode !== home) {
+    // The scores, join screen, or a message went up mid-play: its clock parked, and it comes back to finish.
+    primary = { label: `Put the ${thing} back on the TV`, go: () => setScreen({ screen: { ...s, mode: home } }) };
+    alt = { ...reveal, keys: false };
   } else if (step === "hint") {
     // The same hint the Puzzles deck puts up: on the TV, phones, and team computers.
     primary = { label: "Show hint", go: () => setScreen({ screen: { ...s, mode: "card", hint: true } }) };
