@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { Sketch, drawOpen } from "#/components/draw";
+import { FullScreen, Sketch, drawOpen } from "#/components/draw";
 import { fmtClock, useRemaining } from "#/components/game";
 import { OfficerGate, run } from "#/components/officer";
 import { Picto } from "#/components/ui";
@@ -44,24 +44,6 @@ function useWakeLock() {
       void lock?.release();
     };
   }, []);
-}
-
-/** Full screen hides the browser's address bar and tabs (and Android's bars), so the pad gets the whole tablet. Browsers
- *  only allow it from a tap, and a swipe from the edge leaves it, so the button stays until it's on. */
-function FullScreen({ className = "" }: { className?: string }) {
-  const [on, setOn] = useState(true);
-  useEffect(() => {
-    const check = () => setOn(!!document.fullscreenElement || !document.fullscreenEnabled);
-    check();
-    document.addEventListener("fullscreenchange", check);
-    return () => document.removeEventListener("fullscreenchange", check);
-  }, []);
-  if (on) return null;
-  return (
-    <button className={`btn btn-sm ${className}`} onClick={() => void document.documentElement.requestFullscreen().catch(() => undefined)}>
-      Full screen
-    </button>
-  );
 }
 
 function Pad() {

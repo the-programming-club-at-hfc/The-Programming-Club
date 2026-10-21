@@ -4,7 +4,7 @@ import { useMutation, useQueries, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ordinal } from "./ui";
@@ -315,19 +315,41 @@ export function Blanks({ text, className = "" }: { text: string; className?: str
   );
 }
 
-/** The join screen while a drawing is up: the drawer gets the word and the canvas; everyone else watches and guesses. */
+/** Full screen hides the browser's address bar and tabs (and Android's bars), so the pad gets the whole tablet (or a
+ *  phone on its side). Browsers only allow it from a tap, and a swipe from the edge leaves it, so the button stays until
+ *  it's on. iPhone Safari has no full screen, so there it never shows. */
+export function FullScreen({ className = "" }: { className?: string }) {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const check = () => setOn(!!document.fullscreenElement || !document.fullscreenEnabled);
+    check();
+    document.addEventListener("fullscreenchange", check);
+    return () => document.removeEventListener("fullscreenchange", check);
+  }, []);
+  if (on) return null;
+  return (
+    <button className={`btn btn-sm ${className}`} onClick={() => void document.documentElement.requestFullscreen().catch(() => undefined)}>
+      Full screen
+    </button>
+  );
+}
+
+/** The join screen while a drawing is up: the drawer gets the word and the canvas; everyone else watches and guesses.
+ *  `side` (the team's score and clock) shows beside the drawing on a phone on its side, where the join page's bar goes. */
 export function PhoneDraw({
   token,
   live,
   open,
   playing,
   officer,
+  side,
 }: {
   token: string;
   live: Live;
   open: boolean;
   playing: boolean;
   officer: boolean;
+  side: ReactNode;
 }) {
   const board = useQuery(api.drawings.board);
   const top = useRef<HTMLDivElement>(null);
@@ -349,20 +371,28 @@ export function PhoneDraw({
   if (!b) return null;
   const done = !!live.screen.revealed || b.scored;
   const result = done && m?.points ? `+${m.points}` : null;
-  // As big as fits on a short screen with the word and tools in view, but never under 16rem (a phone on its side scrolls
-  // instead); phones stay full width. On a wide screen (a tablet in landscape, a laptop), the word, canvas, and guess box
-  // share one column as wide as the canvas can be (and no wider than the room beside the join page's left column, or a
-  // 44rem canvas), with the drawer's tools beside the canvas.
-  const canvas = (room: string) => `mx-auto aspect-[4/3] w-full border-[1.5px] border-line ${room}`;
+  // As big as fits on a short screen with the word and tools in view, but never under 16rem; phones stay full width. On a
+  // wide screen (a tablet in landscape, a laptop), the word, canvas, and guess box share one column as wide as the canvas
+  // can be (and no wider than the room beside the join page's left column, or a 44rem canvas), with the drawer's tools
+  // beside the canvas. A phone on its side puts the canvas on the left, as tall as the screen (leaving at least 16.5rem
+  // for the right column), and everything else in a column beside it: Sketch's wrapper steps aside (`contents`) so its
+  // canvas and tools join the grid.
+  const canvas = (room: string) =>
+    `mx-auto aspect-[4/3] w-full border-[1.5px] border-line ${room} short:col-start-1 short:row-[1/-1] short:h-[min(100dvh-3rem,(100vw-20rem)*3/4)] short:w-auto short:max-w-none`;
+  const columns =
+    "short:grid short:grid-cols-[auto_minmax(0,1fr)] short:grid-rows-[repeat(4,auto)_1fr] short:items-start short:gap-x-4 short:gap-y-3 short:space-y-0";
 
   if (m?.drawer)
     return (
-      <div ref={top} className="scroll-mt-20 space-y-3 lg:w-[min((100dvh-12.5rem)*4/3+6.75rem,100vw-26rem,50.75rem)]">
+      <div ref={top} className={`scroll-mt-20 space-y-3 lg:w-[min((100dvh-12.5rem)*4/3+6.75rem,100vw-26rem,50.75rem)] ${columns}`}>
         {/* One row: the word on the left, Skip on the right. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[10px] bg-sun p-4 text-[#12332b] lg:px-5 lg:py-3" role="status">
+        <div
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[10px] bg-sun p-4 text-[#12332b] lg:px-5 lg:py-3 short:p-3"
+          role="status"
+        >
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold sm:text-base">{done ? "You drew" : "You’re drawing. Don’t say it!"}</p>
-            <p className="mt-1 text-3xl leading-none font-extrabold tracking-[-0.03em] break-words sm:text-4xl">{m.word}</p>
+            <p className="mt-1 text-3xl leading-none font-extrabold tracking-[-0.03em] break-words sm:text-4xl short:text-2xl">{m.word}</p>
           </div>
           {result && <p className="text-2xl font-extrabold">{result}</p>}
           {open && b.got.length === 0 && (
@@ -381,22 +411,24 @@ export function PhoneDraw({
           )}
           {error && <p className="w-full text-sm font-semibold">{error}</p>}
         </div>
+        {side}
         <Sketch
           key={`${b._id}:${b.rev}`}
           drawingId={b._id}
           token={token}
           rev={b.rev}
           edit={open}
-          className="lg:flex lg:items-start lg:gap-3"
+          className="lg:flex lg:items-start lg:gap-3 short:contents"
           canvasClass={canvas("max-w-[max((100dvh-21rem)*4/3,16rem)] lg:max-w-none lg:min-w-0 lg:flex-1")}
-          toolsClass="mt-2 flex flex-wrap items-center gap-2 lg:mt-0 lg:grid lg:w-24 lg:shrink-0 lg:grid-cols-2 lg:content-start lg:justify-items-center lg:[&>button:nth-last-of-type(-n+2)]:col-span-2 lg:[&>button:nth-last-of-type(-n+2)]:w-full lg:[&>p]:col-span-2"
+          toolsClass="mt-2 flex flex-wrap items-center gap-2 short:mt-0 lg:mt-0 lg:grid lg:w-24 lg:shrink-0 lg:grid-cols-2 lg:content-start lg:justify-items-center lg:[&>button:nth-last-of-type(-n+2)]:col-span-2 lg:[&>button:nth-last-of-type(-n+2)]:w-full lg:[&>p]:col-span-2"
         />
         {!done && (
-          <p className="text-sm text-dim">
+          <p className="text-sm text-dim short:hidden">
             Draw here, or walk up to the officer tablet: it draws on this same picture. No letters, numbers, or symbols.
             {b.got.length > 0 && ` ${b.got.length} of ${b.guessing} got it so far.`}
           </p>
         )}
+        {!done && <FullScreen className="hidden short:inline-flex short:justify-self-start" />}
       </div>
     );
 
@@ -404,25 +436,31 @@ export function PhoneDraw({
   const status =
     got ?? (m?.teammate ? `${b.drawer} ${done ? "drew" : "is drawing"} for ${w.you}` : done && playing ? "Not this time" : null);
   return (
-    <div ref={top} className="scroll-mt-20 space-y-3 lg:w-[min((100dvh-13rem)*4/3,100vw-26rem,44rem)]">
+    <div ref={top} className={`scroll-mt-20 space-y-3 lg:w-[min((100dvh-13rem)*4/3,100vw-26rem,44rem)] ${columns}`}>
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
         <p className="font-semibold wrap-anywhere">{done ? "The word was" : `${b.drawer} is drawing`}</p>
         {done && b.word ? (
-          <p className="w-full text-4xl leading-none font-extrabold tracking-[-0.03em] break-words">{b.word}</p>
+          <p className="w-full text-4xl leading-none font-extrabold tracking-[-0.03em] break-words short:text-3xl">{b.word}</p>
         ) : (
           <Blanks text={b.blanks} className="text-3xl font-extrabold" />
         )}
       </div>
       {status && (
-        <div className={`rounded-[10px] p-5 ${got ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
-          <p className="text-3xl leading-none font-extrabold tracking-[-0.03em]">{status}</p>
+        <div className={`rounded-[10px] p-5 short:p-3 ${got ? "bg-meadow text-[#12332b]" : "bg-mist"}`} role="status">
+          <p className="text-3xl leading-none font-extrabold tracking-[-0.03em] short:text-2xl">{status}</p>
           {result && <p className="mt-2 text-2xl font-extrabold">{result}</p>}
           {m?.teammate && !done && <p className="mt-2 font-semibold">Sit this one out and cheer them on.</p>}
         </div>
       )}
-      <Sketch key={b._id} drawingId={b._id} canvasClass={canvas("max-w-[max((100dvh-16rem)*4/3,16rem)] lg:max-w-none")} />
+      <Sketch
+        key={b._id}
+        drawingId={b._id}
+        className="short:contents"
+        canvasClass={canvas("max-w-[max((100dvh-16rem)*4/3,16rem)] lg:max-w-none")}
+      />
+      {/* On a phone on its side, the guess box tops the column: the keyboard covers the bottom half. */}
       {officer && playing && !done ? (
-        <p className="text-sm text-dim">Officers see the word, so you draw but don’t guess.</p>
+        <p className="text-sm text-dim short:order-first">Officers see the word, so you draw but don’t guess.</p>
       ) : (
         playing &&
         m &&
@@ -430,8 +468,9 @@ export function PhoneDraw({
         !got &&
         !done &&
         // A new word (a skip) starts a fresh box, so a "So close!" for the old word goes.
-        (open ? <GuessBox key={b.rev} token={token} card={key} /> : <p className="font-semibold">Time’s up.</p>)
+        (open ? <GuessBox key={b.rev} token={token} card={key} /> : <p className="font-semibold short:order-first">Time’s up.</p>)
       )}
+      {side}
     </div>
   );
 }
@@ -465,7 +504,7 @@ function GuessBox({ token, card }: { token: string; card: string }) {
     }
   };
   return (
-    <form onSubmit={submit} className="space-y-2">
+    <form onSubmit={submit} className="space-y-2 short:order-first">
       <div className="flex gap-2">
         <input
           className="field min-w-0 flex-1 text-lg"

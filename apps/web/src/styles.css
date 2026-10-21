@@ -23,6 +23,9 @@
   --font-code: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
 }
 
+/* A phone on its side: short and landscape, under the lg breakpoint so it never meets the wide layout. */
+@custom-variant short (@media (orientation: landscape) and (max-height: 500px) and (width < 64rem));
+
 @layer base {
   .theme-pine {
     --color-paper: #0f2b24;

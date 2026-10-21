@@ -376,12 +376,13 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const work = !!me.team && (laptop || (!!card && fullFor === card));
   const py = usePython(work && teamComputer);
   const wide = work && s.mode === "card" && (s.game === "fix" || s.game === "puzzle");
+  const drawing = s.mode === "draw" && s.drawing !== undefined;
   // A game is up: phones and portrait tablets trade the big name and player card for one slim bar so the game gets the
   // screen, and wide screens (a tablet in landscape, a laptop) put the player card on the left with the game beside it.
   const game =
     (s.mode === "card" && !!s.game && s.index !== undefined) ||
     (s.mode === "wiki" && (!!s.wikiReady || (!!s.wikiFrom && !!s.wikiTo))) ||
-    (s.mode === "draw" && s.drawing !== undefined) ||
+    drawing ||
     (s.mode === "message" && !!s.message);
   const split = !wide && game;
   // No clock once it has run out (each game says time's up its own way), or once the card on screen is revealed.
@@ -395,6 +396,30 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     <button className="link mb-1 py-2.5 text-sm text-dim" onClick={() => setFullFor(null)}>
       Back to the phone view
     </button>
+  );
+  // A game's slim bar: the team, its place and score, and the clock.
+  const bar = (className: string) => (
+    <div className={`theme-pine items-center gap-3 rounded-[10px] p-2 pr-4 ${className}`}>
+      <div className={`tile ${t.tile} size-11 shrink-0 rounded-[6px]`}>
+        <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
+      </div>
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="truncate font-bold">{me.team ? me.team.name : hosting ? "Just hosting" : me.name}</p>
+        <p className="truncate text-sm text-dim">
+          {me.team ? `${ordinal(me.team.rank)} of ${me.team.of}` : hosting ? "Off the teams" : w.waiting}
+          {me.practice && " · practice"}
+        </p>
+      </div>
+      {me.team && <p className="narrow text-3xl leading-none font-extrabold">{me.team.score}</p>}
+      {hosting && (
+        <Link to="/hello-world/host" className="btn btn-sm">
+          Host
+        </Link>
+      )}
+      {timed && (
+        <p className={`narrow border-l border-line pl-3 text-3xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>{clock}</p>
+      )}
+    </div>
   );
   const footer = (className: string) => (
     <div className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-dim ${className}`}>
@@ -415,32 +440,11 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   );
   return (
     <Wrap
-      className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"}`}
+      className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"} ${drawing ? "short:max-w-none" : ""}`}
     >
       <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
-        {game && (
-          <div className="theme-pine sticky top-2 z-20 flex items-center gap-3 rounded-[10px] p-2 pr-4 lg:hidden">
-            <div className={`tile ${t.tile} size-11 shrink-0 rounded-[6px]`}>
-              <Picto id={t.picto} className="absolute inset-x-[12%] top-1/2 -translate-y-1/2" />
-            </div>
-            <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate font-bold">{me.team ? me.team.name : hosting ? "Just hosting" : me.name}</p>
-              <p className="truncate text-sm text-dim">
-                {me.team ? `${ordinal(me.team.rank)} of ${me.team.of}` : hosting ? "Off the teams" : w.waiting}
-                {me.practice && " · practice"}
-              </p>
-            </div>
-            {me.team && <p className="narrow text-3xl leading-none font-extrabold">{me.team.score}</p>}
-            {hosting && (
-              <Link to="/hello-world/host" className="btn btn-sm">
-                Host
-              </Link>
-            )}
-            {timed && (
-              <p className={`narrow border-l border-line pl-3 text-3xl leading-none font-extrabold ${hot ? "text-signal" : ""}`}>{clock}</p>
-            )}
-          </div>
-        )}
+        {/* On a phone on its side, a drawing takes the bar beside it instead. */}
+        {game && bar(`sticky top-2 z-20 flex lg:hidden ${drawing ? "short:hidden" : ""}`)}
         <div className={`${split ? "lg:sticky lg:top-5" : ""} ${game ? "hidden lg:block" : ""}`}>
           <p className="text-sm text-dim">
             Week {live.week}: {wk.title}
@@ -601,6 +605,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
                 open={phoneOpen(live, drawKey(s.drawing), remaining)}
                 playing={!!me.team}
                 officer={me.officer}
+                side={bar("hidden short:flex")}
               />
             </div>
           )}
