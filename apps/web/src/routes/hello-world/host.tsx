@@ -417,6 +417,9 @@ function ScreenPanel({ live }: { live: Live }) {
   const setSound = useMutation(api.sessions.setSound);
   const [message, setMessage] = useState("");
   const show = (screen: Screen) => run(setScreen({ screen }));
+  const s = live.screen;
+  // The game the screen holds, up now or under the scores, join screen, slides, or a message.
+  const held = s.drawing !== undefined ? "draw" : s.wikiFrom ? "wiki" : s.game && s.index !== undefined ? "card" : null;
   const modes = [
     ["lobby", "Join screen"],
     ["scoreboard", "Scoreboard"],
@@ -425,6 +428,16 @@ function ScreenPanel({ live }: { live: Live }) {
   return (
     <Panel title="On the TV" className="">
       <div className="flex flex-wrap gap-2">
+        {/* The game stays here while something else is up (the screens below keep it), one tap from coming back. */}
+        {held && (
+          <button
+            className={`btn btn-sm ${live.screen.mode === held ? "btn-on" : "btn-coin"}`}
+            onClick={() => live.screen.mode !== held && show({ ...live.screen, mode: held })}
+            aria-pressed={live.screen.mode === held}
+          >
+            {live.screen.mode === held ? ON_AIR[held] : `Back to the ${held === "wiki" ? "Wiki Race" : ON_AIR[held].toLowerCase()}`}
+          </button>
+        )}
         {modes.map(([mode, label]) => (
           <button
             key={mode}
@@ -440,9 +453,7 @@ function ScreenPanel({ live }: { live: Live }) {
         >
           Kickoff slides
         </button>
-        {live.screen.mode in ON_AIR && (
-          <span className="btn btn-sm btn-on pointer-events-none">{ON_AIR[live.screen.mode as keyof typeof ON_AIR]}</span>
-        )}
+        {live.screen.mode === "message" && <span className="btn btn-sm btn-on pointer-events-none">{ON_AIR.message}</span>}
       </div>
       <form
         className="mt-3 flex gap-2"
