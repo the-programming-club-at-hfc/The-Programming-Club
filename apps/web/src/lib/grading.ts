@@ -340,8 +340,9 @@ export function swapClock<T extends Clock>(
 ): { timer: T; card?: CardWindow; played: CardWindow[] } {
   let { card, played } = o;
   let timer = t;
+  if (o.hold) return { timer, card, played };
   const ms = clockLeft(t, o.now);
-  if (!o.hold && o.up && t.card && t.card !== o.up && ms > 0 && played.some((w) => w.key === t.card)) {
+  if (o.up && t.card && t.card !== o.up && ms > 0 && played.some((w) => w.key === t.card)) {
     const left = { ms, of: t.durationMs, running: t.startedAt !== undefined || !!t.parked };
     played = played.map((w) => (w.key === t.card ? { ...w, left } : w));
     timer = { ...timer, remainingMs: ms, startedAt: undefined, card: undefined, parked: undefined, parkedAt: undefined };
