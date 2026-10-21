@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import {
+  bonusList,
   CODE_LETTERS,
   hasRows,
   inTeamPool,
@@ -348,6 +349,7 @@ export const host = query({
           firstTime: a.firstTime,
           broughtBy: a.broughtBy ?? null,
           bonusXp: a.bonusXp,
+          bonuses: bonusList(a),
           officer: !!a.officer,
         };
       }),

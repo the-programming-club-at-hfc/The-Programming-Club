@@ -102,7 +102,7 @@ function Overview() {
       <Section title="Still to figure out">
         <p className="text-sm">
           <strong>Costume XP (+3 at Spooky Bugs):</strong> we need a way to confirm who actually wore a costume. Until then, give it by hand
-          with the bonus XP buttons on /host (press + three times).
+          on /host: + Bonus XP, then pick Costume (+3).
         </p>
       </Section>
 

@@ -1512,9 +1512,89 @@ function PictionaryTool({ live }: { live: Live }) {
   );
 }
 
+// The bonus XP in the rules. Picking one fills in the reason, which can still be edited (say, to add who they brought).
+const BONUS_PRESETS = [
+  { why: "Brought a classmate", xp: 2 },
+  { why: "Costume", xp: 3 },
+];
+
+/** A player's bonus XP tonight, each with what it was for, and a form to add one: pick a reason or type your own. */
+function Bonuses({ row }: { row: Row }) {
+  const add = useMutation(api.teams.addBonus);
+  const remove = useMutation(api.teams.removeBonus);
+  const [form, setForm] = useState<{ why: string; xp: number } | null>(null);
+  const presets = row.broughtBy ? [{ why: `Brought by ${row.broughtBy}`, xp: 2 }, ...BONUS_PRESETS] : BONUS_PRESETS;
+
+  return (
+    <div className="flex basis-full flex-wrap items-center gap-1.5 text-sm">
+      {row.bonuses.map((b, i) => (
+        <span key={i} className="chip gap-1.5">
+          +{b.xp} {b.why}
+          <button
+            className="text-dim"
+            onClick={() => run(remove({ attendanceId: row._id, index: i }))}
+            aria-label={`Remove +${b.xp} ${b.why}`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {form ? (
+        <form
+          className="flex flex-wrap items-center gap-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(add({ attendanceId: row._id, ...form }).then(() => setForm(null)));
+          }}
+        >
+          <select
+            className="field w-auto py-1 text-sm"
+            value=""
+            onChange={(e) => setForm(presets[Number(e.target.value)])}
+            aria-label={`Bonus reason for ${row.name}`}
+          >
+            <option value="">Pick a reason…</option>
+            {presets.map((p, i) => (
+              <option key={p.why} value={i}>
+                {p.why} (+{p.xp})
+              </option>
+            ))}
+          </select>
+          <input
+            className="field w-52 py-1 text-sm"
+            placeholder="or type what it’s for"
+            value={form.why}
+            onChange={(e) => setForm({ ...form, why: e.target.value })}
+            maxLength={60}
+            required
+            aria-label="What the bonus is for"
+          />
+          <input
+            className="field w-16 py-1 text-sm"
+            type="number"
+            min={1}
+            max={10}
+            value={form.xp || ""}
+            onChange={(e) => setForm({ ...form, xp: Number(e.target.value) })}
+            required
+            aria-label="Bonus XP"
+          />
+          <button className="btn btn-sm btn-primary">Add</button>
+          <button type="button" className="text-dim underline" onClick={() => setForm(null)}>
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <button className="btn btn-sm" onClick={() => setForm({ why: "", xp: 2 })}>
+          + Bonus XP
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sessionId: Id<"sessions"> }) {
   const move = useMutation(api.teams.move);
-  const bonus = useMutation(api.teams.bonus);
   const addPlayer = useMutation(api.teams.addPlayer);
   const removePlayer = useMutation(api.teams.removePlayer);
   const [form, setForm] = useState({ name: "", email: "" });
@@ -1556,23 +1636,13 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
                   </option>
                 ))}
               </select>
-              <span className="flex items-center gap-1">
-                <button className="btn btn-sm" onClick={() => run(bonus({ attendanceId: r._id, delta: -1 }))} aria-label="Less bonus XP">
-                  −
-                </button>
-                <span className="w-16 text-center text-sm" title="Bonus XP (bringing a friend, costume)">
-                  +{r.bonusXp} XP
-                </span>
-                <button className="btn btn-sm" onClick={() => run(bonus({ attendanceId: r._id, delta: 1 }))} aria-label="More bonus XP">
-                  +
-                </button>
-              </span>
               <button
                 className="text-sm text-dim underline"
                 onClick={() => confirm(`Remove ${r.name} from tonight?`) && run(removePlayer({ attendanceId: r._id }))}
               >
                 Remove
               </button>
+              <Bonuses row={r} />
             </li>
           ))}
         </ul>

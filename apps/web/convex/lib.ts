@@ -6,6 +6,9 @@ import { isOfficerEmail } from "./officers";
 import { TEAM_NAMES } from "./teamNames";
 import { placeOf } from "../src/lib/grading";
 
+/** A player's bonuses for the night, each with its reason. Bonus XP given before reasons were kept is one plain "Bonus". */
+export const bonusList = (a: Doc<"attendance">) => a.bonuses ?? (a.bonusXp > 0 ? [{ xp: a.bonusXp, why: "Bonus" }] : []);
+
 export const openSession = (ctx: QueryCtx) =>
   ctx.db
     .query("sessions")

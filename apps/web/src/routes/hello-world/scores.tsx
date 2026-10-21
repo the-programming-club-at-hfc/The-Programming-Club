@@ -17,7 +17,10 @@ function Scores() {
     <>
       <PageHead title="scores">
         Season XP so far. Showing up every week is the fastest way up the board.
-        <span className="mt-2 block">Each night: 3 XP for coming, +3/2/1 for your place, plus any bonus XP.</span>
+        <span className="mt-2 block">
+          Each night: 3 XP for coming, +3/2/1 for your place, plus bonus XP like +2 for bringing a classmate. Tap a name to see where their
+          XP came from.
+        </span>
       </PageHead>
       <Wrap>
         {board === undefined ? (
@@ -85,7 +88,7 @@ function Scores() {
                                   {" · "}
                                   {n.show} coming
                                   {n.place > 0 && ` · +${n.place} place`}
-                                  {n.bonus > 0 && ` · +${n.bonus} bonus`}
+                                  {n.bonuses.map((b) => ` · +${b.xp} ${b.why}`)}
                                 </span>
                               </span>
                               <span className="narrow shrink-0 font-bold">{n.show + n.place + n.bonus} XP</span>

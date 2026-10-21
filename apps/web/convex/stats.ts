@@ -1,18 +1,24 @@
 import { query } from "./_generated/server";
-import { inTeamPool } from "./lib";
+import { bonusList, inTeamPool } from "./lib";
 
-/** Season high scores: XP per player with each night's show-up, place, and bonus XP. Names only.
+/** Season high scores: XP per player with each night's show-up, place, and bonus XP (and what each bonus was for). Names only.
  *  Practice nights don't count, and officers only when they played. */
 export const leaderboard = query({
   args: {},
   handler: async (ctx) => {
     const sessions = (await ctx.db.query("sessions").collect()).filter((s) => !s.practice);
     const weekOf = new Map(sessions.map((s) => [s._id, s.week]));
-    const byPlayer = new Map<string, { week: number; show: number; place: number; bonus: number }[]>();
+    const byPlayer = new Map<
+      string,
+      { week: number; show: number; place: number; bonus: number; bonuses: { xp: number; why: string }[] }[]
+    >();
     for (const a of await ctx.db.query("attendance").collect()) {
       const week = weekOf.get(a.sessionId);
       if (week === undefined || !inTeamPool(a)) continue;
-      byPlayer.set(a.playerId, [...(byPlayer.get(a.playerId) ?? []), { week, show: a.showXp, place: a.placeXp ?? 0, bonus: a.bonusXp }]);
+      byPlayer.set(a.playerId, [
+        ...(byPlayer.get(a.playerId) ?? []),
+        { week, show: a.showXp, place: a.placeXp ?? 0, bonus: a.bonusXp, bonuses: bonusList(a) },
+      ]);
     }
     const players = await ctx.db.query("players").collect();
     return players

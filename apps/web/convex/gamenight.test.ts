@@ -953,7 +953,7 @@ describe("ending the night", () => {
     await officer.mutation(api.teams.score, { teamId: a._id, delta: 10 });
     await officer.mutation(api.teams.score, { teamId: b._id, delta: 10 });
     const bonusRow = (await attendance()).find((x) => x.token === d.tokens[0])!;
-    await officer.mutation(api.teams.bonus, { attendanceId: bonusRow._id, delta: 2 });
+    await officer.mutation(api.teams.addBonus, { attendanceId: bonusRow._id, xp: 2, why: "Brought a classmate" });
     await officer.mutation(api.sessions.end, {});
 
     const att = await attendance();
@@ -986,6 +986,8 @@ describe("ending the night", () => {
     expect(board[0].xp).toBe(3 + 3);
     // Teams c, d, and Grace's scored nothing, so their players get show XP plus any bonus.
     expect(board.filter((r) => r.xp === 3 + 2)).toHaveLength(1);
+    // Each bonus shows what it was for.
+    expect(board.find((r) => r.xp === 3 + 2)!.nights[0].bonuses).toEqual([{ xp: 2, why: "Brought a classmate" }]);
     expect(board.filter((r) => r.xp === 3)).toHaveLength(4);
     expect((await t.query(api.players.me, { token: ada }))!.seasonXp).toBe(0);
     expect((await t.query(api.players.me, { token: grace }))!.seasonXp).toBe(3);
@@ -1137,7 +1139,7 @@ describe("ending the night", () => {
     const [row] = await t.query(api.stats.leaderboard, {});
     expect([row.xp, row.weeks, row.founder]).toEqual([2 * (3 + 3), 2, true]);
     // Each night's breakdown, for /scores. Names only: no emails on this public query.
-    expect(row.nights).toEqual([1, 2].map((week) => ({ week, show: 3, place: 3, bonus: 0 })));
+    expect(row.nights).toEqual([1, 2].map((week) => ({ week, show: 3, place: 3, bonus: 0, bonuses: [] })));
     expect(JSON.stringify(await t.query(api.stats.leaderboard, {}))).not.toContain("@");
   });
 });
@@ -1412,7 +1414,7 @@ describe("Tech Pictionary", () => {
     // If Ada drew the first one, start another so she's a guesser.
     let d = await newDrawing(o, "laptop");
     if (d.drawer.token === ada) d = await newDrawing(o, "laptop");
-    expect((await o.t.mutation(api.drawings.guess, { token: ada, card: d.key, text: "laptop" }))).toBe("right");
+    expect(await o.t.mutation(api.drawings.guess, { token: ada, card: d.key, text: "laptop" })).toBe("right");
     // She's still in the drawing rotation.
     const drawers = new Set([d.drawer._id]);
     for (let i = 0; i < 3; i++) drawers.add((await newDrawing(o)).drawer._id);

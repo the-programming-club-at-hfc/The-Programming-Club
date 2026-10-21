@@ -1,11 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { requireOfficer } from "./officers";
 import {
   addToSession,
   award,
+  bonusList,
   inTeamPool,
   newTeam,
   newTeamKey,
@@ -160,14 +161,35 @@ export const move = mutation({
   },
 });
 
-export const bonus = mutation({
-  args: { attendanceId: v.id("attendance"), delta: v.number() },
-  handler: async (ctx, { attendanceId, delta }) => {
+/** Bonus XP for one player tonight, with what it's for ("Brought a classmate", "Costume"). */
+export const addBonus = mutation({
+  args: { attendanceId: v.id("attendance"), xp: v.number(), why: v.string() },
+  handler: async (ctx, { attendanceId, xp, why }) => {
     await requireOfficer(ctx);
+    const reason = why.trim().slice(0, 60);
+    if (!reason) throw new ConvexError("Say what the bonus is for.");
+    if (!Number.isInteger(xp) || xp < 1 || xp > 10) throw new ConvexError("Bonus XP is a whole number from 1 to 10.");
     const a = await ctx.db.get(attendanceId);
-    if (a) await ctx.db.patch(attendanceId, { bonusXp: Math.max(0, a.bonusXp + delta) });
+    if (a) await setBonuses(ctx, a, [...bonusList(a), { xp, why: reason }]);
   },
 });
+
+export const removeBonus = mutation({
+  args: { attendanceId: v.id("attendance"), index: v.number() },
+  handler: async (ctx, { attendanceId, index }) => {
+    await requireOfficer(ctx);
+    const a = await ctx.db.get(attendanceId);
+    if (a)
+      await setBonuses(
+        ctx,
+        a,
+        bonusList(a).filter((_, i) => i !== index),
+      );
+  },
+});
+
+const setBonuses = (ctx: MutationCtx, a: Doc<"attendance">, bonuses: { xp: number; why: string }[]) =>
+  ctx.db.patch(a._id, { bonuses, bonusXp: bonuses.reduce((n, b) => n + b.xp, 0) });
 
 /** For anyone without a phone: an officer adds them by name and email. */
 export const addPlayer = mutation({
