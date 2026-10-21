@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { award, inTeamPool, openSession, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
+import { award, cardDouble, inTeamPool, openSession, requireOpenSession, sessionAttendance, sessionTeams } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { PICTIONARY } from "../src/lib/content";
 import { COLORS, GUESS_MAX, H, INK_BLOCK, MAX_INK_POINTS, MAX_INK_ROWS, SIZES, W, WORD_MAX, blanks } from "../src/lib/draw";
@@ -483,7 +483,7 @@ async function scoreDrawing(ctx: MutationCtx, s: Doc<"sessions">, n: number, sco
 /** Score the revealed drawing. Called by sessions.setScreen. */
 export async function scoreDrawReveal(ctx: MutationCtx, s: Doc<"sessions">) {
   const c = drawCard(s);
-  if (c && s.screen.revealed) await scoreDrawing(ctx, s, c.n, s.scored ?? [], s.double);
+  if (c && s.screen.revealed) await scoreDrawing(ctx, s, c.n, s.scored ?? [], cardDouble(s, c.key));
 }
 
 /** Score every drawing up tonight that was never revealed, so ending the night never loses a guess. Called by sessions.end. */

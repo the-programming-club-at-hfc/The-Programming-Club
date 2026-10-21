@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { award, openSession, requireOpenSession, sessionTeams, teamByKey, teamByToken } from "./lib";
+import { award, cardDouble, openSession, requireOpenSession, sessionTeams, teamByKey, teamByToken } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { PUZZLES, puzzleSeed } from "../src/lib/puzzles";
 import { LOCKOUT_MS, cardKey, firstStars, puzzleAwardsFor, submitAnswer } from "../src/lib/grading";
@@ -171,7 +171,7 @@ async function scorePuzzle(ctx: MutationCtx, s: Doc<"sessions">, index: number, 
 /** Score the revealed puzzle. Called by sessions.setScreen. */
 export async function scorePuzzleReveal(ctx: MutationCtx, s: Doc<"sessions">) {
   const c = puzzleCard(s);
-  if (c && s.screen.revealed) await scorePuzzle(ctx, s, c.index, s.scored ?? []);
+  if (c && s.screen.revealed) await scorePuzzle(ctx, s, c.index, s.scored ?? [], cardDouble(s, c.key));
 }
 
 /** Score every puzzle played tonight that was never revealed, so ending the night never loses stars. Called by sessions.end. */

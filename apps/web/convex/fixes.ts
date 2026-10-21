@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { award, openSession, requireOpenSession, sessionTeams, teamByKey, teamByToken } from "./lib";
+import { award, cardDouble, openSession, requireOpenSession, sessionTeams, teamByKey, teamByToken } from "./lib";
 import { cardStart, isOpen, liveCard } from "./answers";
 import { puzzleCard } from "./puzzles";
 import { FIXES } from "../src/lib/fixes";
@@ -133,7 +133,7 @@ export async function scoreFixReveal(ctx: MutationCtx, s: Doc<"sessions">) {
   const { fixed } = await cardFixes(ctx, s, c.key);
   const r = fixAwardsFor({
     index: c.index,
-    double: s.double,
+    double: cardDouble(s, c.key),
     scored: s.scored ?? [],
     fixes: fixed.map((row) => ({ id: row, at: row.at })),
   });

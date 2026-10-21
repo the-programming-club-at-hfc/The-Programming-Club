@@ -3,7 +3,7 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { award, openSession, sessionTeams } from "./lib";
+import { award, cardDouble, openSession, sessionTeams } from "./lib";
 import { BUGS } from "../src/lib/content";
 import { GRACE_MS, answersOpen, awardsFor, cardKey, choices, clockLeft, isAnswerGame } from "../src/lib/grading";
 
@@ -192,7 +192,7 @@ export async function scoreReveal(ctx: MutationCtx, s: Doc<"sessions">) {
     game: c.game,
     index: c.index,
     start: cardStart(s, c.key) ?? 0,
-    double: s.double,
+    double: cardDouble(s, c.key),
     scored: s.scored ?? [],
     answers: rows.map((row) => ({ id: row, pick: row })),
   });

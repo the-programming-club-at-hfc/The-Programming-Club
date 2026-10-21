@@ -178,6 +178,22 @@ export async function addToSession(
   return token;
 }
 
+/** Double points if they were on when the card first went up, so a card revealed in a later round scores as it was played. */
+export const cardDouble = (s: Doc<"sessions">, key: string) => (s.card?.key === key ? s.card.double : undefined) ?? s.double;
+
+/** Whether teams have answered, raced, fixed, starred, or guessed on a card tonight. */
+export async function hasRows(ctx: QueryCtx, s: Doc<"sessions">, card: string) {
+  for (const table of ["answers", "fixes", "stars", "races", "guesses"] as const)
+    if (
+      await ctx.db
+        .query(table)
+        .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", card))
+        .first()
+    )
+      return true;
+  return false;
+}
+
 /** Tonight's cards that teams have answered, raced, fixed, starred, or guessed but that haven't been scored yet. Their rows
  *  belong to tonight's teams, so teams can't be remade until these are revealed. */
 export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
@@ -185,17 +201,7 @@ export async function unscoredCards(ctx: QueryCtx, s: Doc<"sessions">) {
     (k) => !(s.scored ?? []).includes(k),
   );
   const open = [];
-  for (const card of keys)
-    for (const table of ["answers", "fixes", "stars", "races", "guesses"] as const)
-      if (
-        await ctx.db
-          .query(table)
-          .withIndex("by_session_card", (q) => q.eq("sessionId", s._id).eq("card", card))
-          .first()
-      ) {
-        open.push(card);
-        break;
-      }
+  for (const card of keys) if (await hasRows(ctx, s, card)) open.push(card);
   return open;
 }
 

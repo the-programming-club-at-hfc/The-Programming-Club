@@ -59,7 +59,14 @@ export const timerV = v.object({
 
 // One showing of an answerable card: when its clock started (early bonus) and when it ran out (answers stay closed).
 // `double` is whether double points were on when the card first went up, for scoring it later (e.g. when the night ends).
-export const cardWindowV = v.object({ key: v.string(), at: v.number(), endedAt: v.optional(v.number()), double: v.optional(v.boolean()) });
+export const cardWindowV = v.object({
+  key: v.string(),
+  at: v.number(),
+  endedAt: v.optional(v.number()),
+  double: v.optional(v.boolean()),
+  // The card's own clock while another card is up.
+  left: v.optional(v.object({ ms: v.number(), of: v.number(), running: v.boolean() })),
+});
 
 // One entry in a week's lineup, e.g. { label: "Bug Hunt: hard", double: true } for a double-points final round.
 export const lineupItemV = v.object({ label: v.string(), double: v.boolean() });

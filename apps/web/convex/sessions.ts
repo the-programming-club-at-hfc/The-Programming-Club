@@ -4,6 +4,7 @@ import type { MutationCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import {
   CODE_LETTERS,
+  hasRows,
   inTeamPool,
   unscoredCards,
   openSession,
@@ -20,7 +21,7 @@ import { scorePuzzleReveal, scoreUnrevealedPuzzles } from "./puzzles";
 import { scoreWikiReveal } from "./wiki";
 import { drawCard, scoreDrawReveal, scoreUnrevealedDrawings } from "./drawings";
 import type { Doc } from "./_generated/dataModel";
-import { clockLeft, drawKey, isFreshStart, parkClock, settle, showCard, wikiKey } from "../src/lib/grading";
+import { clockLeft, drawKey, isFreshStart, parkClock, settle, showCard, swapClock, wikiKey } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
 
 /** The card (or race, or drawing) on the TV that teams answer against the clock. */
@@ -203,9 +204,10 @@ async function putScreen(ctx: MutationCtx, before: Doc<"sessions">, screen: Doc<
   const up = upCard(next)?.key;
   const w = showCard({ ...settled(s, now), up, now, double: s.double });
   const hold = screen.mode === "timer" || !!s.timer.card?.startsWith("wiki:");
-  const timer = parkClock(s.timer, { to: up, hold, revealed: !!screen.revealed, now });
-  Object.assign(next, { card: w.card, played: w.played, timer });
-  await ctx.db.patch(s._id, { screen, shown: next.shown, card: w.card, played: w.played, timer });
+  const sw = swapClock(s.timer, { ...w, up, hold, revealed: !!screen.revealed, now });
+  const timer = parkClock(sw.timer, { to: up, hold, revealed: !!screen.revealed, now });
+  Object.assign(next, { card: sw.card, played: sw.played, timer });
+  await ctx.db.patch(s._id, { screen, shown: next.shown, card: sw.card, played: sw.played, timer });
   // Revealing scores phone answers, Fix it for real fixes, puzzle stars, a Wiki Race, or a drawing, once per card.
   await scoreReveal(ctx, next);
   await scoreFixReveal(ctx, next);
@@ -309,9 +311,10 @@ export const timer = mutation({
         t.relay = !t.relay;
         break;
     }
-    // A fresh clock on an answerable card restarts its window: early-bonus clock and closing time. It keeps its double points.
+    // A fresh clock on an answerable card restarts its window: early-bonus clock and closing time. It keeps its double
+    // points, and once teams have answered, its early-bonus clock too, so a restart never hands earlier locks the bonus.
     if (w && card === w.key && !(s.scored ?? []).includes(card) && isFreshStart(action, t, now))
-      w = { key: card, at: now, double: w.double };
+      w = (await hasRows(ctx, s, card)) ? { ...w, endedAt: undefined } : { key: card, at: now, double: w.double };
     await ctx.db.patch(s._id, { timer: t, card: w, played });
   },
 });

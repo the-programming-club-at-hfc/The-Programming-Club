@@ -985,8 +985,8 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
     });
   // The card held under the scores or join screen comes back as it was, its parked clock and all. Any other card goes
   // up with its own clock running, so the clock always belongs to the card on the TV and 0:00 closes its answers. A card
-  // that already has answers or a score tonight comes back without a fresh clock (that would reopen it and hand every
-  // lock the early bonus); Start is there to give it one on purpose.
+  // that already has answers or a score tonight comes back with the clock it left with (that's the server's job): a fresh
+  // one would reopen it and hand every lock the early bonus. Start is there to give it one on purpose.
   const showOnTv = async () => {
     const key = cardKey(game, index);
     if (heldKey(s) === key) return setScreen({ screen: { ...s, mode: "card" } });

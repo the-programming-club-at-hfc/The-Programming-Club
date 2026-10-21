@@ -277,6 +277,8 @@ export interface CardWindow {
   endedAt?: number;
   /** Double points were on when the card first went up. */
   double?: boolean;
+  /** The card's own clock, kept while another card is up: time left, its full length, and whether it was running. */
+  left?: { ms: number; of: number; running: boolean };
 }
 
 /** The shared clock. `card` is the card this run is timing; a clock started for another screen doesn't count. */
@@ -325,6 +327,41 @@ export function parkClock<T extends Clock>(t: T, o: { to?: string; hold: boolean
   if (t.parked && o.to === t.card) return { ...t, startedAt: o.revealed ? undefined : o.now, parked: undefined, parkedAt: undefined };
   if (t.parked && o.to !== undefined) return { ...t, parked: undefined, parkedAt: undefined };
   return t;
+}
+
+/**
+ * Card to card: the leaving card takes its clock along in its window, and a card coming back gets its own clock back,
+ * so it still closes at 0:00 and keeps its early-bonus start. A clock that already ran out stays out (its `endedAt`), and
+ * `hold` (a Wiki Race, which goes on on team computers) keeps the clock where it is.
+ */
+export function swapClock<T extends Clock>(
+  t: T,
+  o: { card?: CardWindow; played: CardWindow[]; up?: string; hold: boolean; revealed: boolean; now: number },
+): { timer: T; card?: CardWindow; played: CardWindow[] } {
+  let { card, played } = o;
+  let timer = t;
+  const ms = clockLeft(t, o.now);
+  if (!o.hold && o.up && t.card && t.card !== o.up && ms > 0 && played.some((w) => w.key === t.card)) {
+    const left = { ms, of: t.durationMs, running: t.startedAt !== undefined || !!t.parked };
+    played = played.map((w) => (w.key === t.card ? { ...w, left } : w));
+    timer = { ...timer, remainingMs: ms, startedAt: undefined, card: undefined, parked: undefined, parkedAt: undefined };
+  }
+  const back = card?.left;
+  if (card && back) {
+    timer = {
+      ...timer,
+      durationMs: back.of,
+      remainingMs: back.ms,
+      startedAt: back.running && !o.revealed ? o.now : undefined,
+      card: card.key,
+      parked: undefined,
+      parkedAt: undefined,
+    };
+    const key = card.key;
+    card = { ...card, left: undefined };
+    played = played.map((w) => (w.key === key ? { ...w, left: undefined } : w));
+  }
+  return { timer, card, played };
 }
 
 /** A clock that starts from full for the card on screen: a preset with autostart, or Start from full. Never +30s. */

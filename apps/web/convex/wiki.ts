@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
-import { award, openSession, requireOpenSession, sessionTeams } from "./lib";
+import { award, cardDouble, openSession, requireOpenSession, sessionTeams } from "./lib";
 import { cardStart, isOpen } from "./answers";
 import { wikiAwardsFor, wikiKey, wikiPlaces } from "../src/lib/grading";
 
@@ -151,7 +151,7 @@ export async function scoreWikiReveal(ctx: MutationCtx, s: Doc<"sessions">) {
   const r = wikiAwardsFor<Id<"teams">>({
     key: w.key,
     clicks: w.clicks,
-    double: s.double,
+    double: cardDouble(s, w.key),
     scored: s.scored ?? [],
     teams: teams.map((t) => t._id),
     finishes: counted(finished).map((f) => ({ team: f.teamId, at: f.at, clicks: f.clicks })),

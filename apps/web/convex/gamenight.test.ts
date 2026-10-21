@@ -608,6 +608,47 @@ describe("points", () => {
     await expect(pick()).rejects.toThrow("closed");
   });
 
+  test("a card that leaves for another card takes its clock along, and gets it back when it returns", async () => {
+    const { t, officer, nightWithTeams, show, score } = setup();
+    const { teams } = await nightWithTeams(6);
+    const card = "lang:0";
+    const answer = (i: number) => t.mutation(api.answers.pick, { token: teams[i].tokens[0], card, choice: LANGS[0].lang });
+    const lock = (i: number) => t.mutation(api.answers.lock, { token: teams[i].tokens[0], card, step: "answer" });
+    await show({ mode: "card", game: "lang", index: 0 });
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 45, autostart: true });
+    later(10);
+    await answer(0);
+    await lock(0);
+    await show({ mode: "card", game: "lang", index: 1 });
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 45, autostart: true });
+    later(60);
+    await show({ mode: "card", game: "lang", index: 0 });
+    const { remainingMs, startedAt, card: on } = (await t.query(api.sessions.live, {}))!.timer;
+    expect({ remainingMs, startedAt, on }).toEqual({ remainingMs: 35_000, startedAt: now, on: card });
+    await answer(1);
+    await lock(1);
+    later(38);
+    await expect(answer(2)).rejects.toThrow("closed");
+    // The early bonus still counts from when the card first went up: only the lock at 10s gets it.
+    await show({ mode: "card", game: "lang", index: 0, revealed: true });
+    expect([await score(teams[0]._id), await score(teams[1]._id)]).toEqual([2, 1]);
+  });
+
+  test("Start again after a lock keeps the early bonus where it was, and a card revealed in a double round scores single", async () => {
+    const { t, officer, nightWithTeams, show, score } = setup();
+    const { teams } = await nightWithTeams(4);
+    const card = "lang:0";
+    await show({ mode: "card", game: "lang", index: 0 });
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 45, autostart: true });
+    later(20);
+    await t.mutation(api.answers.pick, { token: teams[0].tokens[0], card, choice: LANGS[0].lang });
+    await t.mutation(api.answers.lock, { token: teams[0].tokens[0], card, step: "answer" });
+    await officer.mutation(api.sessions.timer, { action: "set", seconds: 45, autostart: true });
+    await officer.mutation(api.sessions.setRound, { round: 1, double: true });
+    await show({ mode: "card", game: "lang", index: 0, revealed: true });
+    expect(await score(teams[0]._id)).toBe(1);
+  });
+
   test("the big timer keeps the clock running; Start while parked keeps the clock on its card", async () => {
     const { t, officer, nightWithTeams, show } = setup();
     const { teams } = await nightWithTeams(4);
