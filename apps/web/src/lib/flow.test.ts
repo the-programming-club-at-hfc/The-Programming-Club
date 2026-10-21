@@ -1,7 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import { BUGS, WIKI_RACES } from "./content";
 import { DEFAULT_PLAN } from "./schedule";
-import { deckFor, freshLeft, nextCard, nextRace, puzzleTitle, revealable, roundOf, roundTitle, stepFor } from "./flow";
+import {
+  countLabel,
+  countOf,
+  deckFor,
+  freshLeft,
+  heldKey,
+  heldLabel,
+  nextCard,
+  nextRace,
+  nounFor,
+  puzzleTitle,
+  revealable,
+  roundItems,
+  roundLength,
+  roundNoun,
+  roundOf,
+  roundTitle,
+  stepFor,
+} from "./flow";
 import { cardSeconds, wikiKey } from "./grading";
 import { PUZZLES } from "./puzzles";
 
@@ -186,5 +204,82 @@ describe("the big button", () => {
     expect(step(other, { mode: "message" })).toBe("scores");
     expect(step(other, { mode: "scoreboard" })).toBe("next");
     expect(step(other, { mode: "message" }, 0)).toBe("next");
+  });
+});
+
+describe("round lengths", () => {
+  test("each game plays a set number a round; a puzzle round plays its one puzzle", () => {
+    const labels = ["Guess the Language (warm-up)", "Output?", "Bug Hunt: medium", "Fix it for real", "Code Relay: round 1"];
+    expect(labels.map((l) => roundLength(round(l)))).toEqual([5, 5, 4, 2, 2]);
+    expect([roundLength(round("Wiki Race: Classic")), roundLength(round("Tech Pictionary"))]).toEqual([2, 6]);
+    expect(roundLength(round("Puzzle 1: easy, played as a relay"))).toBeNull();
+    expect(roundLength(round("Meet the officers"))).toBeNull();
+  });
+
+  test("players never see the word card", () => {
+    expect(["lang", "output", "bug", "fix", "relay", "wiki", "pictionary", "puzzle"].map(nounFor)).toEqual([
+      "snippet",
+      "snippet",
+      "snippet",
+      "problem",
+      "problem",
+      "race",
+      "drawing",
+      "puzzle",
+    ]);
+    expect([roundNoun(round("Wiki Race")), roundNoun(round("Final round, double points: Puzzle 2, medium"))]).toEqual(["race", "puzzle"]);
+  });
+
+  test("only this round's game counts, in the order it went up", () => {
+    const tonight = ["bug:3", "output:1", "bug:0", "wiki:Pizza>Moon", "draw:1", "draw:2"];
+    expect(roundItems(round("Bug Hunt: medium"), tonight)).toEqual(["bug:3", "bug:0"]);
+    expect(roundItems(round("Wiki Race"), tonight)).toEqual(["wiki:Pizza>Moon"]);
+    expect(roundItems(round("Tech Pictionary"), tonight)).toEqual(["draw:1", "draw:2"]);
+    expect(roundItems(round("Meet the officers"), tonight)).toEqual([]);
+  });
+
+  test("labels say which one of how many, and just the number past the end", () => {
+    const bug = round("Bug Hunt: medium");
+    expect([countOf(bug, 3), countLabel(bug, 3), countLabel(bug, 5)]).toEqual(["3 of 4", "Snippet 3 of 4", "Snippet 5"]);
+    expect(countLabel(round("Tech Pictionary"), 1)).toBe("Drawing 1 of 6");
+    expect(countLabel(round("Meet the officers"), 1)).toBeNull();
+  });
+
+  test("the TV's card is numbered by its place in the round, even back under the scoreboard", () => {
+    const bug = round("Bug Hunt: medium");
+    const since = ["bug:3", "output:1", "bug:0"];
+    expect(heldKey({ mode: "scoreboard", game: "bug", index: 0 })).toBe("bug:0");
+    expect(heldLabel(bug, since, { mode: "scoreboard", game: "bug", index: 0 })).toBe("Snippet 2 of 4");
+    expect(heldLabel(bug, since, { mode: "card", game: "bug", index: 3 })).toBe("Snippet 1 of 4");
+    // Another game's card, or one from before the round started, isn't one of the round's.
+    expect(heldLabel(bug, since, { mode: "card", game: "output", index: 1 })).toBeNull();
+    expect(heldLabel(bug, since, { mode: "card", game: "bug", index: 7 })).toBeNull();
+    expect(heldLabel(round("Wiki Race"), ["wiki:A>B"], { mode: "wiki", wikiFrom: "A", wikiTo: "B" })).toBe("Race 1 of 2");
+    expect(heldLabel(round("Tech Pictionary"), ["draw:4"], { mode: "draw", drawing: 4 })).toBe("Drawing 1 of 6");
+    expect(heldLabel(null, since, { mode: "card", game: "bug", index: 3 })).toBeNull();
+  });
+
+  test("the big button offers another until the round has played its set number, then moves on", () => {
+    const bug = round("Bug Hunt: medium");
+    const scores = { mode: "scoreboard", game: "bug", revealed: true };
+    const at = (played: number, screen: Parameters<typeof stepFor>[0]["screen"] = scores) =>
+      stepFor({ round: bug, screen, teams: 3, played });
+    expect([at(1), at(3), at(4), at(5)]).toEqual(["choose", "choose", "done", "done"]);
+    // Mid-card it still goes to the reveal and the scores, whatever the count.
+    expect(at(4, { mode: "card", game: "bug" })).toBe("reveal");
+    expect(at(4, { mode: "card", game: "bug", revealed: true })).toBe("scores");
+    // A round that played its number with something else up now is done too; one that hasn't shows the next.
+    expect([at(0, { mode: "message" }), at(4, { mode: "card", game: "output" })]).toEqual(["show", "done"]);
+    const p = round("Tech Pictionary");
+    const drew = (played: number) =>
+      stepFor({ round: p, screen: { mode: "scoreboard", drawing: played, revealed: true }, teams: 3, played });
+    expect([drew(5), drew(6)]).toEqual(["choose", "done"]);
+    const wiki = round("Wiki Race");
+    const raced = { mode: "scoreboard", wikiFrom: "A", wikiTo: "B", revealed: true };
+    expect([1, 2].map((played) => stepFor({ round: wiki, screen: raced, teams: 3, played }))).toEqual(["choose", "done"]);
+    // A puzzle round has no count: the next round after its scores, as before.
+    const puzzle = round("Final round, double points: Puzzle 2, medium", true, 1);
+    const shown = { mode: "scoreboard", game: "puzzle", index: 2, revealed: true };
+    expect(stepFor({ round: puzzle, screen: shown, teams: 3, played: 9 })).toBe("next");
   });
 });

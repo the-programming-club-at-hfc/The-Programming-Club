@@ -87,7 +87,8 @@ export default defineSchema({
     double: v.boolean(),
     screen: screenV,
     timer: timerV,
-    // Cards put on the TV tonight, as "game:index", so later nights can skip them.
+    // Cards put on the TV tonight, as "game:index" (races "wiki:From>To", drawings "draw:n"), so later nights can skip
+    // them, plus Pictionary words handed out ("pictionary:i"), which must never reach a public query.
     shown: v.optional(v.array(v.string())),
     // TV music, set from the host console. Missing means music on at 80% volume.
     sound: v.optional(v.object({ music: v.boolean(), volume: v.number() })),
@@ -101,6 +102,8 @@ export default defineSchema({
     practice: v.optional(v.boolean()),
     // The lineup round being played (0-based), so /host's Next button picks up where it left off.
     round: v.optional(v.number()),
+    // How long `shown` was when that round started, so its cards (races, drawings) since then count toward its set number.
+    roundFrom: v.optional(v.number()),
     // false when officers turned auto teams off for tonight. Missing means on: joiners land on a team of up to teamSize.
     autoTeams: v.optional(v.boolean()),
     // Solo (1), where every player is a team of one named after them, or teams of 2 or 3, from tonight's last Make

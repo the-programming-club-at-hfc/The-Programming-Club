@@ -5,7 +5,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireOfficer } from "./officers";
 import { award, openSession, sessionTeams } from "./lib";
 import { BUGS } from "../src/lib/content";
-import { GRACE_MS, LANGUAGES, answersOpen, awardsFor, cardKey, choices, clockLeft, isAnswerGame } from "../src/lib/grading";
+import { GRACE_MS, answersOpen, awardsFor, cardKey, choices, clockLeft, isAnswerGame } from "../src/lib/grading";
 
 // Phone answers for Bug Hunt, Output?, and Guess the Language: one answer per team, scored on reveal.
 // The rules live in src/lib/grading.ts so the officer test page scores the same way.
@@ -88,7 +88,7 @@ export const pick = mutation({
       if (row?.lineLockedAt !== undefined) throw new ConvexError("Your team already locked in a line.");
       patch = { line, lineBy: name };
     } else if (choice !== undefined) {
-      if (!(c.game === "lang" ? LANGUAGES : choices(c.game, c.index)).includes(choice)) throw new ConvexError("Pick one of the choices.");
+      if (!choices(c.game, c.index).includes(choice)) throw new ConvexError("Pick one of the choices.");
       if (c.game === "bug" && row?.lineLockedAt === undefined) throw new ConvexError("Lock in a line first.");
       if (row?.lockedAt !== undefined) throw new ConvexError("Your team already locked in.");
       patch = { choice, choiceBy: name };

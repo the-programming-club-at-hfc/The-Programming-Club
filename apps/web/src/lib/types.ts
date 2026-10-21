@@ -73,6 +73,8 @@ export interface LangQ {
   tell: string;
   /** Other answers that also count, e.g. TypeScript for a snippet that is valid in both. */
   also?: string[];
+  /** Three look-alike wrong answers, shown beside `lang` as the four choices. Never one of `also`. */
+  decoys: [string, string, string];
 }
 
 export interface Relay {

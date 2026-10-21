@@ -391,7 +391,7 @@ export const GAMES: Game[] = [
     time: "45 sec per snippet",
     steps: [
       "The TV shows a short snippet.",
-      "On a phone, search or scroll for the language, tap it, and lock it in for your team.",
+      "On a phone, pick one of four languages and lock it in for your team.",
       "Reveal the answer and the tell that gives it away. Points add up on their own.",
     ],
     scoring: "1 point for a correct answer, 2 if your team locked it in within the first 15 seconds.",
@@ -1173,68 +1173,99 @@ export const PICTIONARY: string[] = [
   "fan",
 ];
 export const LANGS: LangQ[] = [
-  { lang: "Python", code: 'for i in range(3):\n    print("hi")', tell: "Indentation instead of braces, and range()." },
+  {
+    lang: "Python",
+    decoys: ["Ruby", "Julia", "R"],
+    code: 'for i in range(3):\n    print("hi")',
+    tell: "Indentation instead of braces, and range().",
+  },
   {
     lang: "JavaScript",
+    decoys: ["Java", "Dart", "C#"],
     code: "const nums = [1, 2, 3];\nconsole.log(nums.map((n) => n * 2));",
-    tell: "console.log and the => arrow function. (Also valid TypeScript, so accept that.)",
+    tell: "console.log and the => arrow function. It’s valid TypeScript too.",
     also: ["TypeScript"],
   },
   {
     lang: "Java",
+    decoys: ["C#", "Kotlin", "C++"],
     code: 'public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hi");\n  }\n}',
     tell: "public static void main and System.out.println.",
   },
   {
     lang: "C",
+    decoys: ["C#", "Java", "Go"],
     code: '#include <stdio.h>\n\nint main(void) {\n  printf("%d\\n", 42);\n  return 0;\n}',
-    tell: "#include <stdio.h> and printf. (It also compiles as C++, so accept that.)",
+    tell: "#include <stdio.h> and printf. It compiles as C++ too.",
     also: ["C++"],
   },
   {
     lang: "C++",
+    decoys: ["C", "C#", "Java"],
     code: '#include <iostream>\n\nint main() {\n  std::cout << "Hi" << std::endl;\n}',
     tell: "std::cout and the << operator.",
   },
-  { lang: "SQL", code: "SELECT name, score\nFROM players\nWHERE score > 10\nORDER BY score DESC;", tell: "SELECT … FROM … WHERE." },
-  { lang: "Ruby", code: '3.times do |i|\n  puts "Hi #{i}"\nend', tell: "do |i| … end, puts, and #{} inside a string." },
+  {
+    lang: "SQL",
+    decoys: ["PowerShell", "R", "Python"],
+    code: "SELECT name, score\nFROM players\nWHERE score > 10\nORDER BY score DESC;",
+    tell: "SELECT … FROM … WHERE.",
+  },
+  {
+    lang: "Ruby",
+    decoys: ["Elixir", "Lua", "Python"],
+    code: '3.times do |i|\n  puts "Hi #{i}"\nend',
+    tell: "do |i| … end, puts, and #{} inside a string.",
+  },
   {
     lang: "Go",
+    decoys: ["Rust", "Swift", "Kotlin"],
     code: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hi")\n}',
     tell: "package main, func, and fmt.Println.",
   },
   {
     lang: "Rust",
+    decoys: ["Go", "Swift", "Kotlin"],
     code: 'fn main() {\n    let name = "Ferris";\n    println!("Hi, {}!", name);\n}',
     tell: "fn and the println! macro (the ! gives it away).",
   },
   {
     lang: "HTML",
+    decoys: ["CSS", "JavaScript", "SQL"],
     code: "<ul>\n  <li>Wiki Race</li>\n  <li>Bug Hunt</li>\n</ul>",
     tell: "Tags in angle brackets. HTML describes what’s on a page rather than giving step-by-step instructions.",
   },
   {
     lang: "Bash",
+    decoys: ["PowerShell", "Perl", "Ruby"],
     code: 'for f in *.txt; do\n  echo "$f"\ndone',
-    tell: "do … done, echo, and $ before variables. (It also runs in sh and zsh, so accept those or “shell”.)",
+    tell: "do … done, echo, and $ before variables. It runs in sh and zsh too.",
   },
   {
     lang: "Swift",
+    decoys: ["Kotlin", "Rust", "Python"],
     code: 'let names = ["Ada", "Grace"]\nfor name in names {\n    print("Hi, \\(name)")\n}',
     tell: "\\(name) inside a string, let, and no semicolons.",
   },
   {
     lang: "Kotlin",
+    decoys: ["Scala", "Swift", "Java"],
     code: 'fun main() {\n    val langs = listOf("Kotlin", "Java")\n    println(langs.size)\n}',
     tell: "fun, val, and listOf.",
   },
   {
     lang: "C#",
+    decoys: ["Java", "C++", "Kotlin"],
     code: 'using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hi");\n    }\n}',
     tell: "Console.WriteLine and a capital-M Main.",
   },
-  { lang: "PHP", code: '<?php\n$name = "Ada";\necho "Hi, $name";', tell: "<?php at the top and $ on every variable." },
-  { lang: "Lua", code: 'for i = 1, 3 do\n  print("hi")\nend', tell: "for i = 1, 3 do … end." },
+  {
+    lang: "PHP",
+    decoys: ["Perl", "Bash", "PowerShell"],
+    code: '<?php\n$name = "Ada";\necho "Hi, $name";',
+    tell: "<?php at the top and $ on every variable.",
+  },
+  { lang: "Lua", decoys: ["Ruby", "Julia", "MATLAB"], code: 'for i = 1, 3 do\n  print("hi")\nend', tell: "for i = 1, 3 do … end." },
 ];
 
 // More activities for the season planner, gathered from real club, classroom, and event formats.

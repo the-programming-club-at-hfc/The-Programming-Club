@@ -8,7 +8,7 @@ import schema from "./schema";
 import { placeXpFor } from "./lib";
 import { answersFor } from "./puzzles";
 import { BUGS, LANGS, OUTPUTS } from "../src/lib/content";
-import { LANGUAGES, choices } from "../src/lib/grading";
+import { choices } from "../src/lib/grading";
 import { COLORS, SIZES } from "../src/lib/draw";
 
 const modules = {
@@ -557,9 +557,11 @@ describe("points", () => {
     await lock(a.tokens, LANGS[0].lang);
     later(10);
     await lock(b.tokens, LANGS[0].lang);
+    // Only the card's four choices go in.
+    await expect(t.mutation(api.answers.pick, { token: c.tokens[0], card, choice: "Assembly" })).rejects.toThrow("Pick one of the choices");
     await lock(
       c.tokens,
-      LANGUAGES.find((l) => l !== LANGS[0].lang && !LANGS[0].also?.includes(l))!,
+      choices("lang", 0).find((l) => l !== LANGS[0].lang)!,
     );
     await show({ mode: "card", game: "lang", index: 0, revealed: true });
     expect([await score(a._id), await score(b._id), await score(c._id)]).toEqual([2, 1, 0]);
@@ -1490,5 +1492,48 @@ describe("Tech Pictionary", () => {
     const before = (await o.attendance()).map((a) => a.points);
     await o.officer.mutation(api.sessions.end, {});
     expect((await o.attendance()).map((a) => a.points)).toEqual(before);
+  });
+});
+
+describe("round lengths", () => {
+  test("a round counts what went up since it started: cards, races, and drawings, never the words", async () => {
+    const o = setup();
+    const code = await o.startNight(2);
+    for (let i = 1; i <= 3; i++) await o.join(code, student(i));
+    const thisRound = async () => (await o.t.query(api.sessions.live, {}))!.thisRound;
+    // Before any round, and a card from before the round started.
+    await o.show({ mode: "card", game: "bug", index: 9 });
+    await o.officer.mutation(api.sessions.setRound, { round: 0, double: false, title: "Round 1: Bug Hunt" });
+    expect(await thisRound()).toEqual([]);
+    await o.show({ mode: "card", game: "bug", index: 0 });
+    await o.show({ mode: "scoreboard", game: "bug", index: 0 });
+    // The same card back on the TV counts once.
+    await o.show({ mode: "card", game: "bug", index: 0, revealed: true });
+    await o.show({ mode: "card", game: "bug", index: 1 });
+    expect(await thisRound()).toEqual(["bug:0", "bug:1"]);
+    // Playing the same round again keeps its count; another round starts over.
+    await o.officer.mutation(api.sessions.setRound, { round: 0, double: false });
+    expect(await thisRound()).toEqual(["bug:0", "bug:1"]);
+    await o.officer.mutation(api.sessions.setRound, { round: 1, double: false, title: "Round 2: Tech Pictionary" });
+    expect(await thisRound()).toEqual([]);
+    for (let i = 0; i < 2; i++) {
+      const n = await o.officer.mutation(api.drawings.start, {});
+      await o.show({ mode: "draw", drawing: n });
+      // A skipped word hands out another word, but it's still one drawing.
+      await o.officer.mutation(api.drawings.skip, { drawingId: (await o.officer.query(api.drawings.host, {}))!.current!._id });
+    }
+    expect(await thisRound()).toEqual(["draw:1", "draw:2"]);
+    await o.officer.mutation(api.sessions.setRound, { round: 2, double: false });
+    await o.show({ mode: "wiki", wikiFrom: "Pizza", wikiTo: "Moon", wikiReady: true });
+    expect(await thisRound()).toEqual(["wiki:Pizza>Moon"]);
+    // Back to an earlier round counts afresh.
+    await o.officer.mutation(api.sessions.setRound, { round: 1, double: false });
+    expect(await thisRound()).toEqual([]);
+    await o.show({ mode: "draw", drawing: await o.officer.mutation(api.drawings.start, {}) });
+    expect(await thisRound()).toEqual(["draw:3"]);
+    // The words handed out stay in `shown`, for later nights, but never in the public count.
+    const s = (await o.officer.query(api.sessions.host, {})).session!;
+    expect(s.shown!.filter((k) => k.startsWith("pictionary:"))).toHaveLength(5);
+    expect(s.shown!.slice(0, 3)).toEqual(["bug:9", "bug:0", "bug:1"]);
   });
 });

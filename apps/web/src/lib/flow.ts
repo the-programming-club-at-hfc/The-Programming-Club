@@ -3,7 +3,7 @@
 import { BUGS, LANGS, OUTPUTS, RELAYS, WIKI_RACES } from "./content";
 import { FIXES } from "./fixes";
 import { PUZZLES, puzzleForLabel } from "./puzzles";
-import { cardKey, isAnswerGame, wikiKey, wikiPair } from "./grading";
+import { cardKey, drawKey, isAnswerGame, wikiKey, wikiPair } from "./grading";
 import type { GameId } from "./grading";
 import { gamesIn } from "./schedule";
 import type { LineupItem } from "./schedule";
@@ -65,6 +65,64 @@ export function roundOf(item: LineupItem, index: number): Round {
           ? "pictionary"
           : "other";
   return { index, label: item.label, double: item.double, kind, game, filters: game ? filtersFor(item.label) : [], puzzle };
+}
+
+/** What players call one of a game's items on the TV and host buttons. Never "card": that's only in the code. */
+export const nounFor = (id: string | undefined) =>
+  id === "wiki"
+    ? "race"
+    : id === "pictionary"
+      ? "drawing"
+      : id === "puzzle"
+        ? "puzzle"
+        : id === "relay" || id === "fix"
+          ? "problem"
+          : "snippet";
+
+/** A round's noun: "snippet" for Bug Hunt, "race" for a Wiki Race. */
+export const roundNoun = (r: Round) => nounFor(r.game ?? r.kind);
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+// How many cards (races, drawings) a lineup round plays. A puzzle round plays its one puzzle.
+const LENGTH: Partial<Record<string, number>> = { lang: 5, output: 5, bug: 4, fix: 2, relay: 2, wiki: 2, pictionary: 6 };
+
+/** How many cards (races, drawings) a round plays, or null for a round without a set number. */
+export const roundLength = (r: Round) => LENGTH[r.game ?? r.kind] ?? null;
+
+/** The key the TV's card, race, or drawing has in `shown`, kept while the scores or join screen are up. */
+export const heldKey = (s: ScreenState) =>
+  s.drawing !== undefined
+    ? drawKey(s.drawing)
+    : s.wikiFrom && s.wikiTo
+      ? wikiKey(s.wikiFrom, s.wikiTo)
+      : s.game && s.index !== undefined
+        ? `${s.game}:${s.index}`
+        : null;
+
+/** This round's cards (races, drawings) out of everything put on the TV since it started, in order. */
+export function roundItems(r: Round, sinceStart: string[]) {
+  const prefix = r.kind === "wiki" ? "wiki:" : r.kind === "pictionary" ? "draw:" : r.game ? `${r.game}:` : null;
+  return prefix ? sinceStart.filter((k) => k.startsWith(prefix)) : [];
+}
+
+/** "3 of 5": card k of a round with a set number (just "6" past it), or null for a round without one. */
+export function countOf(r: Round, k: number) {
+  const of = roundLength(r);
+  return of === null ? null : k <= of ? `${k} of ${of}` : `${k}`;
+}
+
+/** "Snippet 3 of 5", or null for a round without a set number. */
+export const countLabel = (r: Round, k: number) => {
+  const n = countOf(r, k);
+  return n && `${cap(roundNoun(r))} ${n}`;
+};
+
+/** The TV's card (race, drawing) as one of its round's, like "Snippet 3 of 5", or null when it isn't one of them. */
+export function heldLabel(r: Round | null, sinceStart: string[], s: ScreenState) {
+  const key = heldKey(s);
+  const i = r && key ? roundItems(r, sinceStart).indexOf(key) : -1;
+  return r && i !== -1 ? countLabel(r, i + 1) : null;
 }
 
 /** What the TV says when a round starts. */
@@ -136,18 +194,21 @@ export interface ScreenState {
   revealed?: boolean;
   hint?: boolean;
   wikiFrom?: string;
+  wikiTo?: string;
   wikiReady?: boolean;
   drawing?: number;
 }
 
 /**
  * What the big button does next:
- * start a round → show a card (race, drawing) → reveal → show scores → another one, or the next round.
+ * start a round → show a card (race, drawing) → reveal → show scores → another one, or the next round. A round of a
+ * set length ("Snippet 3 of 5") offers another one until it has played that many, then moves on ("done": the next
+ * round, or one more).
  * A Wiki Race goes up as a get-ready screen first, then Start shows the race and starts the clock.
  * A puzzle round plays its one puzzle: show it → show the hint once it unlocks → reveal → show scores → next round.
  * Rounds that aren't games (like "Meet the officers") just show scores, then move on.
  */
-export type Step = "start" | "show" | "go" | "hint" | "reveal" | "scores" | "choose" | "next";
+export type Step = "start" | "show" | "go" | "hint" | "reveal" | "scores" | "choose" | "done" | "next";
 
 export function stepFor(o: {
   round: Round | null;
@@ -155,10 +216,15 @@ export function stepFor(o: {
   teams: number;
   /** A puzzle's hint has unlocked (half its time is gone) and the puzzle isn't over yet. */
   hintReady?: boolean;
+  /** Cards (races, drawings) this round has put up so far. */
+  played?: number;
 }): Step {
   const r = o.round;
   const s = o.screen;
   if (!r) return "start";
+  const of = roundLength(r);
+  // Between cards, a round that has played its set number is done.
+  const between = (step: "show" | "choose") => (of !== null && (o.played ?? 0) >= of ? "done" : step);
   if (r.kind === "puzzle") {
     // Like a card, the puzzle comes back for its reveal after the join screen, big timer, or scores went up.
     if (s.game !== "puzzle" || s.index !== r.puzzle) return "show";
@@ -169,17 +235,17 @@ export function stepFor(o: {
     // The TV's screen buttons keep the card (or race) when the join screen, big timer, or scores go up, so a card
     // that's still unrevealed always comes back for its reveal and is never skipped unscored.
     const mine = r.kind === "deck" ? s.game === r.game : !!s.wikiFrom;
-    if (!mine) return "show";
+    if (!mine) return between("show");
     // A race on its get-ready screen waits for Start.
     if (r.kind === "wiki" && s.wikiReady && !s.revealed) return "go";
     if (!s.revealed && revealable(r)) return "reveal";
-    return s.mode === "scoreboard" ? "choose" : "scores";
+    return s.mode === "scoreboard" ? between("choose") : "scores";
   }
   if (r.kind === "pictionary") {
     // Like a card, a drawing comes back for its reveal after the join screen, big timer, or scores went up.
-    if (s.drawing === undefined) return "show";
+    if (s.drawing === undefined) return between("show");
     if (!s.revealed) return "reveal";
-    return s.mode === "scoreboard" ? "choose" : "scores";
+    return s.mode === "scoreboard" ? between("choose") : "scores";
   }
   return s.mode === "scoreboard" || o.teams === 0 ? "next" : "scores";
 }

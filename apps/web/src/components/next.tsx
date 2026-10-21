@@ -11,7 +11,21 @@ import { WORD_MAX } from "#/lib/draw";
 import { run } from "./officer";
 import { BUGS, GAMES, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
-import { freshLeft, nextCard, nextRace, puzzleTitle, roundOf, roundTitle, stepFor } from "#/lib/flow";
+import {
+  countOf,
+  freshLeft,
+  heldKey,
+  heldLabel,
+  nextCard,
+  nextRace,
+  nounFor,
+  puzzleTitle,
+  roundItems,
+  roundNoun,
+  roundOf,
+  roundTitle,
+  stepFor,
+} from "#/lib/flow";
 import type { Round } from "#/lib/flow";
 import { DRAW_SECONDS, cardKey, cardSeconds, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES } from "#/lib/puzzles";
@@ -48,6 +62,28 @@ export function WordPeek({ word }: { word: string }) {
 
 const level = (game: GameId, i: number) =>
   game === "bug" ? BUGS[i].level : game === "fix" ? FIXES[i].level : game === "relay" ? RELAYS[i].level : null;
+
+/**
+ * Before something new goes up over the TV's card (or race) while it has answers in and hasn't been revealed: ask, since
+ * those answers only count once it's back and revealed. A drawing scores itself when something else goes up.
+ */
+export function okToLeave(live: Live) {
+  const s = live.screen;
+  const key = heldKey(s);
+  if (!key || s.drawing !== undefined || !live.unrevealed.includes(key)) return true;
+  const what = s.wikiFrom
+    ? `this race (${s.wikiFrom} → ${s.wikiTo})`
+    : s.game && s.index !== undefined
+      ? `this ${nounFor(s.game)} (${DECKS[s.game].name} #${s.index + 1})`
+      : "it";
+  return confirm(
+    `Skip ${what} without scoring it? ${
+      s.game === "puzzle"
+        ? "Its stars score when you bring it back and reveal it, or when the night ends."
+        : "Answers on it won’t count unless you bring it back and reveal it."
+    }`,
+  );
+}
 
 /** Put a Wiki Race's get-ready screen on the TV, with its clock set but stopped so no old countdown or chime runs on. */
 export function useReadyRace() {
@@ -240,7 +276,11 @@ export function NextPanel({
   const halfway = puzzleUp && live.timer.card === cardKey("puzzle", puzzle) && remaining <= live.timer.durationMs / 2;
   const hintReady = halfway && !timeUp && !allStars;
 
-  const step = stepFor({ round: r, screen: s, teams, hintReady });
+  // This round's cards (races, drawings) so far, toward its set number: "Snippet 3 of 5".
+  const played = r ? roundItems(r, live.thisRound).length : 0;
+  const upNext = r ? countOf(r, played + 1) : null;
+  const held = heldLabel(r, live.thisRound, s);
+  const step = stepFor({ round: r, screen: s, teams, hintReady, played });
   const card = r ? nextCard(r, used, shown) : null;
   const race = r?.kind === "wiki" ? nextRace(r, used, shown) : null;
 
@@ -251,7 +291,8 @@ export function NextPanel({
   const wiki = useQuery(api.wiki.board, waiting && s.mode === "wiki" ? {} : "skip");
   const drawing = useQuery(api.drawings.board, waiting && s.mode === "draw" ? {} : "skip");
   // Who draws next, for the button.
-  const draws = useQuery(api.drawings.host, r?.kind === "pictionary" && (step === "show" || step === "choose") ? {} : "skip");
+  const between = step === "show" || step === "choose" || step === "done";
+  const draws = useQuery(api.drawings.host, r?.kind === "pictionary" && between ? {} : "skip");
   const allIn =
     allStars ||
     (teams > 0 &&
@@ -269,11 +310,13 @@ export function NextPanel({
   // A clock that ran out stays at "time"; one still running stops so the buzzer doesn't go off over the answer.
   const pause = () => (live.timer.startedAt && remaining > 0 ? timer({ action: "pause" }) : undefined);
   const startRound = async (x: Round) => {
+    if (!okToLeave(live)) return;
     await setRound({ round: x.index, double: x.double, title: roundTitle(x) });
   };
   const show = async () => {
+    if (!okToLeave(live)) return;
     if (r?.kind === "deck" && r.game) {
-      if (card === null) return alert("This deck is out of cards for tonight. Pick one by hand under Games.");
+      if (card === null) return alert(`This deck is out of ${thing}s for tonight. Pick one by hand under Games.`);
       await setScreen({ screen: { mode: "card", game: r.game, index: card, revealed: false } });
       await timer({ action: "set", seconds: cardSeconds(r.game, card), relay: live.teamSize > 1 && r.game === "relay", autostart: true });
     } else if (r?.kind === "puzzle" && r.puzzle !== undefined) {
@@ -299,16 +342,9 @@ export function NextPanel({
         go: () => (confirm("End the night? Place XP goes out from the current standings.") ? end() : undefined),
       };
 
-  const thing =
-    r?.kind === "wiki"
-      ? "race"
-      : r?.kind === "puzzle"
-        ? "puzzle"
-        : r?.kind === "pictionary"
-          ? "drawing"
-          : r?.game === "relay"
-            ? "problem"
-            : "card";
+  const thing = r ? roundNoun(r) : "snippet";
+  const drawer = draws?.next?.name ?? "next in turn";
+  const of = upNext ? ` (${upNext})` : "";
   // The TV screen this round's cards (or races, or drawings) play on.
   const home = r?.kind === "wiki" ? "wiki" : r?.kind === "pictionary" ? "draw" : "card";
   const reveal: Action = {
@@ -332,12 +368,12 @@ export function NextPanel({
   } else if (step === "show") {
     const label =
       r.kind === "wiki" && race
-        ? `Get ready: ${w.computers} to /wiki`
+        ? `Get ready${upNext ? ` for race ${upNext}` : ""}: ${w.computers} to /wiki`
         : r.kind === "puzzle" && r.puzzle !== undefined
           ? `Show the puzzle: ${puzzleTitle(r.puzzle)}`
           : r.kind === "pictionary"
-            ? `New drawing: ${draws?.next?.name ?? "next in turn"}`
-            : `Show ${s.mode === "message" ? "the first" : "next"} ${thing}`;
+            ? `New drawing: ${drawer}${of}`
+            : `Show ${upNext ? `${thing} ${upNext}` : `next ${thing}`}`;
     primary = { label, go: show };
   } else if (step === "go") {
     primary = {
@@ -364,8 +400,12 @@ export function NextPanel({
       },
     };
   } else if (step === "choose") {
-    primary = { label: r.kind === "pictionary" ? `Another drawing: ${draws?.next?.name ?? "next in turn"}` : `Another ${thing}`, go: show };
+    primary = { label: r.kind === "pictionary" ? `Another drawing: ${drawer}${of}` : `Next ${thing}${of}`, go: show };
     alt = onward;
+  } else if (step === "done") {
+    // The round has played its set number: on to the next one, with one more a click away (never a stray N).
+    primary = onward;
+    alt = { label: r.kind === "pictionary" ? `One more drawing: ${drawer}` : `One more ${thing}`, go: show, keys: false };
   } else primary = onward;
 
   const act = async (a: Action) => {
@@ -408,7 +448,7 @@ export function NextPanel({
 
   const manual =
     r &&
-    (step === "scores" || step === "choose" || step === "next") &&
+    (step === "scores" || step === "choose" || step === "done" || step === "next") &&
     !(r.kind === "wiki" || r.kind === "puzzle" || r.kind === "pictionary" || (r.kind === "deck" && r.game !== "relay"));
   const rules = r && GAMES.find((g) => g.id === (r.game ?? r.kind));
   return (
@@ -457,9 +497,10 @@ export function NextPanel({
         </p>
       )}
       <div className="mt-3 space-y-0.5 text-sm text-dim">
-        {r?.kind === "deck" && r.game && (step === "show" || step === "choose") && (
+        {held && <p className="font-bold text-ink">{held}</p>}
+        {r?.kind === "deck" && r.game && between && (
           <p>
-            Next card:{" "}
+            Next {thing}:{" "}
             {card === null
               ? "none left tonight"
               : `${DECKS[r.game].name} #${card + 1}${level(r.game, card) ? `, ${level(r.game, card)}` : ""}, ${fmtClock(cardSeconds(r.game, card) * 1000)}`}
@@ -481,7 +522,7 @@ export function NextPanel({
             On the TV: open {CLUB.url}/wiki. Start shows {s.wikiFrom} → {s.wikiTo} and sends every {w.computer} there at once.
           </p>
         )}
-        {race && (step === "show" || step === "choose") && (
+        {race && between && (
           <p>
             Next race: {race.from} → {race.to}, {race.clicks ? "Fewest Clicks, " : ""}
             {fmtClock(wikiSeconds(race.clicks) * 1000)}

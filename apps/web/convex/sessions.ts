@@ -20,7 +20,7 @@ import { scorePuzzleReveal, scoreUnrevealedPuzzles } from "./puzzles";
 import { scoreWikiReveal } from "./wiki";
 import { drawCard, scoreDrawReveal, scoreUnrevealedDrawings } from "./drawings";
 import type { Doc } from "./_generated/dataModel";
-import { clockLeft, isFreshStart, parkClock, settle, showCard, wikiKey } from "../src/lib/grading";
+import { clockLeft, drawKey, isFreshStart, parkClock, settle, showCard, wikiKey } from "../src/lib/grading";
 import type { CardWindow } from "../src/lib/grading";
 
 /** The card (or race, or drawing) on the TV that teams answer against the clock. */
@@ -54,6 +54,9 @@ export const live = query({
       scored: s.scored ?? [],
       practice: !!s.practice,
       round: s.round ?? null,
+      // What went up since this round started, for "Snippet 3 of 5": cards, races, and drawings, never the drawing
+      // words' keys, which would give the word away. A night from before rounds were counted starts at its next round.
+      thisRound: s.roundFrom === undefined ? [] : (s.shown ?? []).slice(s.roundFrom).filter((k) => !k.startsWith("pictionary:")),
       autoTeams: s.autoTeams !== false,
       teamSize: s.teamSize ?? 2,
       // Cards with answers in that haven't been revealed yet ("game:index" or a race): teams stay put until they are.
@@ -190,7 +193,9 @@ async function putScreen(ctx: MutationCtx, before: Doc<"sessions">, screen: Doc<
       ? `${screen.game}:${screen.index}`
       : screen.mode === "wiki" && screen.wikiFrom && screen.wikiTo
         ? wikiKey(screen.wikiFrom, screen.wikiTo)
-        : null;
+        : screen.mode === "draw" && screen.drawing !== undefined
+          ? drawKey(screen.drawing)
+          : null;
   const shown = s.shown ?? [];
   const next = { ...s, screen, shown: card && !shown.includes(card) ? [...shown, card] : shown };
   // Each answerable card keeps its own window; anything else going up clears the current one.
@@ -219,14 +224,16 @@ export const setScreen = mutation({
 
 /**
  * Play a lineup round: double points follow the round (on for a double-points round, off otherwise). With a title,
- * the round's name goes up on the TV too.
+ * the round's name goes up on the TV too. A different round starts counting its cards (races, drawings) from here;
+ * the same one again keeps its count.
  */
 export const setRound = mutation({
   args: { round: v.number(), double: v.boolean(), title: v.optional(v.string()) },
   handler: async (ctx, { round, double, title }) => {
     await requireOfficer(ctx);
     const s = await requireOpenSession(ctx);
-    await ctx.db.patch(s._id, { round, double });
+    const roundFrom = round === s.round && s.roundFrom !== undefined ? s.roundFrom : (s.shown ?? []).length;
+    await ctx.db.patch(s._id, { round, double, roundFrom });
     if (title) await putScreen(ctx, { ...s, round, double }, { mode: "message", message: title.slice(0, 120) });
   },
 });

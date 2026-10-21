@@ -33,9 +33,14 @@ function seeded(key: string) {
   };
 }
 
-/** The four choices for an Output? answer or a Bug Hunt fix, in the same shuffled order everywhere. */
-export function choices(game: "bug" | "output", index: number) {
-  const all = game === "bug" ? [BUGS[index].fix, ...BUGS[index].wrong] : [OUTPUTS[index].answer, ...OUTPUTS[index].wrong];
+/** The four choices for an Output? answer, a Bug Hunt fix, or a language, in the same shuffled order everywhere. */
+export function choices(game: AnswerGame, index: number) {
+  const all =
+    game === "bug"
+      ? [BUGS[index].fix, ...BUGS[index].wrong]
+      : game === "output"
+        ? [OUTPUTS[index].answer, ...OUTPUTS[index].wrong]
+        : [LANGS[index].lang, ...LANGS[index].decoys];
   const rand = seeded(cardKey(game, index));
   for (let i = all.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
@@ -44,7 +49,7 @@ export function choices(game: "bug" | "output", index: number) {
   return all;
 }
 
-/** Every language in the Guess the Language list: each card's answer plus decoys. */
+/** The language names Guess the Language cards may use (answers, answers that also count, decoys), so a typo can't slip in. */
 export const LANGUAGES = [
   "Assembly",
   "Bash",
@@ -76,27 +81,6 @@ export const LANGUAGES = [
   "Swift",
   "TypeScript",
 ];
-
-// Other names people type, so the search still finds them.
-const AKA: Record<string, string> = {
-  Assembly: "asm",
-  Bash: "shell sh zsh",
-  "C#": "c sharp csharp",
-  "C++": "cpp c plus plus",
-  Go: "golang",
-  JavaScript: "js",
-  "Objective-C": "objc",
-  Python: "py",
-  TypeScript: "ts",
-};
-
-/** Languages matching a search, best matches (names that start with it) first. */
-export function searchLanguages(q: string) {
-  const s = q.trim().toLowerCase();
-  if (!s) return LANGUAGES;
-  const hits = LANGUAGES.filter((l) => l.toLowerCase().includes(s) || (AKA[l] ?? "").split(" ").some((a) => a.startsWith(s)));
-  return [...hits.filter((l) => l.toLowerCase().startsWith(s)), ...hits.filter((l) => !l.toLowerCase().startsWith(s))];
-}
 
 /** A team's answer to one card. Times are server milliseconds. */
 export interface Pick {

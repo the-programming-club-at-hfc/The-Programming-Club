@@ -8,13 +8,13 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
-import { DrawHost, NextPanel, useNewDrawing, useReadyRace, useStartRace } from "#/components/next";
+import { DrawHost, NextPanel, okToLeave, useNewDrawing, useReadyRace, useStartRace } from "#/components/next";
 import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { WIKI_RACES, wikiUrl } from "#/lib/content";
-import { deckFor, filtersFor } from "#/lib/flow";
+import { deckFor, filtersFor, heldKey, nounFor } from "#/lib/flow";
 import type { Filter } from "#/lib/flow";
-import { DRAW_SECONDS, drawKey, isAnswerGame, wikiSeconds } from "#/lib/grading";
+import { DRAW_SECONDS, cardKey, drawKey, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
 import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
@@ -419,8 +419,7 @@ function ScreenPanel({ live }: { live: Live }) {
   // The game the screen holds, up now or under the scores, join screen, slides, or a message.
   const held = s.drawing !== undefined ? "draw" : s.wikiFrom ? "wiki" : s.game && s.index !== undefined ? "card" : null;
   // Named the way the Run the night panel names it.
-  const thing =
-    held === "draw" ? "drawing" : held === "wiki" ? "race" : s.game === "puzzle" ? "puzzle" : s.game === "relay" ? "problem" : "card";
+  const thing = nounFor(held === "draw" ? "pictionary" : held === "wiki" ? "wiki" : s.game);
   const modes = [
     ["lobby", "Join screen"],
     ["scoreboard", "Scoreboard"],
@@ -966,7 +965,7 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
   }, [tvIndex]);
   const onTv = tvIndex === index;
 
-  // Next skips cards already shown this season; Prev just steps back.
+  // Prev and Next only move this preview; the TV changes with Show on TV. Next skips cards already shown this season.
   const step = (from: number, d: number) => {
     const n = indexes.length;
     if (d > 0)
@@ -975,14 +974,27 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
       }
     return (from + d + n) % n;
   };
-  const go = (d: number) => {
-    // Step from the card actually on the TV, so a reload or a second officer can't send it backwards.
-    const from = tvIndex !== undefined && indexes.includes(tvIndex) ? indexes.indexOf(tvIndex) : Math.min(pos, indexes.length - 1);
-    const next = step(from, d);
-    setPos(next);
-    if (tvIndex !== undefined) void run(setScreen({ screen: { mode: "card", game, index: indexes[next], revealed: false } }));
-  };
+  const go = (d: number) => setPos(step(Math.min(pos, indexes.length - 1), d));
   const secs = DECKS[game].seconds(index);
+  const start = () =>
+    timer({
+      action: "set",
+      seconds: secs,
+      relay: live.teamSize > 1 && (game === "relay" || (game === "puzzle" && !!PUZZLES[index].relay)),
+      autostart: true,
+    });
+  // The card held under the scores or join screen comes back as it was, its parked clock and all. Any other card goes
+  // up with its own clock running, so the clock always belongs to the card on the TV and 0:00 closes its answers. A card
+  // that already has answers or a score tonight comes back without a fresh clock (that would reopen it and hand every
+  // lock the early bonus); Start is there to give it one on purpose.
+  const showOnTv = async () => {
+    const key = cardKey(game, index);
+    if (heldKey(s) === key) return setScreen({ screen: { ...s, mode: "card" } });
+    if (!okToLeave(live)) return;
+    const scored = live.scored.includes(key);
+    await setScreen({ screen: { mode: "card", game, index, revealed: scored } });
+    if (!scored && !live.unrevealed.includes(key)) await start();
+  };
 
   return (
     <div>
@@ -1022,28 +1034,16 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
             {s.revealed ? "Hide answer on TV" : "Reveal answer on TV"}
           </button>
         ) : (
-          <button
-            className="btn btn-sm btn-neon"
-            onClick={() => run(setScreen({ screen: { mode: "card", game, index, revealed: false } }))}
-          >
+          <button className="btn btn-sm btn-neon" onClick={() => run(showOnTv())}>
             Show on TV
           </button>
         )}
-        <button
-          className="btn btn-sm"
-          onClick={() =>
-            run(
-              timer({
-                action: "set",
-                seconds: secs,
-                relay: live.teamSize > 1 && (game === "relay" || (game === "puzzle" && !!PUZZLES[index].relay)),
-                autostart: true,
-              }),
-            )
-          }
-        >
-          Start {fmtClock(secs * 1000)}
-        </button>
+        {/* A restart for this card's clock. Previewing another card, its clock would time the one on the TV. */}
+        {(onTv || !heldKey(s)) && (
+          <button className="btn btn-sm" onClick={() => run(start())}>
+            Start {fmtClock(secs * 1000)}
+          </button>
+        )}
       </div>
       <p className="mt-3 text-sm text-dim">
         {onTv
@@ -1433,7 +1433,7 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
               <button
                 className="btn btn-sm btn-neon"
                 // The get-ready screen first, so every team is on /wiki before the race shows.
-                onClick={() => run(readyRace({ ...race, clicks }))}
+                onClick={() => okToLeave(live) && run(readyRace({ ...race, clicks }))}
               >
                 Show on TV
               </button>
@@ -1492,7 +1492,9 @@ function PictionaryTool({ live }: { live: Live }) {
         <button
           className="btn btn-sm btn-neon"
           disabled={busy}
-          onClick={() => (!up || confirm("A drawing is still up. Score it as it stands and start a new one?")) && act(newDrawing)}
+          onClick={() =>
+            (!up || confirm("A drawing is still up. Score it as it stands and start a new one?")) && okToLeave(live) && act(newDrawing)
+          }
         >
           New drawing, {fmtClock(DRAW_SECONDS * 1000)}
         </button>

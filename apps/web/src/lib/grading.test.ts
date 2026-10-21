@@ -22,7 +22,6 @@ import {
   parkClock,
   puzzleAwardsFor,
   sameOutput,
-  searchLanguages,
   settle,
   showCard,
   submitAnswer,
@@ -41,6 +40,7 @@ describe("decks", () => {
     for (const [game, size] of [
       ["bug", BUGS.length],
       ["output", OUTPUTS.length],
+      ["lang", LANGS.length],
     ] as const) {
       for (let i = 0; i < size; i++) {
         const c = choices(game, i);
@@ -52,17 +52,18 @@ describe("decks", () => {
 
   test("the right answer isn't always in the same spot", () => {
     expect(new Set(OUTPUTS.map((o, i) => choices("output", i).indexOf(o.answer))).size > 1).toBe(true);
+    expect(new Set(LANGS.map((l, i) => choices("lang", i).indexOf(l.lang))).size > 1).toBe(true);
   });
 
-  test("the language list spells every answer exactly like the deck", () => {
-    for (const l of LANGS) for (const name of [l.lang, ...(l.also ?? [])]) expect(LANGUAGES).toContain(name);
+  test("the language list spells every answer and decoy exactly like the deck", () => {
+    for (const l of LANGS) for (const name of [l.lang, ...(l.also ?? []), ...l.decoys]) expect(LANGUAGES).toContain(name);
   });
 
-  test("search filters and finds nicknames", () => {
-    expect(searchLanguages("")).toHaveLength(LANGUAGES.length);
-    expect(searchLanguages("java")).toEqual(["Java", "JavaScript"]);
-    expect(searchLanguages("js")).toContain("JavaScript");
-    expect(searchLanguages("shell")).toContain("Bash");
+  test("a language card's choices are its answer and three decoys that never also count", () => {
+    LANGS.forEach((l, i) => {
+      expect([...choices("lang", i)].sort()).toEqual([l.lang, ...l.decoys].sort());
+      for (const d of l.decoys) expect([l.lang, ...(l.also ?? [])]).not.toContain(d);
+    });
   });
 });
 

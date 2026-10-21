@@ -384,8 +384,10 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     (s.mode === "draw" && s.drawing !== undefined) ||
     (s.mode === "message" && !!s.message);
   const split = !wide && game;
-  const timed = !!live.timer.startedAt || s.mode === "timer";
-  const clock = remaining === 0 && live.timer.startedAt ? "time" : fmtClock(remaining);
+  // No clock once it has run out (each game says time's up its own way), or once the card on screen is revealed.
+  const done = (remaining === 0 && !!live.timer.startedAt) || (!!card && (!!s.revealed || live.scored.includes(card)));
+  const timed = (!!live.timer.startedAt || s.mode === "timer") && !done;
+  const clock = fmtClock(remaining);
   const hosting = me.officer && !me.playing;
   // The game's column is as wide as it needs (a drawing sizes itself to the screen), and the pair sits centered.
   const columns = s.mode === "draw" ? "lg:grid-cols-[20rem_auto]" : "lg:grid-cols-[20rem_minmax(0,52rem)]";
@@ -505,7 +507,15 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
           {s.mode === "card" && s.game && s.index !== undefined && (
             <div className="mt-5">
               {isAnswerGame(s.game) && me.team ? (
-                <TeamAnswer key={cardKey(s.game, s.index)} token={token} live={live} game={s.game} index={s.index} remaining={remaining} />
+                <TeamAnswer
+                  key={cardKey(s.game, s.index)}
+                  token={token}
+                  live={live}
+                  teamId={me.team._id}
+                  game={s.game}
+                  index={s.index}
+                  remaining={remaining}
+                />
               ) : s.game === "fix" && me.team ? (
                 work ? (
                   <>
@@ -698,12 +708,14 @@ function TeamRace({
 function TeamAnswer({
   token,
   live,
+  teamId,
   game,
   index,
   remaining,
 }: {
   token: string;
   live: Live;
+  teamId: Id<"teams">;
   game: AnswerGame;
   index: number;
   remaining: number;
@@ -715,13 +727,16 @@ function TeamAnswer({
   const key = cardKey(game, index);
   const current = mine?.card === key ? mine : null;
   const open = phoneOpen(live, key, remaining);
+  // Once scored, the result stays up even if an officer hides the answer again.
+  const revealed = !!live.screen.revealed || live.scored.includes(key);
+  // The TV's locked-in count (counts only, never picks), while the phone waits for the reveal.
+  const board = useQuery(api.answers.board, open || revealed ? "skip" : {});
   const send = sender(setError);
   return (
     <PhoneRound
       game={game}
       index={index}
-      // Once scored, the result stays up even if an officer hides the answer again.
-      revealed={!!live.screen.revealed || live.scored.includes(key)}
+      revealed={revealed}
       open={open}
       pick={current?.pick ?? NO_PICK}
       result={current?.result ?? null}
@@ -729,6 +744,9 @@ function TeamAnswer({
       onPick={(p) => send(pick({ token, card: key, ...p }))}
       onLock={(step) => send(lock({ token, card: key, step }))}
       solo={live.teamSize === 1}
+      teams={live.teams}
+      teamId={teamId}
+      lockedIn={board?.card === key && board.locked !== null ? { locked: board.locked, of: board.teams } : undefined}
     />
   );
 }

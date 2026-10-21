@@ -1,13 +1,12 @@
 // Phone answering for Bug Hunt, Output?, and Guess the Language. Presentational only: the join page wires it
 // to Convex, and the officer test page drives it with local state, so both show exactly the same thing.
-import { useState } from "react";
-import { BUGS } from "#/lib/content";
-import { choices, searchLanguages } from "#/lib/grading";
+import { BUGS, LANGS } from "#/lib/content";
+import { choices, placeOf } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
 import { teamWords } from "#/lib/words";
 import type { TeamWords } from "#/lib/words";
 import { CardView, LevelChip } from "./game";
-import { highlight } from "./ui";
+import { highlight, ordinal } from "./ui";
 
 /** The team's current answer, as every teammate's phone sees it. */
 export interface TeamPick {
@@ -47,17 +46,43 @@ interface RoundProps {
   onLock: (step: "line" | "answer") => void;
   /** A solo night: the copy speaks to one player. */
   solo?: boolean;
+  /** Tonight's teams, best first, for the standings after the reveal. */
+  teams?: Standing[];
+  /** This phone's team in `teams`. */
+  teamId?: string;
+  /** How many teams have locked in, while waiting for the reveal. */
+  lockedIn?: { locked: number; of: number };
 }
 
-/** What a phone shows for an answerable card: the card and the team's answer, then the result after the reveal. */
+export interface Standing {
+  _id: string;
+  name: string;
+  score: number;
+}
+
+/**
+ * What a phone shows for an answerable card: the card and the team's answer; once answers close, what the team's
+ * answer is; after the reveal, the result and the standings.
+ */
 export function PhoneRound(p: RoundProps) {
   const w = teamWords(p.solo);
   if (p.revealed)
     return (
       <div className="space-y-3">
-        <ResultBanner game={p.game} pick={p.pick} result={p.result} w={w} />
+        <ResultBanner game={p.game} index={p.index} pick={p.pick} result={p.result} w={w} />
+        {p.teams && p.teams.length > 0 && <Standings teams={p.teams} mine={p.teamId} />}
         <div className="card p-5">
-          <CardView game={p.game} index={p.index} answer />
+          {/* The language and its tell are in the banner already. */}
+          <CardView game={p.game} index={p.index} answer={p.game !== "lang"} />
+        </div>
+      </div>
+    );
+  if (!p.open)
+    return (
+      <div className="space-y-3">
+        <TimesUp game={p.game} pick={p.pick} lockedIn={p.lockedIn} w={w} />
+        <div className="card p-5 opacity-60">
+          <CardView game={p.game} index={p.index} answer={false} />
         </div>
       </div>
     );
@@ -73,7 +98,7 @@ export function PhoneRound(p: RoundProps) {
               <ChoiceList
                 options={choices("output", p.index)}
                 pick={p.pick}
-                disabled={!p.open || p.pick.locked}
+                disabled={p.pick.locked}
                 onPick={(choice) => p.onPick({ choice })}
                 w={w}
               />
@@ -82,7 +107,6 @@ export function PhoneRound(p: RoundProps) {
                 by={p.pick.choiceBy}
                 locked={p.pick.locked}
                 lockedBy={p.pick.lockedBy}
-                open={p.open}
                 onLock={() => p.onLock("answer")}
                 w={w}
               />
@@ -109,7 +133,6 @@ function LockStep({
   by,
   locked,
   lockedBy,
-  open,
   onLock,
   label,
   w,
@@ -118,7 +141,6 @@ function LockStep({
   by?: string;
   locked: boolean;
   lockedBy?: string;
-  open: boolean;
   onLock: () => void;
   label?: string;
   w: TeamWords;
@@ -127,12 +149,6 @@ function LockStep({
     return (
       <p className="mt-4 rounded-[6px] bg-pine px-4 py-3 font-semibold text-white">
         {w.lockedBy(lockedBy)}: {what}. {w.final}
-      </p>
-    );
-  if (!open)
-    return (
-      <p className="mt-4 rounded-[6px] bg-mist px-4 py-3 font-semibold">
-        {what ? `Time’s up. ${w.Your} pick (${what}) still counts.` : "Time’s up. Answers are closed."}
       </p>
     );
   return (
@@ -188,10 +204,10 @@ function ChoiceList({
 }
 
 /** Bug Hunt in two steps: tap the line and lock it, then pick the fix and lock that. */
-function BugAnswer({ index, open, pick, onPick, onLock, solo }: RoundProps) {
+function BugAnswer({ index, pick, onPick, onLock, solo }: RoundProps) {
   const w = teamWords(solo);
   const b = BUGS[index];
-  const canTap = open && !pick.lineLocked;
+  const canTap = !pick.lineLocked;
   return (
     <div>
       <p className="text-lg">
@@ -224,7 +240,6 @@ function BugAnswer({ index, open, pick, onPick, onLock, solo }: RoundProps) {
         by={pick.lineBy}
         locked={pick.lineLocked}
         lockedBy={pick.lineLockedBy}
-        open={open}
         onLock={() => onLock("line")}
         label={w.lockLine}
         w={w}
@@ -235,7 +250,7 @@ function BugAnswer({ index, open, pick, onPick, onLock, solo }: RoundProps) {
           <ChoiceList
             options={choices("bug", index)}
             pick={pick}
-            disabled={!open || pick.locked}
+            disabled={pick.locked}
             code
             onPick={(choice) => onPick({ choice })}
             w={w}
@@ -245,7 +260,6 @@ function BugAnswer({ index, open, pick, onPick, onLock, solo }: RoundProps) {
             by={pick.choiceBy}
             locked={pick.locked}
             lockedBy={pick.lockedBy}
-            open={open}
             onLock={() => onLock("answer")}
             w={w}
           />
@@ -255,97 +269,164 @@ function BugAnswer({ index, open, pick, onPick, onLock, solo }: RoundProps) {
   );
 }
 
-/** Search or scroll a list of languages, then tap one. */
-function LangAnswer({ open, pick, onPick, onLock, solo }: RoundProps) {
+/** Four big language buttons, then the lock that names the pick. */
+function LangAnswer({ index, pick, onPick, onLock, solo }: RoundProps) {
   const w = teamWords(solo);
-  const [q, setQ] = useState("");
-  const list = searchLanguages(q);
-  const disabled = !open || pick.locked;
   return (
-    <div className="mt-4">
-      <input
-        type="search"
-        className="field"
-        placeholder="Search, or scroll the list"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        disabled={disabled}
-        autoComplete="off"
-        autoCorrect="off"
-        spellCheck={false}
-        aria-label="Search languages"
-      />
-      <ul className="mt-2 grid max-h-80 grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain p-0.5">
-        {list.map((l) => (
-          <li key={l}>
-            <button
-              type="button"
-              className={`btn w-full ${pick.choice === l ? "btn-on disabled:opacity-100" : ""}`}
-              disabled={disabled}
-              onClick={() => onPick({ choice: l })}
-              aria-pressed={pick.choice === l}
-            >
-              {l}
-            </button>
-          </li>
+    <>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {choices("lang", index).map((l) => (
+          <button
+            key={l}
+            type="button"
+            className={`btn min-h-16 w-full text-lg ${pick.choice === l ? "btn-on disabled:opacity-100" : ""}`}
+            disabled={pick.locked}
+            onClick={() => onPick({ choice: l })}
+            aria-pressed={pick.choice === l}
+          >
+            {l}
+          </button>
         ))}
-        {list.length === 0 && <li className="col-span-2 p-3 text-dim">No match. Try another spelling, or clear the search and scroll.</li>}
-      </ul>
+      </div>
       <LockStep
         what={pick.choice}
         by={pick.choiceBy}
         locked={pick.locked}
         lockedBy={pick.lockedBy}
-        open={open}
         onLock={() => onLock("answer")}
+        label={pick.choice && `Lock in ${pick.choice}`}
         w={w}
       />
-    </div>
+    </>
   );
 }
 
 const mark = (ok?: boolean) => (ok ? "✓" : "✗");
 
-/** "Correct! +N" or "Not this time", with what the team picked. */
-function ResultBanner({ game, pick, result, w }: { game: AnswerGame; pick: TeamPick; result: Result | null; w: TeamWords }) {
+/** The team's answer, big: the language, the printed output, or the line and fix. Marked right or wrong once scored. */
+function Picked({ game, pick, result }: { game: AnswerGame; pick: TeamPick; result?: Result | null }) {
+  const marked = result !== undefined;
+  if (game === "bug")
+    return (
+      <div className="mt-2 font-semibold">
+        <p className="text-2xl font-extrabold">
+          Line {pick.line} {marked && mark(result?.line)}
+        </p>
+        {pick.choice ? (
+          <p className="mt-1">
+            Fix {marked && mark(result?.fix)} <code className="font-code">{pick.choice}</code>
+          </p>
+        ) : (
+          <p className="mt-1">No fix picked.</p>
+        )}
+      </div>
+    );
+  // The mark sits beside the whole block, so it reads as the verdict on every line of a multiline answer.
+  return (
+    <div className="mt-2 flex items-center gap-3">
+      {game === "lang" ? (
+        <p className="min-w-0 flex-1 text-4xl leading-none font-extrabold tracking-[-0.03em] wrap-anywhere">{pick.choice}</p>
+      ) : (
+        <pre className="min-w-0 flex-1 overflow-x-auto rounded-[6px] border-2 border-current/25 px-4 py-2 font-code text-3xl font-bold">
+          {pick.choice}
+        </pre>
+      )}
+      {marked && <span className="shrink-0 text-3xl leading-none font-extrabold">{mark(result?.correct)}</span>}
+    </div>
+  );
+}
+
+/** Answers are closed but not revealed yet: what the team's answer is (an unlocked pick still counts), and the wait. */
+function TimesUp({ game, pick, lockedIn, w }: { game: AnswerGame; pick: TeamPick; lockedIn?: RoundProps["lockedIn"]; w: TeamWords }) {
+  const nothing = pick.line === undefined && pick.choice === undefined;
+  const locked = pick.locked && (game !== "bug" || pick.lineLocked);
+  return (
+    <div className="rounded-[10px] bg-mist p-5" role="status">
+      {nothing ? (
+        <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">No answer this time</p>
+      ) : (
+        <>
+          <p className="font-semibold">{locked ? w.lockedBy(pick.lockedBy) : `${w.Your} pick still counts`}</p>
+          <Picked game={game} pick={pick} />
+        </>
+      )}
+      <p className="mt-4 font-semibold">Time’s up. Waiting for the answer.</p>
+      {lockedIn && (
+        <p className="mt-1 text-sm text-dim">
+          {lockedIn.locked} of {lockedIn.of} {lockedIn.of === 1 ? w.team : w.teams} locked in.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** "Right! +N" or "Not this time", with what the team picked (Guess the Language: the language and its tell). */
+function ResultBanner({
+  game,
+  index,
+  pick,
+  result,
+  w,
+}: {
+  game: AnswerGame;
+  index: number;
+  pick: TeamPick;
+  result: Result | null;
+  w: TeamWords;
+}) {
   const pts = result?.points ?? 0;
   const tone = result?.correct ? "bg-meadow text-[#12332b]" : pts > 0 ? "bg-sun text-[#12332b]" : "bg-mist";
   const nothing = pick.line === undefined && pick.choice === undefined;
+  const l = LANGS[index];
   return (
     <div className={`rounded-[10px] p-5 ${tone}`} role="status">
       <p className="text-4xl leading-none font-extrabold tracking-[-0.03em]">
-        {result?.correct ? `Correct! +${pts}` : pts > 0 ? `Partly right. +${pts}` : "Not this time"}
+        {result?.correct ? `Right! +${pts}` : pts > 0 ? `Partly right. +${pts}` : "Not this time"}
       </p>
       <div className="mt-3 font-semibold">
-        {nothing ? (
-          <p>{w.You} didn’t pick an answer.</p>
-        ) : game === "bug" ? (
+        {game === "lang" ? (
           <>
-            <p>
-              Line {pick.line} {mark(result?.line)}
-            </p>
-            {pick.choice ? (
-              <p className="mt-1">
-                Fix {mark(result?.fix)} <code className="font-code">{pick.choice}</code>
-              </p>
-            ) : (
-              <p className="mt-1">No fix picked.</p>
-            )}
+            <p className="text-2xl font-extrabold">{result?.correct ? `It’s ${l.lang}.` : `It was ${l.lang}.`}</p>
+            <p className="mt-1 font-normal">{l.tell}</p>
           </>
+        ) : nothing ? (
+          <p>{w.You} didn’t pick an answer.</p>
         ) : (
           <>
-            <p>{w.You} picked</p>
-            {/* The mark sits beside the whole block, so it reads as the verdict on every line of a multiline answer. */}
-            <div className="mt-2 flex items-center gap-3">
-              <pre className="min-w-0 flex-1 overflow-x-auto rounded-[6px] border-2 border-current/25 px-4 py-2 font-code text-3xl font-bold">
-                {pick.choice}
-              </pre>
-              <span className="shrink-0 text-3xl leading-none font-extrabold">{mark(result?.correct)}</span>
-            </div>
+            {game === "output" && <p>{w.You} picked</p>}
+            <Picked game={game} pick={pick} result={result} />
           </>
         )}
         {result?.early && <p className="mt-1 font-normal">Includes the bonus for locking in early.</p>}
       </div>
     </div>
+  );
+}
+
+/** The top three and, below them if it isn't one, this team, with its row highlighted. Ties share a place. */
+function Standings({ teams, mine }: { teams: Standing[]; mine?: string }) {
+  const at = teams.findIndex((t) => t._id === mine);
+  const rows = at > 2 ? [...teams.slice(0, 3), ...(at > 3 ? [null] : []), teams[at]] : teams.slice(0, 3);
+  const scores = teams.map((t) => t.score);
+  return (
+    <ol className="card p-2" aria-label="Standings">
+      {rows.map((t) =>
+        t ? (
+          <li
+            key={t._id}
+            className={`flex items-center gap-3 rounded-[6px] px-3 py-2 ${t._id === mine ? "bg-pine text-white" : ""}`}
+            aria-current={t._id === mine || undefined}
+          >
+            <span className="w-10 shrink-0 font-bold">{ordinal(placeOf(t.score, scores))}</span>
+            <span className="min-w-0 flex-1 truncate font-semibold">{t.name}</span>
+            <span className="narrow text-2xl leading-none font-extrabold">{t.score}</span>
+          </li>
+        ) : (
+          <li key="gap" className="px-3 leading-none text-dim" aria-hidden>
+            …
+          </li>
+        ),
+      )}
+    </ol>
   );
 }

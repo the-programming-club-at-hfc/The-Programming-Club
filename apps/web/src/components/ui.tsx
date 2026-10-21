@@ -229,25 +229,37 @@ export function highlight(line: string) {
   return out + esc(line.slice(last));
 }
 
-/** Highlighted Python. `mark` lists 1-based lines to call out, like the lines a fix changed. */
+/** Columns of leading whitespace (a tab is 4, like the code's tab-size). */
+const indentOf = (l: string) => [...(l.match(/^\s*/)?.[0] ?? "")].reduce((n, c) => n + (c === "\t" ? 4 : 1), 0);
+
+/**
+ * Highlighted Python. `mark` lists 1-based lines to call out, like the lines a fix changed. `wrap` wraps long lines
+ * instead of scrolling: each line keeps its indent, and the rest of it hangs 2 columns further in.
+ */
 export function Code({
   code,
   numbered = true,
   mark = [],
+  wrap = false,
   className = "",
 }: {
   code: string;
   numbered?: boolean;
   mark?: number[];
+  wrap?: boolean;
   className?: string;
 }) {
   return (
     <pre className={`code ${className}`}>
       <code>
         {code.split("\n").map((l, i) => (
-          <span className={`cl ${mark.includes(i + 1) ? "-mx-2 bg-sun/20 px-2" : ""}`} key={i}>
+          <span
+            className={`cl ${mark.includes(i + 1) ? "-mx-2 bg-sun/20 px-2" : ""} ${wrap ? "indent-[-2ch] wrap-break-word whitespace-pre-wrap" : ""}`}
+            style={wrap ? { paddingLeft: `${indentOf(l) + 2}ch` } : undefined}
+            key={i}
+          >
             {numbered && <span className="ln">{i + 1}</span>}
-            <span dangerouslySetInnerHTML={{ __html: highlight(l) || " " }} />
+            <span dangerouslySetInnerHTML={{ __html: highlight(wrap ? l.trimStart() : l) || " " }} />
           </span>
         ))}
       </code>

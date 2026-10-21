@@ -180,6 +180,16 @@ function Tester() {
   );
 }
 
+/** Made-up rivals around the pretend team, so the standings after the reveal look like a real night's. */
+const standings = (points: number) =>
+  [
+    { _id: "a", name: "Null Pointers", score: 9 },
+    { _id: "b", name: "Off by One", score: 6 },
+    { _id: "c", name: "Tab Hoarders", score: 4 },
+    { _id: "d", name: "Semicolons", score: 2 },
+    { _id: "you", name: "Your team", score: points },
+  ].sort((x, y) => y.score - x.score);
+
 /** One card played by a pretend team, scored by the same function Convex uses. */
 function Play({ game, index, tv }: { game: AnswerGame; index: number; tv: boolean }) {
   const secs = cardSeconds(game, index);
@@ -238,9 +248,9 @@ function Play({ game, index, tv }: { game: AnswerGame; index: number; tv: boolea
     <>
       <div className="w-[390px] max-w-full shrink-0">
         <div className="rounded-[28px] border-8 border-ink bg-paper p-3">
-          {timed && !revealed && (
+          {timed && !revealed && remaining > 0 && (
             <p className={`narrow mb-3 text-center text-6xl leading-none font-extrabold ${remaining <= 10_000 ? "text-signal" : ""}`}>
-              {remaining === 0 ? "time" : fmtClock(remaining)}
+              {fmtClock(remaining)}
             </p>
           )}
           <PhoneRound
@@ -252,6 +262,8 @@ function Play({ game, index, tv }: { game: AnswerGame; index: number; tv: boolea
             result={result}
             onPick={onPick}
             onLock={onLock}
+            teams={standings(result?.points ?? 0)}
+            teamId="you"
           />
         </div>
         <div className="mt-4 flex flex-wrap gap-1">
@@ -587,9 +599,9 @@ function WikiPlay({ index, tv }: { index: number; tv: boolean }) {
     <>
       <div className="w-[390px] max-w-full shrink-0">
         <div className="rounded-[28px] border-8 border-ink bg-paper p-3">
-          {timed && !revealed && (
+          {timed && !revealed && remaining > 0 && (
             <p className={`narrow mb-3 text-center text-6xl leading-none font-extrabold ${remaining <= 10_000 ? "text-signal" : ""}`}>
-              {remaining === 0 ? "time" : fmtClock(remaining)}
+              {fmtClock(remaining)}
             </p>
           )}
           <WikiRound

@@ -300,7 +300,8 @@ export function CardView({
   return (
     <div>
       <p className={big ? "text-2xl" : "text-lg"}>Which language is this?</p>
-      <Code code={l.code} numbered={false} className={`my-3 ${codeCls}`} />
+      {/* Long lines wrap rather than scroll, so a phone shows the whole snippet. */}
+      <Code code={l.code} numbered={false} wrap className={`my-3 ${big ? codeCls : "max-sm:px-4 max-sm:text-[0.8125rem]"}`} />
       {answer && (
         <div className="mt-4 border-t-2 border-dashed border-line pt-4">
           <p className={`font-extrabold tracking-[-0.02em] ${big ? "text-[clamp(2.4rem,4.5vw,5rem)]" : "text-3xl"}`}>{l.lang}</p>

@@ -12,6 +12,7 @@ import { InstagramGlyph, InstagramQr } from "#/components/instagram";
 import { OfficerGate, run, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
+import { heldLabel, roundOf } from "#/lib/flow";
 import { cardKey, drawKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
 import { nextMeeting, useJustEnded, useSchedule } from "#/lib/schedule";
 import { CLUB, fmtDate } from "#/lib/season";
@@ -145,6 +146,9 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   const wk = plan[live.week - 1];
   const wt = weekTile(wk);
   const w = teamWords(live.teamSize === 1);
+  // "Snippet 3 of 5": the card (race, drawing) on the TV as one of its lineup round's.
+  const item = live.round !== null && wk.lineup[live.round] ? roundOf(wk.lineup[live.round], live.round) : null;
+  const count = heldLabel(item, live.thisRound, s);
   const deckTile = s.game ? GAME_TILE[s.game] : null;
   const answerable = s.mode === "card" && isAnswerGame(s.game) && s.index !== undefined;
   const boardData = useQuery(api.answers.board, answerable ? {} : "skip");
@@ -194,6 +198,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 </span>
               )}
               {DECKS[s.game].name}
+              {count && <span className="font-normal text-dim">· {count}</span>}
               {board && board.locked !== null && !s.revealed && board.teams > 0 && (
                 <span className="ml-auto">
                   <span className="narrow text-[2.6vw] font-extrabold">{board.locked}</span> of {board.teams} {w.teams} locked in
@@ -221,7 +226,10 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
         {s.mode === "wiki" && s.wikiReady && (
           <div className="grid h-full place-items-center text-center">
             <div>
-              <p className="text-[2vw] font-bold text-dim">Wiki Race{s.wikiClicks ? ": Fewest Clicks" : ""} · get ready</p>
+              <p className="text-[2vw] font-bold text-dim">
+                Wiki Race{s.wikiClicks ? ": Fewest Clicks" : ""}
+                {count && ` · ${count}`} · get ready
+              </p>
               <p className="mt-[1.5vw] text-[2.4vw]">{w.openOn}</p>
               <p className="mt-[0.5vw] text-[6vw] leading-[1] font-extrabold tracking-[-0.03em]">{CLUB.url}/wiki</p>
               <p className="mt-[2vw] text-[1.8vw] text-dim">The start and target go up when the race starts, for {w.everyone} at once.</p>
@@ -231,6 +239,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
         {s.mode === "wiki" && !s.wikiReady && s.wikiFrom && s.wikiTo && (
           <div className={`grid h-full items-center gap-[3vw] ${wikiBoard && wikiBoard.teams > 0 ? "grid-cols-[minmax(0,1fr)_26vw]" : ""}`}>
             <div className="flex flex-col gap-[3vw]">
+              {count && <p className="-mb-[1.5vw] text-[1.8vw] font-bold text-dim">Wiki Race · {count}</p>}
               <div className={`grid gap-[0.3vw] ${wikiBoard && wikiBoard.teams > 0 ? "" : "grid-cols-2"}`}>
                 <div className="bg-mist p-[3vw]">
                   <p className="text-[1.6vw] text-dim">Start here</p>
@@ -252,7 +261,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
             {wikiBoard && wikiBoard.teams > 0 && <RaceList board={wikiBoard} done={done || wikiBoard.scored} w={w} />}
           </div>
         )}
-        {s.mode === "draw" && s.drawing !== undefined && <DrawView n={s.drawing} live={live} remaining={remaining} w={w} />}
+        {s.mode === "draw" && s.drawing !== undefined && <DrawView n={s.drawing} live={live} remaining={remaining} w={w} count={count} />}
         {s.mode === "message" && (
           <div className="grid h-full place-items-center text-center">
             <p className="max-w-[18ch] text-[5.5vw] leading-[1] font-extrabold tracking-[-0.03em] text-balance">{s.message}</p>
@@ -467,7 +476,7 @@ function RaceList({ board, done, w }: { board: WikiBoard; done: boolean; w: Team
 
 /** Tech Pictionary: the live drawing, who's drawing, the word as blanks, the clock, and who has got it so far. On the
  *  reveal, the word and every team's points. Wrong guesses never come here. */
-function DrawView({ n, live, remaining, w }: { n: number; live: Live; remaining: number; w: TeamWords }) {
+function DrawView({ n, live, remaining, w, count }: { n: number; live: Live; remaining: number; w: TeamWords; count: string | null }) {
   const data = useQuery(api.drawings.board);
   const b = data?.key === drawKey(n) ? data : null;
   useCountSound(b?.key, b ? b.got.length : null);
@@ -478,6 +487,7 @@ function DrawView({ n, live, remaining, w }: { n: number; live: Live; remaining:
     <div className="grid h-full grid-cols-[minmax(0,1fr)_28vw] gap-[3vw]">
       <Sketch drawingId={b._id} className="min-h-0" canvasClass="size-full" />
       <div className="flex min-h-0 flex-col overflow-hidden">
+        {count && <p className="mb-[0.6vw] text-[1.4vw] font-bold text-dim">{count}</p>}
         {done && b.word ? (
           <>
             <p className="text-[1.8vw] font-bold text-dim">The word was</p>
