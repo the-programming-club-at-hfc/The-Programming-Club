@@ -46,6 +46,24 @@ function useWakeLock() {
   }, []);
 }
 
+/** Full screen hides the browser's address bar and tabs (and Android's bars), so the pad gets the whole tablet. Browsers
+ *  only allow it from a tap, and a swipe from the edge leaves it, so the button stays until it's on. */
+function FullScreen({ className = "" }: { className?: string }) {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const check = () => setOn(!!document.fullscreenElement || !document.fullscreenEnabled);
+    check();
+    document.addEventListener("fullscreenchange", check);
+    return () => document.removeEventListener("fullscreenchange", check);
+  }, []);
+  if (on) return null;
+  return (
+    <button className={`btn btn-sm ${className}`} onClick={() => void document.documentElement.requestFullscreen().catch(() => undefined)}>
+      Full screen
+    </button>
+  );
+}
+
 function Pad() {
   useWakeLock();
   const live = useQuery(api.sessions.live);
@@ -70,6 +88,7 @@ function Pad() {
             {paused ? "drawing paused" : "waiting for the next drawing"}
             <span className="blink"> _</span>
           </h1>
+          <FullScreen className="mt-8" />
         </div>
       </div>
     );
@@ -94,6 +113,7 @@ function Pad() {
             Skip word
           </button>
         )}
+        <FullScreen />
         <p className={`narrow ml-auto text-5xl font-extrabold ${open && remaining <= 10_000 ? "text-signal" : ""}`}>
           {open ? fmtClock(remaining) : "pens down"}
         </p>
