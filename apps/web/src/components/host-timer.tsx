@@ -192,8 +192,8 @@ function SetTime({ c, live, onSet }: { c: Clock; live: Live; onSet: () => void }
   );
 }
 
-/** Reset, the relay chime, and the big timer: the clock's less frequent controls. */
-const Extras = ({ c, live }: { c: Clock; live: Live }) => (
+/** Reset, the relay chime, and (unless the strip shows it itself) the big timer: the clock's less frequent controls. */
+const Extras = ({ c, live, tv = true }: { c: Clock; live: Live; tv?: boolean }) => (
   <>
     {c.state !== "ready" && (
       <button className="btn btn-sm min-h-11" disabled={c.busy} onClick={() => void c.reset()}>
@@ -213,7 +213,7 @@ const Extras = ({ c, live }: { c: Clock; live: Live }) => (
         Relay chime: {live.timer.relay ? "on" : "off"}
       </Switch.Root>
     )}
-    {live.screen.mode === "timer" ? (
+    {!tv ? null : live.screen.mode === "timer" ? (
       <span className="chip">Big timer is on the TV</span>
     ) : (
       <button className="btn btn-sm min-h-11" disabled={c.busy} onClick={() => void c.bigTimer()}>
@@ -305,41 +305,70 @@ export function HostTimer({
     );
   }
 
+  // One row as tall as the big button beside it: the clock, its main command, the additions, and Set time (the
+  // replacements, Reset, and the relay chime) with Big timer last. Under it, a line for what the clock is timing and the
+  // relay chime, which a note takes over for a few seconds; with nothing to say it takes no room.
   return (
-    <section data-own-keys aria-label="Timer" className={`rounded-[8px] bg-mist p-3 ${className}`}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <p role="timer" className={`narrow text-5xl leading-none font-extrabold tabular-nums ${urgent ? "text-signal" : ""}`}>
+    <section data-own-keys aria-label="Timer" className={`grid content-start gap-1.5 ${className}`}>
+      <div ref={portal} className="flex items-center gap-2 rounded-[8px] bg-mist px-3 py-2 whitespace-nowrap">
+        {/* A set width, so the buttons stay put as the status changes. What it's timing goes on the line below. */}
+        <div className="w-[6.5rem] shrink-0 whitespace-normal">
+          <p role="timer" className={`narrow text-4xl leading-none font-extrabold tabular-nums ${urgent ? "text-signal" : ""}`}>
             {clock}
           </p>
-          <p className={`min-w-0 text-sm font-bold ${tone}`}>{status}</p>
+          <p className={`mt-1 text-xs leading-tight font-bold ${tone}`}>{STATUS[c.state]}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button className="btn btn-coin min-w-32" disabled={c.busy} onClick={() => void c.main.go()}>
-            {c.main.label}
+        <button className="btn btn-coin min-h-11 min-w-28 px-4" disabled={c.busy} onClick={() => void c.main.go()}>
+          {c.main.label}
+        </button>
+        <AddTime c={c} />
+        <Popover.Root open={open} onOpenChange={setOpen}>
+          <Popover.Trigger className="btn btn-sm min-h-11">
+            Set time <span aria-hidden>▾</span>
+          </Popover.Trigger>
+          <Popover.Portal container={portal}>
+            <Popover.Positioner sideOffset={8} align="end" collisionPadding={8} positionMethod="fixed" className="z-50">
+              <Popover.Popup className={`${POPUP} w-72 whitespace-normal`}>
+                <Popover.Title className="sr-only">Set time</Popover.Title>
+                <SetTime c={c} live={live} onSet={() => setOpen(false)} />
+                {(c.state !== "ready" || live.teamSize > 1 || live.timer.relay) && (
+                  <>
+                    <hr className="my-3 border-line" />
+                    <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                      <Extras c={c} live={live} tv={false} />
+                    </div>
+                  </>
+                )}
+              </Popover.Popup>
+            </Popover.Positioner>
+          </Popover.Portal>
+        </Popover.Root>
+        {live.screen.mode === "timer" ? (
+          <span className="chip">Big timer is on the TV</span>
+        ) : (
+          <button className="btn btn-sm min-h-11" disabled={c.busy} onClick={() => void c.bigTimer()}>
+            Big timer on TV
           </button>
-          <AddTime c={c} />
-        </div>
-        <div ref={portal} className="flex flex-wrap items-center gap-2 border-line sm:ml-auto sm:border-l-2 sm:pl-3">
-          <Popover.Root open={open} onOpenChange={setOpen}>
-            <Popover.Trigger className="btn btn-sm min-h-11">Set time…</Popover.Trigger>
-            <Popover.Portal container={portal}>
-              <Popover.Positioner sideOffset={8} align="end" collisionPadding={8} positionMethod="fixed" className="z-50">
-                <Popover.Popup className={`${POPUP} w-72`}>
-                  <Popover.Title className="sr-only">Set time</Popover.Title>
-                  <SetTime c={c} live={live} onSet={() => setOpen(false)} />
-                </Popover.Popup>
-              </Popover.Positioner>
-            </Popover.Portal>
-          </Popover.Root>
-        </div>
+        )}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <Extras c={c} live={live} />
-        <p aria-live="polite" className="font-semibold text-pine">
-          {c.note}
-        </p>
-      </div>
+      {(c.note || cardLabel || live.timer.relay) && (
+        <div className="flex flex-wrap gap-x-3 text-sm text-dim">
+          {c.note ? (
+            <p aria-hidden className="font-semibold text-pine">
+              {c.note}
+            </p>
+          ) : (
+            <>
+              {cardLabel && <p>Timing: {cardLabel}</p>}
+              {live.timer.relay && <p className="font-bold">Relay chime on: every 2 minutes</p>}
+            </>
+          )}
+        </div>
+      )}
+      {/* Always mounted, so each note is heard (the line above is what shows); out of the flow, so it takes no row. */}
+      <p aria-live="polite" className="sr-only">
+        {c.note}
+      </p>
     </section>
   );
 }

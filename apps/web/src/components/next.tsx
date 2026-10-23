@@ -349,6 +349,11 @@ export function DrawHost({ live }: { live: Live }) {
   );
 }
 
+/** A key drawn in a button's top corner from its data-key, clear of a label centered on one or two lines. Its empty
+ *  alt text keeps it out of the button's name: aria-keyshortcuts says it. */
+const KEY_CAP =
+  "after:absolute after:top-1.5 after:right-1.5 after:rounded-[4px] after:px-1.5 after:py-0.5 after:text-[11px] after:leading-none after:font-bold after:opacity-60 after:shadow-[inset_0_0_0_1.5px_currentColor] after:content-[attr(data-key)_/_''] max-lg:after:hidden";
+
 export function NextPanel({
   live,
   lineup,
@@ -589,8 +594,54 @@ export function NextPanel({
         : race && between
           ? `Next race: ${race.from} → ${race.to}, ${race.clicks ? "Fewest Clicks, " : ""}${fmtClock(wikiSeconds(race.clicks) * 1000)}`
           : null;
+  // Each button's key, drawn in its corner (out of the label's way, and out of its name and text): the sentence that
+  // used to spell them out repeated the whole label.
+  const keyOf = (a: Action | null, key: string) => (a && a.keys !== false ? key : undefined);
+  const primaryKey = keyOf(primary, "Space");
+  const altKey = keyOf(alt, "N");
+  // The line under the buttons says only what nothing else on the page does: whether answers are in, a warning, the
+  // round's progress, the card up next, and how to run this step. The rounds strip already shows what's next.
+  const lines = [
+    ready && (
+      <p key="ready" className="font-bold text-pine">
+        {allIn ? (drawing ? "Everyone guessing got it." : `Every ${w.team} ${allStars ? "has both stars" : "is in"}.`) : "Time’s up."}
+      </p>
+    ),
+    // Before round 1 the getting-ready list says who's playing; this is for a round that's waiting on players.
+    teams === 0 && step === "show" && (
+      <p key="nobody" className="font-semibold text-signal">
+        {w.solo ? "Nobody’s playing yet." : "No teams yet."}{" "}
+        {live.autoTeams
+          ? "Players go on as they join from the TV’s code."
+          : "Pick how tonight is played under Team settings (or turn on Auto teams) so phones can play."}
+      </p>
+    ),
+    r && (
+      <p key="where" className="short:hidden">
+        Round {r.index + 1} of {rounds.length}
+        {held ? `, ${held.toLowerCase()}` : ""}
+        {live.double && <span className="chip ml-2">Double points</span>}
+      </p>
+    ),
+    step === "hint" && <p key="hint">Half the time is gone, so the hint is unlocked.</p>,
+    step === "go" && (
+      <p key="go">
+        On the TV: open {CLUB.url}/wiki. Start shows {s.wikiFrom} → {s.wikiTo} and sends every {w.computer} there at once.
+      </p>
+    ),
+    nextCardLine && (
+      <p key="card" className="max-lg:hidden">
+        {nextCardLine}
+      </p>
+    ),
+    manual && (
+      <p key="manual" className="text-ink">
+        <strong>Score this one by hand</strong> with the score buttons{rules ? `: ${rules.scoring}` : "."}
+      </p>
+    ),
+  ].filter(Boolean);
   return (
-    <section ref={panel} aria-labelledby={`${panelId}-title`} className={`min-w-0 ${className}`}>
+    <section ref={panel} aria-labelledby={`${panelId}-title`} className={`grid min-w-0 content-start gap-1.5 ${className}`}>
       <h2 id={`${panelId}-title`} className="sr-only">
         Run the night
       </h2>
@@ -599,18 +650,22 @@ export function NextPanel({
       ) : (
         <div className={`grid gap-2 ${alt ? "grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]" : ""}`}>
           <button
-            className={`btn btn-coin min-h-14 w-full aria-disabled:cursor-wait aria-disabled:opacity-60 text-lg leading-tight whitespace-normal short:min-h-11 short:py-2 short:text-base lg:min-h-16 lg:text-2xl ${ready ? "ring-4 ring-sun ring-offset-2" : ""}`}
+            className={`btn btn-coin relative min-h-14 w-full aria-disabled:cursor-wait aria-disabled:opacity-60 text-lg leading-tight whitespace-normal short:min-h-11 short:py-2 short:text-base lg:min-h-16 lg:text-2xl ${primaryKey ? KEY_CAP : ""} ${ready ? "ring-4 ring-sun ring-offset-2" : ""}`}
             // Not disabled while it works: a disabled button drops focus, and the next key would land nowhere. The
             // guard ignores presses until the last one finishes.
             aria-disabled={busy || undefined}
+            aria-keyshortcuts={primaryKey && "Space ArrowRight"}
+            data-key={primaryKey}
             onClick={() => act(primary)}
           >
             {primary.label}
           </button>
           {alt && (
             <button
-              className="btn min-h-14 w-full text-sm aria-disabled:cursor-wait aria-disabled:opacity-60 leading-tight whitespace-normal short:min-h-11 short:py-2 lg:min-h-16 lg:text-base"
+              className={`btn relative min-h-14 w-full text-sm aria-disabled:cursor-wait aria-disabled:opacity-60 leading-tight whitespace-normal short:min-h-11 short:py-2 lg:min-h-16 lg:text-base ${altKey ? KEY_CAP : ""}`}
               aria-disabled={busy || undefined}
+              aria-keyshortcuts={altKey}
+              data-key={altKey}
               onClick={() => act(alt)}
             >
               {alt.label}
@@ -618,59 +673,7 @@ export function NextPanel({
           )}
         </div>
       )}
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-dim">
-        {ready && (
-          <p className="font-bold text-pine">
-            {allIn ? (drawing ? "Everyone guessing got it." : `Every ${w.team} ${allStars ? "has both stars" : "is in"}.`) : "Time’s up."}
-          </p>
-        )}
-        {teams === 0 && (step === "start" || step === "show") && (
-          <p className="font-semibold text-signal">
-            {w.solo ? "Nobody’s playing yet." : "No teams yet."}{" "}
-            {live.autoTeams
-              ? "Players go on as they join from the TV’s code."
-              : "Pick how tonight is played under Team settings (or turn on Auto teams) so phones can play."}
-          </p>
-        )}
-        <p className="short:hidden">
-          {r ? (
-            <>
-              Round {r.index + 1} of {rounds.length}
-              {held ? `, ${held.toLowerCase()}` : ""}
-            </>
-          ) : (
-            "Not started yet"
-          )}
-          {live.double && <span className="chip ml-2">Double points</span>}
-        </p>
-        {step === "hint" && <p>Half the time is gone, so the hint is unlocked.</p>}
-        {step === "go" && (
-          <p>
-            On the TV: open {CLUB.url}/wiki. Start shows {s.wikiFrom} → {s.wikiTo} and sends every {w.computer} there at once.
-          </p>
-        )}
-        {nextCardLine && <p className="max-lg:hidden">{nextCardLine}</p>}
-        <p className="max-lg:hidden">
-          {after ? (
-            <>
-              Up next: round {after.index + 1}, {after.label}
-              {after.double && " (double points)"}
-            </>
-          ) : (
-            "This is the last round."
-          )}
-        </p>
-        {primary && primary.keys !== false && (
-          <p className="max-lg:hidden">
-            Keys: Space or → for “{primary.label}”{alt && alt.keys !== false ? `, N for “${alt.label}”` : ""}
-          </p>
-        )}
-      </div>
-      {manual && (
-        <p className="mt-1.5 text-sm">
-          <strong>Score this one by hand</strong> with the score buttons{rules ? `: ${rules.scoring}` : "."}
-        </p>
-      )}
+      {lines.length > 0 && <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-dim">{lines}</div>}
     </section>
   );
 }

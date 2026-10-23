@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Locator, Page } from "@playwright/test";
+import type { BrowserType, Locator, Page } from "@playwright/test";
 
 // The whole /hello-world/host page (site Layout + host route component) against a local reactive store; see
 // fixtures/host-layout.jsx. Screenshots and layout metrics go to this run's output directory, never the repo.
@@ -241,10 +241,13 @@ test.describe("HostTimer", () => {
     await expect(add.getByRole("button")).toHaveText(["+30 sec", "+1 min"]);
     // No bare preset like "1:00" sits next to the additions.
     await expect(timer.getByRole("button", { name: /^\d+:\d\d$/ })).toHaveCount(0);
-    await timer.getByRole("button", { name: "Set time…" }).click();
+    await timer.getByRole("button", { name: /^Set time/ }).click();
     const presets = page.getByRole("dialog").getByRole("button");
     await expect(presets.first()).toBeVisible();
-    for (const label of await presets.allTextContents()) expect(label).toMatch(/^Set to \d+:\d\d$/);
+    // Every replacement says what it sets; Reset and the relay chime sit with them, under their own names.
+    const labels = await presets.allTextContents();
+    expect(labels.filter((label) => /^Set to \d+:\d\d$/.test(label)).length).toBeGreaterThan(0);
+    for (const label of labels) expect(label).toMatch(/^(Set to \d+:\d\d|Reset to \d+:\d\d|Relay chime.*)$/);
     await capture(page, "timer-set-popover");
     await page.keyboard.press("Escape");
     expect(await timerCalls(page)).toEqual([]);
@@ -297,7 +300,7 @@ test.describe("HostTimer", () => {
   test("Set to replaces and stops without touching the relay chime; Start, Pause, Resume and Reset", async ({ page }) => {
     const result = await mountHost(page, "active", "laptop", "timer");
     const timer = page.getByRole("region", { name: "Timer" });
-    await timer.getByRole("button", { name: "Set time…" }).click();
+    await timer.getByRole("button", { name: /^Set time/ }).click();
     await page.getByRole("button", { name: "Set to 1:00" }).click();
     await expect(clock(page)).toHaveText("1:00");
     await expect(note(page)).toHaveText("Set to 1:00 and stopped. Press Start when ready.");
@@ -309,7 +312,9 @@ test.describe("HostTimer", () => {
     await expect(clock(page)).toHaveText("0:45");
     await timer.getByRole("button", { name: "Pause" }).click();
     await expect(timer.getByRole("button", { name: "Resume" })).toBeVisible();
-    await timer.getByRole("button", { name: "Reset to 1:00" }).click();
+    // Reset lives with the other replacements, behind Set time.
+    await timer.getByRole("button", { name: /^Set time/ }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Reset to 1:00" }).click();
     await expect(clock(page)).toHaveText("1:00");
     expect(await timerCalls(page)).toEqual([
       { action: "set", seconds: 60 },
@@ -404,7 +409,8 @@ test.describe("run desk", () => {
       const result = await mountHost(page, "active", viewport);
       const m = await capture(page, `desk-active-${viewport}`);
       expect(m.overflowX, `sideways overflow: ${m.wide.join(", ")}`).toBe(false);
-      expect(m.scrollHeight, "document scrolls on a laptop").toBeLessThanOrEqual(m.viewport.height + 1);
+      // Exact: one extra pixel is a page scrollbar, and a menu's scroll lock then reflows the whole page.
+      expect(m.scrollHeight, "document scrolls on a laptop").toBeLessThanOrEqual(m.viewport.height);
       // The host console replaces the public site chrome.
       await expect(page.getByRole("link", { name: "Join tonight" })).toHaveCount(0);
       await inView([
@@ -640,4 +646,238 @@ test.describe("run desk", () => {
     await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
     expectClean(result);
   });
+});
+
+// ---- Polish: what the host feels, measured on the real page ---------------------------------------------------
+
+/** A page in a browser that shows real scrollbars. Headless hides them, which hides any reflow when one disappears. */
+async function scrollbarPage(browserType: BrowserType) {
+  const { launchOptions, baseURL } = test.info().project.use;
+  const browser = await browserType.launch({ ...launchOptions, headless: true, ignoreDefaultArgs: ["--hide-scrollbars"] });
+  const page = await browser.newPage({ baseURL });
+  return { page, close: () => browser.close() };
+}
+
+/** Every rendered box on the page except open popups, keyed by element identity (stable across popups mounting). */
+const boxes = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as { __boxIds?: WeakMap<Element, number>; __boxNext?: number };
+    const ids = (w.__boxIds ??= new WeakMap());
+    const out: Partial<Record<string, [number, number, number, number]>> = {};
+    document.querySelectorAll<HTMLElement>("#host-layout-mount *").forEach((el) => {
+      if (el.closest("[role=menu], [role=dialog]")) return;
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return;
+      if (!ids.has(el)) ids.set(el, (w.__boxNext = (w.__boxNext ?? 0) + 1));
+      out[`${ids.get(el)} ${el.tagName.toLowerCase()} “${el.textContent.trim().slice(0, 30)}”`] = [r.x, r.y, r.width, r.height];
+    });
+    return out;
+  });
+
+/** The ancestors (below the document) whose overflow cuts any part of this element off. */
+const clippedBy = (locator: Locator) =>
+  locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const out: string[] = [];
+    for (let up = el.parentElement; up && up !== document.body; up = up.parentElement) {
+      const style = getComputedStyle(up);
+      if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+      const a = up.getBoundingClientRect();
+      if (r.left < a.left - 1 || r.right > a.right + 1 || r.top < a.top - 1 || r.bottom > a.bottom + 1)
+        out.push(`${up.tagName.toLowerCase()}.${[...up.classList].slice(0, 3).join(".")} ${Math.round(a.height)}px tall`);
+    }
+    return out;
+  });
+
+/** How many lines an element's text takes, from the text's own line boxes rather than its font size. */
+const lines = (locator: Locator) =>
+  locator.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const tops = [...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top + r.height / 2));
+    return new Set(tops.map((t) => Math.round(t / 6))).size;
+  });
+
+const rootFont = (page: Page, px: number) => page.addStyleTag({ content: `html { font-size: ${px}px !important; }` });
+
+test.describe("host polish", () => {
+  const MENU_SIZES = {
+    laptop: VIEWPORTS.laptop,
+    desktop: VIEWPORTS.desktop,
+    // Too short for the desk layout, so the page scrolls and has a scrollbar to lose.
+    scrolling: { width: 1280, height: 600 },
+  } as const;
+  for (const scenario of ["lobby", "active"] as const) {
+    for (const [size, viewport] of Object.entries(MENU_SIZES)) {
+      test(`${scenario} at ${size}: opening a menu moves nothing, with real scrollbars`, async ({ playwright }) => {
+        const { page, close } = await scrollbarPage(playwright.chromium);
+        try {
+          const result = await mountHost(page, scenario, "laptop");
+          await page.setViewportSize(viewport);
+          await page.evaluate(() => scrollTo(0, 0));
+          const scrolls = await page.evaluate(() => document.documentElement.scrollHeight > innerHeight);
+          if (size === "scrolling") {
+            // Guard against a vacuous pass: this size must really show a page scrollbar.
+            expect(scrolls).toBe(true);
+            expect(await page.evaluate(() => document.documentElement.clientWidth)).toBeLessThan(viewport.width);
+            await page.evaluate(() => scrollTo(0, 60));
+          } else {
+            expect(scrolls, `${size}: the desk fits without a page scrollbar`).toBe(false);
+          }
+          for (const name of [/^Pick a game by hand/, /^Night/]) {
+            const trigger = page.getByRole("button", { name }).first();
+            const before = await boxes(page);
+            const top = await page.evaluate(() => window.scrollY);
+            await trigger.click();
+            await expect(page.getByRole("menu")).toBeVisible();
+            // Let any scroll lock and reflow settle before measuring.
+            await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+            const after = await boxes(page);
+            const moved = Object.keys(before)
+              .map((k) => [k, before[k], after[k]] as const)
+              .filter(([, b, a]) => b && a && b.some((v, j) => Math.abs(v - a[j]) > 0.5))
+              .map(([k, b, a]) => `${k}: ${b?.map(Math.round).join(",")} → ${a?.map(Math.round).join(",")}`);
+            expect(moved.slice(0, 8), `${String(name)} moved ${moved.length} boxes`).toEqual([]);
+            expect(await page.evaluate(() => window.scrollY), "scroll position").toBe(top);
+            await capture(page, `polish-menu-${scenario}-${size}-${String(name).replace(/\W+/g, "")}`);
+            await page.keyboard.press("Escape");
+            await expect(page.getByRole("menu")).toHaveCount(0);
+            await expect(trigger).toBeFocused();
+          }
+          expect(await calls(page)).toEqual([]);
+          expectClean(result);
+        } finally {
+          await close();
+        }
+      });
+    }
+  }
+
+  for (const viewport of ["laptop", "desktop", "tablet", "phone"] as const) {
+    test(`getting ready at ${viewport} is compact, live, and doesn't repeat the lineup`, async ({ page }) => {
+      const result = await mountHost(page, "lobby", viewport);
+      const ready = page.getByRole("region", { name: "Getting ready" });
+      await expect(ready).toBeVisible();
+      await capture(page, `polish-ready-${viewport}`);
+      const { empty, height } = await ready.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        // The lowest piece of real content: text or a control, not an empty stretched box.
+        let bottom = r.top;
+        for (const child of el.querySelectorAll<HTMLElement>("*")) {
+          const own = [...child.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
+          if (!own && !child.matches("button, a, input, svg, img")) continue;
+          const c = child.getBoundingClientRect();
+          if (c.height && getComputedStyle(child).visibility !== "hidden") bottom = Math.max(bottom, c.bottom);
+        }
+        return { empty: r.bottom - bottom, height: r.height };
+      });
+      expect.soft(empty, "empty space under the last item").toBeLessThanOrEqual(48);
+      if (viewport === "laptop" || viewport === "desktop")
+        expect.soft(height / VIEWPORTS[viewport].height, "share of the screen").toBeLessThanOrEqual(0.45);
+      // The rounds strip already lists tonight's games.
+      for (const label of ["Bug Hunt: medium", "Fix it for real, spooky"]) await expect.soft(ready.getByText(label)).toHaveCount(0);
+      // Still useful: who's in, kept current as phones join.
+      await expect(ready).toContainText(/\b0\b|nobody|no one/i);
+      await page.evaluate(() => window.__hostLayout.join("Ada"));
+      await expect(ready).toContainText(/\b1\b|Ada/);
+      for (const button of await ready.getByRole("button").all()) {
+        await expect(button).toBeVisible();
+        await expect(button).toBeEnabled();
+        expect(await clippedBy(button), (await button.textContent()) ?? "").toEqual([]);
+      }
+      expect(await calls(page)).toEqual([]);
+      expectClean(result);
+    });
+  }
+
+  // Labels and buttons stay whole at a host's default size and with a bigger root font (browser zoom, settings).
+  const TIMER_CASES = [
+    ["laptop", 0],
+    ["desktop", 0],
+    ["tablet", 0],
+    ["desktop", 20],
+    ["desktop", 24],
+  ] as const;
+  for (const scenario of ["lobby", "active"] as const) {
+    for (const [viewport, font] of TIMER_CASES) {
+      test(`${scenario} at ${viewport}${font ? ` with a ${font}px root font` : ""}: timer and command row read whole`, async ({ page }) => {
+        const result = await mountHost(page, scenario, viewport);
+        if (font) await rootFont(page, font);
+        const timer = page.getByRole("region", { name: "Timer" });
+        const command = page.getByRole("region", { name: "Run the night" });
+        await capture(page, `polish-command-${scenario}-${viewport}-${font || "default"}`);
+        expect.soft((await metrics(page)).overflowX).toBe(false);
+
+        for (const button of await timer.getByRole("button").all()) {
+          const label = ((await button.textContent()) ?? "").trim();
+          await expect(button, label).toBeVisible();
+          expect.soft(await lines(button), `“${label}” on one line`).toBe(1);
+          const { scrollWidth, clientWidth } = await button.evaluate((el) => ({
+            scrollWidth: el.scrollWidth,
+            clientWidth: el.clientWidth,
+          }));
+          expect.soft(scrollWidth, `“${label}” fits its button`).toBeLessThanOrEqual(clientWidth + 1);
+          expect.soft(await clippedBy(button), `“${label}” clipped`).toEqual([]);
+        }
+        // An ellipsis on a button reads as a cut-off label.
+        const set = timer.getByRole("button", { name: /^Set time/ });
+        await expect(set).toBeVisible();
+        expect.soft(((await set.textContent()) ?? "").trim()).not.toMatch(/(…|\.\.\.)$/);
+
+        const primary = command.getByRole("button").first();
+        const label = ((await primary.textContent()) ?? "").trim();
+        expect.soft(await clippedBy(primary), "primary clipped").toEqual([]);
+        // Said once: hints refer to the button, they don't repeat it.
+        const text = await command.innerText();
+        expect.soft(text.split(label).length - 1, `“${label}” repeated in ${JSON.stringify(text)}`).toBe(1);
+
+        // No blank band between the command row and the rounds strip: whatever space sits there holds something.
+        const gap = await page.evaluate(() => {
+          const regions = [...document.querySelectorAll("section")].filter((el) =>
+            ["Run the night", "Timer"].includes(
+              el.getAttribute("aria-label") ?? document.getElementById(el.getAttribute("aria-labelledby") ?? "")?.textContent.trim() ?? "",
+            ),
+          );
+          let bottom = 0;
+          for (const region of regions)
+            for (const el of region.querySelectorAll<HTMLElement>("*")) {
+              const own = [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
+              const r = el.getBoundingClientRect();
+              if ((own || el.matches("button")) && r.height && !el.closest(".sr-only") && getComputedStyle(el).visibility !== "hidden")
+                bottom = Math.max(bottom, r.bottom);
+            }
+          const strip = document.querySelector("nav[aria-label='Tonight’s rounds']")?.getBoundingClientRect().top ?? bottom;
+          // In rem: card padding and the grid gap grow with the root font, a reserved empty line is extra.
+          return (strip - bottom) / parseFloat(getComputedStyle(document.documentElement).fontSize);
+        });
+        expect.soft(gap, "empty band above the rounds strip, in rem").toBeLessThanOrEqual(1.75);
+
+        if (scenario === "lobby")
+          for (const button of await page.getByRole("region", { name: "Getting ready" }).getByRole("button").all())
+            expect.soft(await clippedBy(button), `Getting ready: “${(await button.textContent())?.trim()}” clipped`).toEqual([]);
+
+        if (!font && viewport !== "tablet") {
+          // The clock's own controls are one row, not a row and a straggler.
+          const row = [
+            timer.getByRole("button", { name: /^(Start|Pause|Resume|Start again)/ }).first(),
+            timer.getByRole("button", { name: "+30 sec" }),
+            timer.getByRole("button", { name: "+1 min" }),
+            set,
+          ];
+          const centers = await Promise.all(
+            row.map(async (b) => ((await b.boundingBox())?.y ?? 0) + ((await b.boundingBox())?.height ?? 0) / 2),
+          );
+          expect.soft(Math.max(...centers) - Math.min(...centers), "main timer controls share a row").toBeLessThanOrEqual(4);
+          // Metadata under the command is a few whole notes, not a wrapped jumble that outgrows the timer beside it.
+          for (const item of await command.locator("p:visible").all())
+            expect.soft(await lines(item), `“${(await item.textContent())?.trim()}” on one line`).toBe(1);
+          const c = (await command.boundingBox())!;
+          const t = (await timer.boundingBox())!;
+          expect.soft(c.y + c.height - (t.y + t.height), "command row ends with the timer").toBeLessThanOrEqual(12);
+        }
+        expect(await calls(page)).toEqual([]);
+        expectClean(result);
+      });
+    }
+  }
 });

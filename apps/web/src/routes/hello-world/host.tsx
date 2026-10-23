@@ -201,7 +201,7 @@ function Running({
   return (
     <Tabs.Root value={isWide ? side : pane} onValueChange={(v) => isPane(v) && choose(v)} data-host-shell>
       <HostBar live={live} />
-      <div className="mx-auto grid w-full max-w-[100rem] grid-cols-[minmax(0,1fr)] gap-3 px-3 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] lg:grid-rows-[auto_auto_auto_1fr] lg:px-5 desk:h-[calc(100dvh-4rem)] desk:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
+      <div className="mx-auto grid w-full max-w-[100rem] grid-cols-[minmax(0,1fr)] gap-3 px-3 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] lg:grid-rows-[auto_auto_auto_1fr] lg:px-5 desk:h-[calc(100dvh-4rem-1px)] desk:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
         <RoundStrip
           lineup={lineup}
           playing={playing}
@@ -216,11 +216,21 @@ function Running({
           className={`lg:col-span-2 lg:row-start-2 ${pane === "play" ? "" : "max-lg:hidden"}`}
         />
         {/* On a phone, the next action, the clock, and the panes stay pinned at the top, in one row on a phone on its
-            side; on a big screen the command row runs across the top and the panes head the rail. */}
+            side; on a big screen the command row runs across the top and the panes head the rail. The command row is
+            two lines: the big button beside the timer's controls, at one height, then a line of notes under each. */}
         <div className="grid gap-2 bg-paper max-lg:sticky max-lg:top-0 max-lg:z-30 max-lg:order-first max-lg:-mx-3 max-lg:border-b max-lg:border-line max-lg:px-3 max-lg:pt-2 short:grid-cols-[minmax(0,1fr)_auto] short:items-center lg:contents">
-          <div className="grid gap-3 lg:col-span-2 lg:row-start-1 lg:grid-cols-[minmax(0,1fr)_auto]">
-            <NextPanel live={live} lineup={lineup} used={used} shown={shown} />
-            <HostTimer live={live} cardLabel={timing} className="self-start max-lg:hidden" />
+          {/* Side by side once there's room for both in rem, which follows the text size (a breakpoint wouldn't). */}
+          <div className="@container lg:col-span-2 lg:row-start-1">
+            <div className="grid gap-x-3 gap-y-1.5 @min-[68rem]:grid-cols-[minmax(0,1fr)_auto] @min-[68rem]:grid-rows-[auto_auto]">
+              <NextPanel
+                live={live}
+                lineup={lineup}
+                used={used}
+                shown={shown}
+                className="@min-[68rem]:row-span-2 @min-[68rem]:grid-rows-subgrid"
+              />
+              <HostTimer live={live} cardLabel={timing} className="max-lg:hidden @min-[68rem]:row-span-2 @min-[68rem]:grid-rows-subgrid" />
+            </div>
           </div>
           <HostTimer live={live} variant="bar" cardLabel={timing} className="lg:hidden" />
           <Tabs.List
@@ -269,7 +279,6 @@ function Running({
             live={live}
             rows={rows}
             used={used}
-            lineup={lineup}
             round={round}
             tool={tool}
             roundTab={roundTab}
@@ -278,7 +287,6 @@ function Running({
             onTeams={openTeams}
             onPlayers={() => choose("players")}
             onTv={() => choose("tv")}
-            onEdit={() => setEditing(true)}
           />
         </PanePanel>
         <PanePanel value="scores" className={railClass("scores")}>
@@ -609,7 +617,6 @@ function Stage({
   live,
   rows,
   used,
-  lineup,
   round,
   tool,
   roundTab,
@@ -618,12 +625,10 @@ function Stage({
   onTeams,
   onPlayers,
   onTv,
-  onEdit,
 }: {
   live: Live;
   rows: Row[];
   used: string[];
-  lineup: LineupItem[];
   round: Round | null;
   tool: Tab | null;
   roundTab: Tab | null;
@@ -632,7 +637,6 @@ function Stage({
   onTeams: () => void;
   onPlayers: () => void;
   onTv: () => void;
-  onEdit: () => void;
 }) {
   const manual = tool !== null && tool !== roundTab;
   const label = round?.label ?? null;
@@ -648,8 +652,10 @@ function Stage({
   const id = useId();
   const filter = label && !manual ? filterFor(label) : "all";
   const pick = label && !manual && tool === "puzzle" ? puzzleForLabel(label) : undefined;
+  // Getting ready is a short summary, so its card ends where it does; a game's tools fill the space they're given.
+  const setup = !tool && !round;
   return (
-    <section aria-labelledby={`${id}-stage`} className="card flex h-full min-h-0 flex-col">
+    <section aria-labelledby={`${id}-stage`} className={`card flex min-h-0 flex-col ${setup ? "" : "h-full"}`}>
       {/* The round already shows in the rounds strip and under the big button, so a header only appears when the stage
           isn't simply the round's own game. */}
       <div className={head ? "flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2" : "contents"}>
@@ -680,41 +686,43 @@ function Stage({
         ) : round ? (
           <ActivityStage live={live} round={round} />
         ) : (
-          <SetupSteps live={live} rows={rows} lineup={lineup} onTeams={onTeams} onPlayers={onPlayers} onTv={onTv} onEdit={onEdit} />
+          <SetupSteps live={live} rows={rows} onTeams={onTeams} onPlayers={onPlayers} onTv={onTv} />
         )}
       </div>
     </section>
   );
 }
 
-/** Before round 1: what's ready and what isn't, each with the way to it. The controls themselves live in one place. */
+/** Before round 1: what's ready and what isn't, each with the way to it. The controls themselves live in one place,
+ *  and the lineup is the rounds strip above, so this is the TV, who's playing, and how, in a few short lines. */
 function SetupSteps({
   live,
   rows,
-  lineup,
   onTeams,
   onPlayers,
   onTv,
-  onEdit,
 }: {
   live: Live;
   rows: Row[];
-  lineup: LineupItem[];
   onTeams: () => void;
   onPlayers: () => void;
   onTv: () => void;
-  onEdit: () => void;
 }) {
   const code = useJoinCode();
   const w = teamWords(live.teamSize === 1);
   const lobby = live.screen.mode === "lobby";
   const teams = live.teams.length > 0;
   const mode = MODES.find(([size]) => size === live.teamSize)?.[1] ?? "Teams";
-  const steps: { ok: boolean; title: string; detail: string; go?: [string, () => void] }[] = [
+  const steps: { ok: boolean; title: string; detail: React.ReactNode; go?: [string, () => void] }[] = [
     {
       ok: lobby,
-      title: lobby ? "The join screen is on the TV" : `The TV shows: ${tvNow(live)}`,
-      detail: `Phones join at ${CLUB.url}/join with code ${code ?? "…"}.`,
+      title: lobby ? "Join screen on the TV" : `The TV shows: ${tvNow(live)}`,
+      detail: (
+        <>
+          Phones: {CLUB.url}/<wbr />
+          join, code {code ?? "…"}
+        </>
+      ),
       go: lobby ? undefined : ["TV controls", onTv],
     },
     {
@@ -729,41 +737,41 @@ function SetupSteps({
     },
     {
       ok: rows.length > 0,
-      title: `Players: ${rows.length} joined`,
-      detail: "They show up as they join. Someone without a phone? Add them by hand.",
+      title: `${rows.length} ${rows.length === 1 ? "player" : "players"} joined`,
+      detail: "Someone without a phone? Add them by hand.",
       go: ["Players", onPlayers],
     },
-    {
-      ok: lineup.length > 0,
-      title: `Tonight’s lineup: ${lineup.length} ${lineup.length === 1 ? "round" : "rounds"}`,
-      detail: lineup.map((g) => g.label).join(" · ") || "Nothing planned yet.",
-      go: ["Edit lineup", onEdit],
-    },
   ];
+  // Side by side once there's room for three (in rem, so larger text gets rows), else a row each with its button last.
   return (
-    <ol className="divide-y divide-line">
-      {steps.map((s, i) => (
-        <li key={s.title} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 py-3 first:pt-0">
-          <span
-            className={`grid size-8 place-items-center rounded-full font-extrabold ${s.ok ? "bg-pine text-white" : "bg-mist text-ink shadow-[inset_0_0_0_1.5px_var(--color-line)]"}`}
+    <div className="@container">
+      <ol className="grid gap-2 @min-[40rem]:grid-cols-3">
+        {steps.map((s) => (
+          <li
+            key={s.title}
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[8px] bg-mist p-3 @min-[40rem]:flex @min-[40rem]:flex-col @min-[40rem]:items-start"
           >
-            {s.ok ? "✓" : i + 1}
-            <span className="sr-only">{s.ok ? " done" : " to do"}</span>
-          </span>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <div className="min-w-0 flex-1 basis-60">
-              <p className="font-bold">{s.title}</p>
-              <p className="text-sm text-dim">{s.detail}</p>
+            <div className="flex min-w-0 flex-1 items-start gap-2.5 [overflow-wrap:anywhere]">
+              <span
+                className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-sm font-extrabold ${s.ok ? "bg-pine text-white" : "bg-paper shadow-[inset_0_0_0_2px_var(--color-signal)]"}`}
+              >
+                <span aria-hidden>{s.ok ? "✓" : ""}</span>
+                <span className="sr-only">{s.ok ? "Done: " : "To do: "}</span>
+              </span>
+              <div className="min-w-0">
+                <p className="leading-snug font-bold">{s.title}</p>
+                <p className="text-sm text-dim">{s.detail}</p>
+              </div>
             </div>
             {s.go && (
-              <button className="btn btn-sm" onClick={s.go[1]}>
+              <button className="btn btn-sm shrink-0" onClick={s.go[1]}>
                 {s.go[0]}
               </button>
             )}
-          </div>
-        </li>
-      ))}
-    </ol>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 

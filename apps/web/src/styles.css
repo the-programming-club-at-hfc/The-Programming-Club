@@ -55,6 +55,11 @@
     background: var(--color-paper);
     color: var(--color-ink);
   }
+  /* The host console's menus and dialogs lock scrolling, and Chrome leaves a scrollbar out of vw once that lock
+     reserves its gutter. A gutter that's always there keeps the type size above (and so every box) still. */
+  html:has([data-host-shell]) {
+    scrollbar-gutter: stable;
+  }
   body {
     margin: 0;
     font-family: var(--font-sans);
