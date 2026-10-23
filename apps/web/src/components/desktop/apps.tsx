@@ -117,6 +117,7 @@ function Meetings() {
             <p className="text-sm">
               {fmtDate(plan[next.i].start, { weekday: "long", month: "long", day: "numeric" })}, {CLUB.time}, {roomFor(plan[next.i].start)}
             </p>
+            {plan[next.i].bonus && <p className="mt-1 text-sm font-semibold text-[#c2410c]">{plan[next.i].bonus}</p>}
           </div>
         </div>
       )}
@@ -130,7 +131,7 @@ function Meetings() {
           Apple / Outlook
         </a>
       </div>
-      {isHalloweenMonth() && costume && (
+      {isHalloweenMonth() && costume && costume !== (next && plan[next.i]) && (
         <p className="mb-4 text-sm font-semibold text-[#c2410c]">Come to {costume.title} in costume for +3 XP.</p>
       )}
       <div className="flex items-baseline justify-between gap-3">

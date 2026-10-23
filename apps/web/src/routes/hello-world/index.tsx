@@ -131,6 +131,7 @@ function Home() {
                 {plan[next.i].title}
               </p>
               <p className="mt-3 max-w-[56ch] text-dim">{plan[next.i].pitch}</p>
+              {plan[next.i].bonus && <p className="mt-2 font-semibold">{plan[next.i].bonus}</p>}
             </div>
             <div className="md:text-right">
               <p className="narrow text-[clamp(3rem,6vw,5rem)] leading-none font-extrabold">{short(plan[next.i].start)}</p>
