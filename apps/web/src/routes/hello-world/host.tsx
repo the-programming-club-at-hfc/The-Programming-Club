@@ -1,3 +1,4 @@
+import { Tabs } from "@base-ui/react/tabs";
 import { UserButton } from "@clerk/tanstack-react-start";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
@@ -98,48 +99,43 @@ function Running({
   const setRound = useMutation(api.sessions.setRound);
   // On a phone, one pane at a time, picked in the bar at the top; on a big screen, everything at once.
   const [pane, setPane] = useState<Pane>("run");
-  const on = (p: Pane) => (pane === p ? "" : "max-lg:hidden");
   return (
-    <>
-      <PhoneBar live={live} pane={pane} setPane={setPane} />
+    <Tabs.Root value={pane} onValueChange={(v) => isPane(v) && setPane(v)}>
+      <PhoneBar live={live} pane={pane} />
       <Header live={live} />
-      <NextPanel live={live} lineup={lineup} used={used} shown={shown} className={`mt-6 ${on("run")}`} />
-      <LineupPanel
-        week={live.week}
-        playing={playing}
-        onPlay={(i, item) => {
-          // A double-points lineup round turns double points on; any other round turns it off.
-          void run(setRound({ round: i, double: item.double }));
-          const t = tabFor(item.label);
-          if (!t) return;
-          setTab(t);
-          // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
-          setPane("games");
-          // After the pane shows, so there's something to scroll to.
-          setTimeout(() => deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-        }}
-        className={`mt-6 ${on("run")}`}
-      />
+      <PanePanel value="run">
+        <NextPanel live={live} lineup={lineup} used={used} shown={shown} className="mt-6" />
+        <LineupPanel
+          week={live.week}
+          playing={playing}
+          onPlay={(i, item) => {
+            // A double-points lineup round turns double points on; any other round turns it off.
+            void run(setRound({ round: i, double: item.double }));
+            const t = tabFor(item.label);
+            if (!t) return;
+            setTab(t);
+            // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
+            setPane("games");
+            // After the pane shows, so there's something to scroll to.
+            setTimeout(() => deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
+          className="mt-6"
+        />
+      </PanePanel>
       {/* On a phone the two columns step aside (display: contents), so only the pane's own panels take up room. */}
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
         <div className="space-y-6 max-lg:contents">
-          {(week.kind === "kickoff" || live.screen.mode === "slides") && (
-            <div className={on("tv")}>
-              <SlidesPanel live={live} />
-            </div>
-          )}
-          <div className={on("tv")}>
+          <PanePanel value="tv" className="space-y-6">
+            {(week.kind === "kickoff" || live.screen.mode === "slides") && <SlidesPanel live={live} />}
             <ScreenPanel live={live} />
-          </div>
-          <div className={on("tv")}>
             <TimerPanel live={live} />
-          </div>
-          <div className={on("scores")}>
+          </PanePanel>
+          <PanePanel value="scores">
             <TeamsPanel live={live} keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}} />
-          </div>
+          </PanePanel>
         </div>
         <div className="space-y-6 max-lg:contents">
-          <div ref={deck} className={`scroll-mt-6 max-lg:scroll-mt-32 ${on("games")}`}>
+          <PanePanel ref={deck} value="games" className="scroll-mt-6 max-lg:scroll-mt-32">
             <DeckPanel
               live={live}
               tab={tab}
@@ -148,13 +144,13 @@ function Running({
               filter={label && tabFor(label) === tab ? filterFor(label) : "all"}
               pick={label && tabFor(label) === tab && tab === "puzzle" ? puzzleForLabel(label) : undefined}
             />
-          </div>
-          <div className={on("players")}>
+          </PanePanel>
+          <PanePanel value="players">
             <PlayersPanel live={live} rows={rows} sessionId={live._id} />
-          </div>
+          </PanePanel>
         </div>
       </div>
-    </>
+    </Tabs.Root>
   );
 }
 
@@ -166,10 +162,18 @@ const PANES: [Pane, string][] = [
   ["tv", "TV"],
   ["players", "Players"],
 ];
+const isPane = (v: unknown): v is Pane => PANES.some(([p]) => p === v);
+
+/** A pane's panels. Every pane stays mounted, so forms and live data carry over when the phone switches panes; a big
+ *  screen shows them all, so a pane that isn't picked is only hidden on a phone (not hidden or inert everywhere, as
+ *  a tab panel would be). */
+const PanePanel = ({ className = "", ...props }: Omit<Tabs.Panel.Props, "className"> & { value: Pane; className?: string }) => (
+  <Tabs.Panel keepMounted hidden={false} inert={false} className={`max-lg:data-hidden:hidden ${className}`} {...props} />
+);
 
 /** On a phone, pinned to the top: the night, the join code, the clock (tap to start or pause), the rest under ⋯, and the
  *  panes. The big screen's header does all this with room to spare. */
-function PhoneBar({ live, pane, setPane }: { live: Live; pane: Pane; setPane: (p: Pane) => void }) {
+function PhoneBar({ live, pane }: { live: Live; pane: Pane }) {
   const end = useMutation(api.sessions.end);
   const timer = useMutation(api.sessions.timer);
   const remaining = useRemaining(live.timer);
@@ -242,23 +246,21 @@ function PhoneBar({ live, pane, setPane }: { live: Live; pane: Pane; setPane: (p
           </div>
         </details>
       </div>
-      <nav className="mt-1 grid grid-cols-5" role="tablist" aria-label="Host controls">
+      <Tabs.List className="mt-1 grid grid-cols-5" aria-label="Host controls">
         {PANES.map(([p, label]) => (
-          <button
+          <Tabs.Tab
             key={p}
-            role="tab"
-            aria-selected={pane === p}
+            value={p}
             className={`border-b-[3px] py-2.5 text-sm font-bold ${pane === p ? "border-ink text-ink" : "border-transparent text-dim"}`}
             onClick={() => {
-              setPane(p);
               menu.current?.removeAttribute("open");
               scrollTo({ top: 0 });
             }}
           >
             {label}
-          </button>
+          </Tabs.Tab>
         ))}
-      </nav>
+      </Tabs.List>
     </div>
   );
 }
@@ -877,6 +879,7 @@ const TABS: [Tab, string][] = [
   ["pictionary", "Pictionary"],
   ["lang", "Guess the Language"],
 ];
+const isTab = (v: unknown): v is Tab => TABS.some(([t]) => t === v);
 const filterFor = (label: string): Filter => filtersFor(label)[0] ?? "all";
 /** The Games tab for a lineup entry, if it has one. */
 const tabFor = (label: string | null) => {
@@ -902,26 +905,34 @@ function DeckPanel({
 }) {
   return (
     <Panel title="Games" className="">
-      <div className="-mx-4 flex gap-1 overflow-x-auto border-b-4 border-line px-4 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-        {TABS.map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`shrink-0 px-3 py-2 font-bold whitespace-nowrap ${tab === id ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
-          >
-            {label}
-          </button>
+      <Tabs.Root value={tab} onValueChange={(v) => isTab(v) && setTab(v)}>
+        <Tabs.List
+          className="-mx-4 flex gap-1 overflow-x-auto border-b-4 border-line px-4 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+          aria-label="Games"
+        >
+          {TABS.map(([id, label]) => (
+            <Tabs.Tab
+              key={id}
+              value={id}
+              className={`shrink-0 px-3 py-2 font-bold whitespace-nowrap ${tab === id ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
+            >
+              {label}
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+        {/* Only the picked game's tool is mounted, so a card tool starts fresh each time its tab opens. */}
+        {TABS.map(([id]) => (
+          <Tabs.Panel key={id} value={id} className="mt-4">
+            {id === "wiki" ? (
+              <WikiTool live={live} used={used} />
+            ) : id === "pictionary" ? (
+              <PictionaryTool live={live} />
+            ) : (
+              <CardTool key={`${filter}:${pick}`} game={id} live={live} used={used} initial={filter} pick={pick} />
+            )}
+          </Tabs.Panel>
         ))}
-      </div>
-      <div className="mt-4">
-        {tab === "wiki" ? (
-          <WikiTool live={live} used={used} />
-        ) : tab === "pictionary" ? (
-          <PictionaryTool live={live} />
-        ) : (
-          <CardTool key={`${tab}:${filter}:${pick}`} game={tab} live={live} used={used} initial={filter} pick={pick} />
-        )}
-      </div>
+      </Tabs.Root>
     </Panel>
   );
 }

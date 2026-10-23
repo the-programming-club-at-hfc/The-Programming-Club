@@ -1,10 +1,11 @@
 // The club home page as a lab-computer desktop: icons open draggable windows, a taskbar shows the clock and the next meeting.
 // Every window has its own address (/about, /meetings, …) so links, search, and the back button work.
 // Phones get a home screen of app icons, and each app opens full screen.
+import { Menu } from "@base-ui/react/menu";
 import { Show, SignInButton, UserButton } from "@clerk/tanstack-react-start";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, RefObject, PointerEvent as ReactPointerEvent } from "react";
 import { InstagramGlyph, InstagramLink } from "#/components/instagram";
 import { useLikelyOfficer } from "#/components/officer";
 import { ClubLogo } from "#/components/site";
@@ -82,6 +83,7 @@ export function Desktop() {
       setWins((ws) => ws.map((w) => (w.tile === 1 ? { ...w, min: true, phase: undefined } : w)));
   }, []);
   const [startOpen, setStartOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
   const iconApps = useIconApps();
   const october = isHalloweenMonth();
   // Startup stagger: each icon (and the "About this site" card after them) waits for the one before.
@@ -139,11 +141,10 @@ export function Desktop() {
     );
   const move = (id: AppId, pos: Pt) => patch(id, { pos });
 
-  // Escape closes the window on top.
+  // Escape closes the window on top, unless something else (like the Start menu) already handled it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (startOpen) return setStartOpen(false);
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       const top = [...wins].reverse().find((w) => !w.min && w.phase !== "closing");
       if (top && !(e.target as HTMLElement).closest("input, textarea")) close(top.id);
     };
@@ -155,7 +156,7 @@ export function Desktop() {
   const topId = visible.filter((w) => w.phase !== "closing").at(-1)?.id;
 
   return (
-    <div className="theme-club desk-wallpaper fixed inset-0 overflow-hidden text-ink" data-october={october || undefined}>
+    <div ref={root} className="theme-club desk-wallpaper fixed inset-0 overflow-hidden text-ink" data-october={october || undefined}>
       <div aria-hidden className={`absolute inset-0 ${boot ? "boot-wallpaper" : ""}`}>
         <div className="desk-aerial" />
         <Scene october={october} />
@@ -229,6 +230,7 @@ export function Desktop() {
         onMinimize={minimize}
         inApp={!!routeApp}
         boot={boot}
+        menuRoot={root}
       />
     </div>
   );
@@ -358,6 +360,7 @@ function Taskbar({
   onMinimize,
   inApp,
   boot,
+  menuRoot,
 }: {
   wins: Win[];
   topId?: AppId;
@@ -369,58 +372,66 @@ function Taskbar({
   /** A phone has an app open full screen: the taskbar's first button goes back home. */
   inApp: boolean;
   boot: boolean;
+  /** The Start menu renders in the desktop root so it keeps the club theme. */
+  menuRoot: RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <>
-      {startOpen && (
-        <div className="fixed inset-0 z-40" onPointerDown={() => setStartOpen(false)}>
-          <div
-            className="win menu-open absolute bottom-16 left-3 w-72 p-2"
-            role="menu"
+    <Menu.Root open={startOpen} onOpenChange={setStartOpen} modal={false}>
+      <Menu.Portal container={menuRoot}>
+        {/* Sits 1rem above the taskbar, just right of the Start button. */}
+        <Menu.Positioner side="top" align="start" sideOffset={rem(1.375)} alignOffset={rem(0.25)} className="z-40">
+          <Menu.Popup
+            // Short screens: cap to the room Base UI measures and scroll (`!` beats .win overflow: hidden).
+            className="win menu-open max-h-(--available-height) w-72 max-w-(--available-width) overflow-y-auto! p-2 outline-none"
             aria-label="Start"
-            onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 border-b border-line px-2 pt-1.5 pb-3">
-              <ClubLogo className="size-10" />
-              <p className="text-sm leading-tight text-dim">
-                {CLUB.name}
-                <br />
-                <span className="font-semibold text-ink">at {CLUB.school}</span>
-              </p>
-            </div>
-            <div className="pt-1.5" />
-            {APPS.filter((a) => !a.officer).map((a) => (
-              <button
-                key={a.id}
-                role="menuitem"
-                onClick={() => onOpen(a)}
-                className="press flex w-full items-center gap-3 rounded-[8px] px-2 py-1.5 text-left hover:bg-mist focus-visible:bg-mist"
+            <Menu.Group>
+              <Menu.GroupLabel className="flex items-center gap-3 border-b border-line px-2 pt-1.5 pb-3">
+                <ClubLogo className="size-10" />
+                <p className="text-sm leading-tight text-dim">
+                  {CLUB.name}
+                  <br />
+                  <span className="font-semibold text-ink">at {CLUB.school}</span>
+                </p>
+              </Menu.GroupLabel>
+              <div className="pt-1.5" />
+              {APPS.filter((a) => !a.officer).map((a) => (
+                <Menu.Item
+                  key={a.id}
+                  label={a.label}
+                  onClick={() => onOpen(a)}
+                  className="press flex w-full items-center gap-3 rounded-[8px] px-2 py-1.5 text-left hover:bg-mist data-highlighted:bg-mist"
+                >
+                  <span className="grid size-8 place-items-center rounded-[8px] bg-[#0b4fa3] p-1.5 text-white">{a.glyph}</span>
+                  <span className="font-semibold">{a.label}</span>
+                </Menu.Item>
+              ))}
+              <Menu.LinkItem
+                href={INSTAGRAM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                label="Instagram"
+                closeOnClick
+                className="press flex w-full items-center gap-3 rounded-[8px] px-2 py-1.5 hover:bg-mist data-highlighted:bg-mist"
               >
-                <span className="grid size-8 place-items-center rounded-[8px] bg-[#0b4fa3] p-1.5 text-white">{a.glyph}</span>
-                <span className="font-semibold">{a.label}</span>
-              </button>
-            ))}
-            <a
-              role="menuitem"
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="press flex w-full items-center gap-3 rounded-[8px] px-2 py-1.5 hover:bg-mist focus-visible:bg-mist"
+                <span className="grid size-8 place-items-center rounded-[8px] bg-[linear-gradient(135deg,#d62976,#962fbf_55%,#4f5bd5)] p-1.5 text-white">
+                  <InstagramGlyph className="size-full" />
+                </span>
+                <span className="font-semibold">Instagram</span>
+                <span className="ml-auto text-sm text-dim">@{CLUB.instagram}</span>
+              </Menu.LinkItem>
+            </Menu.Group>
+            <Menu.Separator className="mt-2 mb-2 border-t border-line" />
+            <Menu.LinkItem
+              render={<Link to="/hello-world/host" />}
+              closeOnClick
+              className="block rounded-[8px] px-2 py-1.5 text-sm text-dim hover:bg-mist data-highlighted:bg-mist"
             >
-              <span className="grid size-8 place-items-center rounded-[8px] bg-[linear-gradient(135deg,#d62976,#962fbf_55%,#4f5bd5)] p-1.5 text-white">
-                <InstagramGlyph className="size-full" />
-              </span>
-              <span className="font-semibold">Instagram</span>
-              <span className="ml-auto text-sm text-dim">@{CLUB.instagram}</span>
-            </a>
-            <div className="mt-2 border-t border-line pt-2">
-              <Link to="/hello-world/host" className="block rounded-[8px] px-2 py-1.5 text-sm text-dim hover:bg-mist">
-                Officer sign-in
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+              Officer sign-in
+            </Menu.LinkItem>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
       <footer className={`glass taskbar fixed inset-x-0 bottom-0 z-50 flex h-12 items-center gap-1.5 px-2 ${boot ? "boot-taskbar" : ""}`}>
         {inApp && (
           <Link
@@ -441,15 +452,13 @@ function Taskbar({
             Home
           </Link>
         )}
-        <button
-          onClick={() => setStartOpen(!startOpen)}
-          aria-expanded={startOpen}
+        <Menu.Trigger
           aria-label="Start"
           className={`press flex h-9 items-center gap-2 rounded-[8px] px-2 pr-3 text-sm font-bold hover:bg-white/12 ${startOpen ? "bg-white/15" : ""} ${inApp ? "max-md:hidden" : ""}`}
         >
           <ClubLogo className="size-6" />
           <span className="max-sm:hidden">Programming Club</span>
-        </button>
+        </Menu.Trigger>
         <span className="mx-1 h-6 w-px bg-white/15 max-md:hidden" aria-hidden />
         <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto max-md:hidden">
           {wins.map((w) => {
@@ -473,9 +482,12 @@ function Taskbar({
         <Clock />
         <Account />
       </footer>
-    </>
+    </Menu.Root>
   );
 }
+
+/** A Floating UI offset in rem, so the menu keeps its place as the root font size scales. */
+const rem = (n: number) => () => n * parseFloat(getComputedStyle(document.documentElement).fontSize);
 
 function NextChip({ onOpen }: { onOpen: (a: App) => void }) {
   const plan = useSchedule();
