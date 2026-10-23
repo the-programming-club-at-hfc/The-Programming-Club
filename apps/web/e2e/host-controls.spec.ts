@@ -10,8 +10,8 @@ async function mountHost(page: Page, view: "phone" | "teams" | "round" | "screen
   await page.routeWebSocket("**/*", (socket) => {
     const url = new URL(socket.url());
     if (url.host === new URL(test.info().project.use.baseURL ?? "http://localhost:3117").host && url.pathname === "/") {
-      // Only Vite's local HMR transport may connect.
-      socket.connectToServer();
+      // Isolate this fixture from other dev clients' intermediate compile overlays.
+      socket.close();
       return;
     }
     networkAttempts.push(socket.url());
@@ -55,7 +55,7 @@ async function mountHost(page: Page, view: "phone" | "teams" | "round" | "screen
       body = body.replace(/from "\/e2e\/fixtures\/host-controls-convex\.jsx[^"]*"/g, `from "${fixtureModule}"`);
       if (url.pathname.endsWith("/host.tsx") && url.searchParams.get("tsr-split") === "component") {
         body = body.replace(/import \{ Link \} from "[^"]+";/, `import { Link } from "${fixtureModule}";`);
-        body += "\nexport { PhoneBar, TeamsPanel, ScreenPanel };\n";
+        body += "\nexport { HostBar, ScoresPane, ScreenPanel };\n";
       }
       if (url.pathname.endsWith("/join.tsx") && url.searchParams.get("tsr-split") === "component") {
         body += "\nexport { PlayTonight };\n";
@@ -88,16 +88,16 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 });
 
-test("mobile More menu supports keyboard navigation, Escape, and focus return", async ({ page }) => {
+test("mobile Night menu supports keyboard navigation, Escape, and focus return", async ({ page }) => {
   const result = await mountHost(page);
-  const more = page.getByRole("button", { name: "More", exact: true });
+  const more = page.getByRole("button", { name: "Night", exact: true });
   await more.focus();
   await page.keyboard.press("ArrowDown");
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Open TV view" })).toBeFocused();
   await page.keyboard.press("End");
-  await expect(menu.getByRole("menuitem", { name: "End night", exact: true })).toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: /^End night/ })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   await expect(more).toBeFocused();
@@ -107,11 +107,11 @@ test("mobile More menu supports keyboard navigation, Escape, and focus return", 
 
 test("mobile End night waits for approval, cancels safely, and confirms exactly once", async ({ page }) => {
   const result = await mountHost(page);
-  const more = page.getByRole("button", { name: "More", exact: true });
+  const more = page.getByRole("button", { name: "Night", exact: true });
   const dialog = page.getByRole("alertdialog", { name: "End the night?" });
   for (const accept of [false, true]) {
     await more.click();
-    await page.getByRole("menuitem", { name: "End night", exact: true }).evaluate((item: HTMLElement) => {
+    await page.getByRole("menuitem", { name: /^End night/ }).evaluate((item: HTMLElement) => {
       item.click();
       item.click();
     });

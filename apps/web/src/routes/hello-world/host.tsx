@@ -1,3 +1,5 @@
+import { Collapsible } from "@base-ui/react/collapsible";
+import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
@@ -10,12 +12,13 @@ import { UserButton } from "@clerk/tanstack-react-start";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
+import { HostTimer } from "#/components/host-timer";
 import {
   DrawHost,
   NextPanel,
@@ -24,18 +27,20 @@ import {
   useOkToLeave,
   useNewDrawing,
   useReadyRace,
+  cardLevel,
+  useReveal,
   useStartRace,
 } from "#/components/next";
 import { ExportButton, OfficerGate, useAction, useJoinCode } from "#/components/officer";
 import { useConfirm } from "#/components/feedback";
 import { SearchPicker } from "#/components/search-picker";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
-import { WIKI_RACES, wikiUrl } from "#/lib/content";
-import { deckFor, filtersFor, heldKey, nounFor } from "#/lib/flow";
-import type { Filter } from "#/lib/flow";
+import { GAMES, WIKI_RACES, wikiUrl } from "#/lib/content";
+import { deckFor, filtersFor, heldKey, nounFor, puzzleTitle, revealable, roundOf, roundTitle } from "#/lib/flow";
+import type { Filter, Round } from "#/lib/flow";
 import { DRAW_SECONDS, cardKey, drawKey, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
-import { CATALOG, gamesIn, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
+import { CATALOG, gamesIn, ideaFor, ideaTile, likelyWeek, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import type { LineupItem } from "#/lib/schedule";
 import { CLUB, fmtDate, isCupWeek } from "#/lib/season";
 import { teamWords } from "#/lib/words";
@@ -49,34 +54,34 @@ type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
 type HostData = FunctionReturnType<typeof api.sessions.host>;
 type Row = NonNullable<HostData["rows"]>[number];
 
-const Panel = ({
-  title,
-  action,
-  children,
-  className = "",
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) => (
-  // On a phone a pane is already the frame, so panels lose their card and their headings shrink.
-  <section className={`card p-5 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none ${className}`}>
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <h2 className="text-2xl max-lg:text-lg">{title}</h2>
-      {action}
-    </div>
+/** A titled group of controls inside a pane, which is already the frame. */
+const Panel = ({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) => (
+  <section className={className}>
+    <h2 className="mb-2 text-lg">{title}</h2>
     {children}
   </section>
 );
 
+const STRIP = ["tile-sky", "tile-meadow", "tile-sun", "tile-silver", "tile-pine", "tile-gold"];
+const Brand = () => (
+  <Link to="/hello-world" className="flex shrink-0 items-center" aria-label="hello, world cup home">
+    <span className="grid grid-cols-3 gap-[2px]" aria-hidden>
+      {STRIP.map((t) => (
+        <span key={t} className={`tile ${t} size-2.5`} />
+      ))}
+    </span>
+  </Link>
+);
+
+// The host page has its own bar instead of the site's header and footer (see route.tsx), so the console gets the
+// whole screen. The sign-in prompts and the start screen are plain pages under a small bar.
 function Host() {
   return (
-    <Wrap className="py-8 max-lg:pt-0">
+    <div className="[&>:not([data-host-shell])]:mx-4 [&>:not([data-host-shell])]:my-16">
       <OfficerGate redirect="/hello-world/host" purpose="run tonight’s game">
         <Console />
       </OfficerGate>
-    </Wrap>
+    </div>
   );
 }
 
@@ -84,8 +89,44 @@ function Console() {
   const data = useQuery(api.sessions.host);
   const live = useQuery(api.sessions.live);
   if (!data || live === undefined) return <p className="font-bold text-dim">Loading…</p>;
-  if (!data.session || !live) return <StartPanel recent={data.recent} />;
+  if (!data.session || !live)
+    return (
+      <div data-host-shell>
+        <header className="border-b border-line">
+          <div className="mx-auto flex h-14 w-[min(1240px,100%-2.5rem)] items-center gap-3">
+            <Brand />
+            <p className="font-extrabold">Host tonight’s game</p>
+            <span className="ml-auto">
+              <UserButton />
+            </span>
+          </div>
+        </header>
+        <Wrap className="py-8">
+          <StartPanel recent={data.recent} />
+        </Wrap>
+      </div>
+    );
   return <Running live={live} rows={data.rows} used={data.used} shown={data.session.shown ?? []} keys={data.keys} />;
+}
+
+/** On a phone, one pane at a time; on a big screen, Play (the command row, rounds, and stage) is always there and the
+ *  rail beside it shows Scores, Players, or the TV. */
+type Pane = "play" | "scores" | "players" | "tv";
+type Side = Exclude<Pane, "play">;
+const isPane = (v: unknown): v is Pane => v === "play" || v === "scores" || v === "players" || v === "tv";
+
+/** Whether the screen is big enough for the side-by-side console (Tailwind's lg), kept current as the window resizes. */
+const WIDE = "(min-width: 64rem)";
+function useWide() {
+  return useSyncExternalStore(
+    (change) => {
+      const query = window.matchMedia(WIDE);
+      query.addEventListener("change", change);
+      return () => query.removeEventListener("change", change);
+    },
+    () => window.matchMedia(WIDE).matches,
+    () => false,
+  );
 }
 
 function Running({
@@ -103,96 +144,199 @@ function Running({
 }) {
   const week = useSchedule()[live.week - 1];
   const lineup = week.lineup;
-  // The lineup round being played (from the session, so it survives a reload) opens its deck with its filter,
-  // e.g. spooky cards for "Fix it for real, spooky".
+  // The lineup round being played comes from the session, so it survives a reload.
   const playing = live.round !== null && live.round < lineup.length ? live.round : null;
-  const label = playing === null ? null : lineup[playing].label;
-  // Before the first round, the Games pane opens on tonight's first game.
-  const [tab, setTab] = useState<Tab>(() => tabFor(label) ?? tabFor(lineup[0]?.label ?? null) ?? "bug");
-  useEffect(() => {
-    const t = tabFor(label);
-    if (t) setTab(t);
-  }, [label, playing]);
-  const deck = useRef<HTMLDivElement>(null);
+  const round = playing === null ? null : roundOf(lineup[playing], playing);
+  const roundTab = round ? (tabFor(round.label) ?? null) : null;
+  // A game picked by hand lasts until the round changes; then the stage follows the round again.
+  const [pick, setPick] = useState<{ round: number | null; tab: Tab } | null>(null);
+  const tool = pick && pick.round === playing ? pick.tab : roundTab;
+  // Two selections: the phone's pane, and the rail's on a big screen, where Play is always showing and never a tab. The
+  // tabs follow whichever one this screen size uses, so a selected tab is always one you can see.
+  const isWide = useWide();
+  const [pane, setPane] = useState<Pane>("play");
+  const [side, setSide] = useState<Side>("scores");
+  const choose = (p: Pane) => {
+    setPane(p);
+    if (p !== "play") setSide(p);
+  };
+  const [teamsOpen, setTeamsOpen] = useState(live.teams.length === 0);
+  const [editing, setEditing] = useState(false);
   const setRound = useMutation(api.sessions.setRound);
+  const confirm = useConfirm();
   const okToLeave = useOkToLeave(live);
   const { act } = useGuardedAction(JSON.stringify([liveActionKey(live), lineup]));
-  // On a phone, one pane at a time, picked in the bar at the top; on a big screen, everything at once.
-  const [pane, setPane] = useState<Pane>("run");
+
+  // Any round but the current one, by hand: the same skip warning as the big button, and the same title on the TV.
+  const jump = (i: number, item: LineupItem) => {
+    setPick(null);
+    setPane("play");
+    if (i === playing) return;
+    const r = roundOf(item, i);
+    void act(async (current) => {
+      if (
+        !(await confirm({
+          title: `Jump to round ${i + 1}?`,
+          description: `${item.label}${item.double ? " (double points)" : ""}. The TV shows the round’s title. Scores stay as they are.`,
+          confirmLabel: "Jump to round",
+        })) ||
+        !current() ||
+        !(await okToLeave()) ||
+        !current()
+      )
+        return;
+      await setRound({ round: i, double: r.double, title: roundTitle(r) });
+    });
+  };
+  const openTeams = () => {
+    setTeamsOpen(true);
+    choose("scores");
+  };
+  // What the clock is timing, named the way the TV-now line names it.
+  const timing = live.timer.card ? cardName(live.timer.card) : undefined;
+  // Each pane's visibility comes from CSS at each size, so nothing flashes or unmounts while the size changes.
+  const railClass = (p: Side) =>
+    `card min-h-0 p-4 lg:col-start-2 lg:row-start-4 lg:rounded-t-none desk:overflow-y-auto ${pane === p ? "" : "max-lg:hidden"} ${side === p ? "" : "lg:hidden"}`;
+
   return (
-    <Tabs.Root value={pane} onValueChange={(v) => isPane(v) && setPane(v)}>
-      <PhoneBar live={live} pane={pane} />
-      <Header live={live} />
-      <PanePanel value="run">
-        <NextPanel live={live} lineup={lineup} used={used} shown={shown} className="mt-6" />
-        <LineupPanel
-          week={live.week}
+    <Tabs.Root value={isWide ? side : pane} onValueChange={(v) => isPane(v) && choose(v)} data-host-shell>
+      <HostBar live={live} />
+      <div className="mx-auto grid w-full max-w-[100rem] grid-cols-[minmax(0,1fr)] gap-3 px-3 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)] lg:grid-rows-[auto_auto_auto_1fr] lg:px-5 desk:h-[calc(100dvh-4rem)] desk:grid-rows-[auto_auto_auto_minmax(0,1fr)]">
+        <RoundStrip
+          lineup={lineup}
           playing={playing}
-          onPlay={(i, item) => {
-            void act(async (current) => {
-              if (!(await okToLeave()) || !current()) return;
-              // A double-points lineup round turns double points on; any other round turns it off.
-              await setRound({ round: i, double: item.double });
-              const t = tabFor(item.label);
-              if (!t) return;
-              setTab(t);
-              // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
-              setPane("games");
-              // After the pane shows, so there's something to scroll to.
-              setTimeout(() => deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-            });
+          tool={tool}
+          roundTab={roundTab}
+          onJump={jump}
+          onEdit={() => setEditing(true)}
+          onPick={(tab) => {
+            setPick(tab === null ? null : { round: playing, tab });
+            setPane("play");
           }}
-          className="mt-6"
+          className={`lg:col-span-2 lg:row-start-2 ${pane === "play" ? "" : "max-lg:hidden"}`}
         />
-      </PanePanel>
-      {/* On a phone the two columns step aside (display: contents), so only the pane's own panels take up room. */}
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        <div className="space-y-6 max-lg:contents">
-          <PanePanel value="tv" className="space-y-6">
+        {/* On a phone, the next action, the clock, and the panes stay pinned at the top, in one row on a phone on its
+            side; on a big screen the command row runs across the top and the panes head the rail. */}
+        <div className="grid gap-2 bg-paper max-lg:sticky max-lg:top-0 max-lg:z-30 max-lg:order-first max-lg:-mx-3 max-lg:border-b max-lg:border-line max-lg:px-3 max-lg:pt-2 short:grid-cols-[minmax(0,1fr)_auto] short:items-center lg:contents">
+          <div className="grid gap-3 lg:col-span-2 lg:row-start-1 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <NextPanel live={live} lineup={lineup} used={used} shown={shown} />
+            <HostTimer live={live} cardLabel={timing} className="self-start max-lg:hidden" />
+          </div>
+          <HostTimer live={live} variant="bar" cardLabel={timing} className="lg:hidden" />
+          <Tabs.List
+            aria-label="Host panes"
+            className="grid grid-cols-4 short:col-span-2 lg:col-start-2 lg:rounded-t-[10px] lg:shadow-[inset_0_0_0_1.5px_var(--color-line)] lg:row-start-3 lg:flex lg:gap-1 lg:rounded-b-none lg:px-3 lg:pt-1"
+          >
+            {(
+              [
+                ["play", "Play"],
+                ["scores", "Scores"],
+                ["players", `Players (${rows.length})`],
+                ["tv", "TV"],
+              ] as const
+            )
+              .filter(([p]) => !(isWide && p === "play"))
+              .map(([p, label]) => (
+                <Tabs.Tab
+                  key={p}
+                  value={p}
+                  className={`border-b-[3px] py-2.5 text-sm font-bold lg:px-2 lg:text-base ${p === "play" ? "lg:hidden" : ""} ${
+                    side === p ? "lg:border-ink lg:text-ink" : "lg:border-transparent lg:text-dim"
+                  } ${pane === p ? "max-lg:border-ink max-lg:text-ink" : "max-lg:border-transparent max-lg:text-dim"}`}
+                  onClick={() => {
+                    if (!isWide) scrollTo({ top: 0 });
+                  }}
+                >
+                  {p === "tv" ? (
+                    <>
+                      TV<span className="max-lg:hidden"> &amp; sound</span>
+                    </>
+                  ) : (
+                    label
+                  )}
+                </Tabs.Tab>
+              ))}
+          </Tabs.List>
+        </div>
+        {/* A big screen has no Play tab, since the stage is always there: it's a plain region then, the same element. */}
+        <PanePanel
+          value="play"
+          role={isWide ? "region" : undefined}
+          aria-label={isWide ? "Current activity" : undefined}
+          className={`lg:col-start-1 lg:row-span-2 lg:row-start-3 ${pane === "play" ? "" : "max-lg:hidden"}`}
+        >
+          <Stage
+            live={live}
+            rows={rows}
+            used={used}
+            lineup={lineup}
+            round={round}
+            tool={tool}
+            roundTab={roundTab}
+            onBack={() => setPick(null)}
+            onPick={(tab) => setPick(tab === roundTab ? null : { round: playing, tab })}
+            onTeams={openTeams}
+            onPlayers={() => choose("players")}
+            onTv={() => choose("tv")}
+            onEdit={() => setEditing(true)}
+          />
+        </PanePanel>
+        <PanePanel value="scores" className={railClass("scores")}>
+          <ScoresPane
+            live={live}
+            keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}}
+            open={teamsOpen}
+            setOpen={setTeamsOpen}
+          />
+        </PanePanel>
+        <PanePanel value="players" className={railClass("players")}>
+          <PlayersPanel live={live} rows={rows} sessionId={live._id} />
+        </PanePanel>
+        <PanePanel value="tv" className={railClass("tv")}>
+          <div className="space-y-6">
             {(week.kind === "kickoff" || live.screen.mode === "slides") && <SlidesPanel live={live} />}
             <ScreenPanel live={live} />
-            <TimerPanel live={live} />
-          </PanePanel>
-          <PanePanel value="scores">
-            <TeamsPanel live={live} keys={lineup.some((g) => gamesIn(g.label).some(usesTeamComputer)) ? keys : {}} />
-          </PanePanel>
-        </div>
-        <div className="space-y-6 max-lg:contents">
-          <PanePanel ref={deck} value="games" className="scroll-mt-6 max-lg:scroll-mt-32">
-            <DeckPanel
-              live={live}
-              tab={tab}
-              setTab={setTab}
-              used={used}
-              filter={label && tabFor(label) === tab ? filterFor(label) : "all"}
-              pick={label && tabFor(label) === tab && tab === "puzzle" ? puzzleForLabel(label) : undefined}
-            />
-          </PanePanel>
-          <PanePanel value="players">
-            <PlayersPanel live={live} rows={rows} sessionId={live._id} />
-          </PanePanel>
-        </div>
+          </div>
+        </PanePanel>
       </div>
+      <LineupDialog week={live.week} open={editing} setOpen={setEditing} />
     </Tabs.Root>
   );
 }
 
-type Pane = "run" | "scores" | "games" | "tv" | "players";
-const PANES: [Pane, string][] = [
-  ["run", "Run"],
-  ["scores", "Scores"],
-  ["games", "Games"],
-  ["tv", "TV"],
-  ["players", "Players"],
-];
-const isPane = (v: unknown): v is Pane => PANES.some(([p]) => p === v);
-
-/** A pane's panels. Every pane stays mounted, so forms and live data carry over when the phone switches panes; a big
- *  screen shows them all, so a pane that isn't picked is only hidden on a phone (not hidden or inert everywhere, as
- *  a tab panel would be). */
+/** A pane. Every pane stays mounted, so forms, open confirmations, and live data carry over between panes, and the
+ *  page decides which ones show at each size (a big screen shows Play beside one rail pane). */
 const PanePanel = ({ className = "", ...props }: Omit<Tabs.Panel.Props, "className"> & { value: Pane; className?: string }) => (
-  <Tabs.Panel keepMounted hidden={false} inert={false} className={`max-lg:data-hidden:hidden ${className}`} {...props} />
+  <Tabs.Panel keepMounted hidden={false} inert={false} className={`min-w-0 ${className}`} {...props} />
 );
+
+/** What the TV shows right now, in words, with the game waiting under it when something else is up. */
+function tvNow(live: Live) {
+  const s = live.screen;
+  const key = heldKey(s);
+  const held = key ? cardName(key) : null;
+  switch (s.mode) {
+    case "card":
+      return `${held ?? "A card"}, ${s.revealed ? "answer shown" : "answer hidden"}${s.hint ? ", hint up" : ""}`;
+    case "wiki":
+      return `${held ?? "Wiki Race"}${s.wikiReady ? ": get ready" : s.revealed ? ": over" : ": racing"}`;
+    case "draw":
+      return `${held ?? "A drawing"}${s.revealed ? ", word shown" : ""}`;
+    default: {
+      const what =
+        s.mode === "lobby"
+          ? "Join screen"
+          : s.mode === "scoreboard"
+            ? "Scoreboard"
+            : s.mode === "timer"
+              ? "Big timer"
+              : s.mode === "slides"
+                ? `Kickoff slide ${(s.slide ?? 0) + 1}`
+                : `Message: “${s.message ?? ""}”`;
+      return held ? `${what} (${held} waits under it)` : what;
+    }
+  }
+}
 
 function useEndNight(live: Live) {
   const end = useMutation(api.sessions.end);
@@ -217,168 +361,438 @@ function useEndNight(live: Live) {
   };
 }
 
-/** On a phone, pinned to the top: the night, the join code, the clock (tap to start or pause), the rest under ⋯, and the
- *  panes. The big screen's header does all this with room to spare. */
-function PhoneBar({ live, pane }: { live: Live; pane: Pane }) {
-  const run = useAction();
-  const { busy, endNight } = useEndNight(live);
-  const timer = useMutation(api.sessions.timer);
-  const remaining = useRemaining(live.timer);
-  const code = useJoinCode();
+/** The night, the join code, what the TV shows, and the Night menu: links to the other officer pages and End night. */
+function HostBar({ live }: { live: Live }) {
   const plan = useSchedule();
-  const running = !!live.timer.startedAt;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
-  const moreTrigger = useRef<HTMLButtonElement>(null);
-  const dialogHandoff = useRef(false);
-  const links = [
-    ["/hello-world/kickoff", "Kickoff slides"],
-    ["/hello-world/schedule", "Plan the season"],
-    ["/hello-world/kit", "Game plan"],
-    ["/hello-world/test", "Test the decks"],
-  ] as const;
+  const code = useJoinCode();
+  const tv = tvNow(live);
   return (
-    <div className="sticky top-0 z-40 -mx-5 border-b border-line bg-paper/95 px-5 pt-3 backdrop-blur-md lg:hidden">
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1 leading-tight">
+    <header className="border-b border-line bg-paper/95 backdrop-blur-md lg:sticky lg:top-0 lg:z-40">
+      <div className="mx-auto flex h-14 max-w-[100rem] items-center gap-3 px-3 lg:h-16 lg:gap-4 lg:px-5">
+        <span className="max-sm:hidden">
+          <Brand />
+        </span>
+        <div className="min-w-0 flex-1 leading-tight lg:flex-initial">
           <p className="truncate text-xs font-bold text-pine">
             Week {live.week}
-            {live.practice ? " · practice" : ""}
+            {isCupWeek(live.week) ? " · Cup night" : ""}
+            {live.practice && (
+              <span className="chip ml-2 bg-sky text-[#12332b]">
+                Practice<span className="max-lg:hidden">: doesn’t count</span>
+              </span>
+            )}
           </p>
-          <p className="truncate font-extrabold">{plan[live.week - 1]?.title}</p>
+          <h1 className="truncate text-lg lg:text-xl">{plan[live.week - 1]?.title}</h1>
         </div>
-        <p className="narrow text-2xl font-extrabold tracking-[0.15em]" title="Join code">
+        <p className="narrow text-2xl font-extrabold tracking-[0.15em] lg:ml-auto lg:text-4xl" title="Join code">
+          <span className="sr-only">Join code </span>
           {code}
         </p>
-        <button
-          className={`btn btn-sm narrow min-w-24 text-lg tabular-nums ${running && remaining <= 10_000 ? "text-signal" : ""}`}
-          onClick={() => run(timer({ action: "toggle" }))}
-          aria-label={running ? "Pause the timer" : "Start the timer"}
+        <p
+          className="flex min-w-0 items-center gap-2 rounded-[6px] bg-mist px-3 py-1.5 text-sm font-semibold max-lg:hidden"
+          title="What the TV shows"
         >
-          {running ? "❚❚" : "▶"} {running && remaining === 0 ? "TIME" : fmtClock(remaining)}
-        </button>
-        <div ref={menu} data-own-keys>
-          <Menu.Root
-            open={menuOpen}
-            onOpenChange={(open) => {
-              if (open) dialogHandoff.current = false;
-              setMenuOpen(open);
-            }}
-            onOpenChangeComplete={(open) => {
-              if (!open && dialogHandoff.current) {
-                dialogHandoff.current = false;
-                // Wait until the menu releases its focus trap, then give the dialog a durable return target.
-                moreTrigger.current?.focus();
-                void endNight();
-              }
-            }}
-          >
-            <Menu.Trigger ref={moreTrigger} className="btn btn-sm" aria-label="More">
-              ⋯
-            </Menu.Trigger>
-            <Menu.Portal container={menu}>
-              <Menu.Positioner sideOffset={8} align="end" positionMethod="fixed" className="z-50">
-                <Menu.Popup
-                  finalFocus={moreTrigger}
-                  className="card grid max-h-[var(--available-height)] w-60 max-w-[var(--available-width)] gap-1 overflow-y-auto bg-paper p-2 text-ink shadow-lg"
-                >
-                  <Menu.LinkItem
-                    href="/hello-world/tv"
-                    target="_blank"
-                    rel="noreferrer"
-                    closeOnClick
-                    className="btn btn-sm justify-start data-highlighted:bg-mist"
-                  >
-                    Open TV view
-                  </Menu.LinkItem>
-                  {links.map(([to, label]) => (
-                    <Menu.LinkItem
-                      key={to}
-                      render={<Link to={to} />}
-                      closeOnClick
-                      className="btn btn-sm justify-start data-highlighted:bg-mist"
-                    >
-                      {label}
-                    </Menu.LinkItem>
-                  ))}
-                  <Menu.Item
-                    disabled={busy}
-                    className="btn btn-sm btn-neon justify-start data-highlighted:outline-2"
-                    onClick={() => {
-                      dialogHandoff.current = true;
-                      setMenuOpen(false);
-                    }}
-                  >
-                    End night
-                  </Menu.Item>
-                </Menu.Popup>
-              </Menu.Positioner>
-            </Menu.Portal>
-          </Menu.Root>
-        </div>
+          <span className="size-2 shrink-0 rounded-full bg-pine" aria-hidden />
+          <span className="max-w-[24rem] truncate">TV: {tv}</span>
+        </p>
+        <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="btn btn-sm max-lg:hidden">
+          Open TV view ↗
+        </a>
+        <NightMenu live={live} />
         <UserButton />
       </div>
-      <Tabs.List className="mt-1 grid grid-cols-5" aria-label="Host controls">
-        {PANES.map(([p, label]) => (
-          <Tabs.Tab
-            key={p}
-            value={p}
-            className={`border-b-[3px] py-2.5 text-sm font-bold ${pane === p ? "border-ink text-ink" : "border-transparent text-dim"}`}
-            onClick={() => {
-              setMenuOpen(false);
-              scrollTo({ top: 0 });
-            }}
-          >
-            {label}
-          </Tabs.Tab>
-        ))}
-      </Tabs.List>
+      <p className="truncate border-t border-line px-3 py-1 text-xs font-semibold text-dim lg:hidden">TV: {tv}</p>
+    </header>
+  );
+}
+
+const PAGES = [
+  ["/hello-world/kickoff", "Kickoff slides page"],
+  ["/hello-world/schedule", "Plan the season"],
+  ["/hello-world/kit", "Game plan"],
+  ["/hello-world/test", "Test the decks"],
+] as const;
+
+function NightMenu({ live }: { live: Live }) {
+  const { busy, endNight } = useEndNight(live);
+  const [open, setOpen] = useState(false);
+  const menu = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const dialogHandoff = useRef(false);
+  return (
+    <div ref={menu} data-own-keys>
+      <Menu.Root
+        open={open}
+        onOpenChange={(next) => {
+          if (next) dialogHandoff.current = false;
+          setOpen(next);
+        }}
+        onOpenChangeComplete={(next) => {
+          if (!next && dialogHandoff.current) {
+            dialogHandoff.current = false;
+            // Wait until the menu releases its focus trap, then give the dialog a durable return target.
+            trigger.current?.focus();
+            void endNight();
+          }
+        }}
+      >
+        <Menu.Trigger ref={trigger} className="btn btn-sm">
+          Night <span aria-hidden>▾</span>
+        </Menu.Trigger>
+        <Menu.Portal container={menu}>
+          <Menu.Positioner sideOffset={8} align="end" positionMethod="fixed" className="z-50">
+            <Menu.Popup
+              finalFocus={trigger}
+              className="card grid max-h-[var(--available-height)] w-60 max-w-[var(--available-width)] gap-1 overflow-y-auto bg-paper p-2 text-ink shadow-lg"
+            >
+              <Menu.LinkItem
+                href="/hello-world/tv"
+                target="_blank"
+                rel="noreferrer"
+                closeOnClick
+                className="btn btn-sm justify-start data-highlighted:bg-mist lg:hidden"
+              >
+                Open TV view ↗
+              </Menu.LinkItem>
+              {PAGES.map(([to, label]) => (
+                <Menu.LinkItem
+                  key={to}
+                  render={<Link to={to} />}
+                  closeOnClick
+                  className="btn btn-sm justify-start data-highlighted:bg-mist"
+                >
+                  {label}
+                </Menu.LinkItem>
+              ))}
+              <Menu.Separator className="my-1 border-t border-line" />
+              <Menu.Item
+                disabled={busy}
+                className="btn btn-sm btn-neon justify-start data-highlighted:outline-2"
+                onClick={() => {
+                  dialogHandoff.current = true;
+                  setOpen(false);
+                }}
+              >
+                End night…
+              </Menu.Item>
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
     </div>
   );
 }
 
-function Header({ live }: { live: Live }) {
-  const { busy, endNight } = useEndNight(live);
-  const plan = useSchedule();
-  const code = useJoinCode();
+/** Tonight's rounds at a glance: played, playing, to come. Picking one jumps there by hand; the lineup edits in a dialog;
+ *  any game's tools can come up by hand. */
+function RoundStrip({
+  lineup,
+  playing,
+  tool,
+  roundTab,
+  onJump,
+  onEdit,
+  onPick,
+  className = "",
+}: {
+  lineup: LineupItem[];
+  playing: number | null;
+  tool: Tab | null;
+  roundTab: Tab | null;
+  onJump: (i: number, item: LineupItem) => void;
+  onEdit: () => void;
+  onPick: (tab: Tab | null) => void;
+  className?: string;
+}) {
+  const menu = useRef<HTMLDivElement>(null);
   return (
-    <header className="flex flex-wrap items-center gap-x-6 gap-y-3 max-lg:hidden">
-      <div className="min-w-0">
-        <p className="font-bold text-pine">
-          Week {live.week}
-          {isCupWeek(live.week) ? " · Cup night" : ""}
-          {live.practice && <span className="chip ml-2 bg-sky text-[#12332b]">Practice: doesn’t count</span>}
-        </p>
-        <h1 className="text-3xl">{plan[live.week - 1]?.title}</h1>
+    <nav aria-label="Tonight’s rounds" className={`flex flex-wrap items-center gap-2 ${className}`}>
+      {lineup.length === 0 ? (
+        <p className="flex-1 text-sm text-dim">No rounds planned tonight.</p>
+      ) : (
+        <ol className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5 max-lg:basis-full">
+          {lineup.map((g, i) => {
+            const id = gamesIn(g.label)[0];
+            const gt = id ? GAME_TILE[id] : null;
+            const state = playing === null ? (i === 0 ? "next" : "later") : i < playing ? "done" : i === playing ? "now" : "later";
+            return (
+              <li key={`${i}-${g.label}`} className="shrink-0">
+                <button
+                  className={`relative flex min-h-10 items-center gap-2 rounded-[6px] py-1 pr-3 pl-2 text-sm font-semibold whitespace-nowrap ${
+                    state === "now"
+                      ? "bg-sun/30 shadow-[inset_0_0_0_2px_var(--color-sun)]"
+                      : state === "done"
+                        ? "text-dim shadow-[inset_0_0_0_1px_var(--color-line)]"
+                        : "bg-mist hover:bg-line"
+                  }`}
+                  aria-current={state === "now" ? "step" : undefined}
+                  onClick={() => onJump(i, g)}
+                >
+                  <span className="narrow w-4 text-center font-extrabold">{i + 1}</span>
+                  <span className={`tile ${gt?.tile ?? ideaTile(g.label) ?? "bg-line"} size-5 shrink-0`}>
+                    {gt && <Picto id={gt.picto} className="absolute inset-[10%]" />}
+                  </span>
+                  {g.label}
+                  {g.double && <span className="chip">×2</span>}
+                  <span className="sr-only">
+                    {state === "now" ? ", playing now" : state === "done" ? ", played" : state === "next" ? ", first up" : ""}
+                  </span>
+                  {state === "done" && <span aria-hidden>✓</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <button className="btn btn-sm" onClick={onEdit}>
+        Edit lineup
+      </button>
+      <div ref={menu} data-own-keys>
+        <Menu.Root>
+          <Menu.Trigger className={`btn btn-sm ${tool !== roundTab ? "btn-on" : ""}`}>
+            Pick a game by hand <span aria-hidden>▾</span>
+          </Menu.Trigger>
+          <Menu.Portal container={menu}>
+            <Menu.Positioner sideOffset={6} align="end" positionMethod="fixed" className="z-50">
+              <Menu.Popup className="card grid max-h-[var(--available-height)] w-64 max-w-[var(--available-width)] gap-0.5 overflow-y-auto bg-paper p-2 text-ink shadow-lg">
+                <Menu.RadioGroup value={tool === roundTab ? "round" : (tool ?? "round")} onValueChange={(v) => onPick(isTab(v) ? v : null)}>
+                  <Menu.RadioItem
+                    value="round"
+                    closeOnClick
+                    className="btn btn-sm justify-start data-checked:bg-pine data-checked:text-white data-highlighted:outline-2"
+                  >
+                    {playing === null ? "Back to getting ready" : "Back to this round’s game"}
+                  </Menu.RadioItem>
+                  <Menu.Separator className="my-1 border-t border-line" />
+                  {TABS.filter(([t]) => t !== roundTab).map(([t, label]) => (
+                    <Menu.RadioItem
+                      key={t}
+                      value={t}
+                      closeOnClick
+                      className="btn btn-sm justify-start data-checked:bg-pine data-checked:text-white data-highlighted:outline-2"
+                    >
+                      {label}
+                    </Menu.RadioItem>
+                  ))}
+                </Menu.RadioGroup>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
       </div>
-      <p className="narrow ml-auto font-extrabold text-4xl tracking-[0.2em] text-ink sm:ml-0 sm:text-5xl" title="Join code">
-        {code}
+    </nav>
+  );
+}
+
+function LineupDialog({ week, open, setOpen }: { week: number; open: boolean; setOpen: (open: boolean) => void }) {
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="fixed inset-0 z-[90] bg-black/50" />
+        <Dialog.Popup className="card fixed top-[4dvh] left-1/2 z-[91] max-h-[92dvh] w-[min(44rem,calc(100%-1.5rem))] -translate-x-1/2 overflow-y-auto bg-paper p-5 text-ink shadow-lg">
+          <div className="flex items-center gap-3">
+            <Dialog.Title className="text-2xl">Tonight’s lineup</Dialog.Title>
+            <Dialog.Close className="btn btn-sm ml-auto">Done</Dialog.Close>
+          </div>
+          <Dialog.Description className="mt-1 mb-4 text-sm text-dim">
+            Changes save to the season plan right away. Use the round buttons to jump to a round.
+          </Dialog.Description>
+          <LineupPanel week={week} />
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+/** The game in play: getting ready before round 1, the round's tools, or an activity run by hand. */
+function Stage({
+  live,
+  rows,
+  used,
+  lineup,
+  round,
+  tool,
+  roundTab,
+  onBack,
+  onPick,
+  onTeams,
+  onPlayers,
+  onTv,
+  onEdit,
+}: {
+  live: Live;
+  rows: Row[];
+  used: string[];
+  lineup: LineupItem[];
+  round: Round | null;
+  tool: Tab | null;
+  roundTab: Tab | null;
+  onBack: () => void;
+  onPick: (tab: Tab) => void;
+  onTeams: () => void;
+  onPlayers: () => void;
+  onTv: () => void;
+  onEdit: () => void;
+}) {
+  const manual = tool !== null && tool !== roundTab;
+  const label = round?.label ?? null;
+  // The game the TV holds, up now or waiting under the scores, when it isn't the one on the stage.
+  const s = live.screen;
+  const tvTab: Tab | null = s.drawing !== undefined ? "pictionary" : s.wikiFrom ? "wiki" : (s.game ?? null);
+  const tvKey = heldKey(s);
+  // Something still in play on the TV (not revealed or scored) that the stage isn't showing.
+  const elsewhere = tvTab && tvTab !== tool && tvKey && !s.revealed && !live.scored.includes(tvKey) ? tvTab : null;
+  const name = tool ? TABS.find(([t]) => t === tool)?.[1] : null;
+  const heading = manual ? name : round ? `Round ${round.index + 1}: ${round.label}` : tool ? name : "Getting ready";
+  const head = manual || !tool || !!elsewhere;
+  const id = useId();
+  const filter = label && !manual ? filterFor(label) : "all";
+  const pick = label && !manual && tool === "puzzle" ? puzzleForLabel(label) : undefined;
+  return (
+    <section aria-labelledby={`${id}-stage`} className="card flex h-full min-h-0 flex-col">
+      {/* The round already shows in the rounds strip and under the big button, so a header only appears when the stage
+          isn't simply the round's own game. */}
+      <div className={head ? "flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2" : "contents"}>
+        <h2 id={`${id}-stage`} className={head ? "min-w-0 text-lg" : "sr-only"}>
+          {heading}
+        </h2>
+        {manual && (
+          <>
+            <span className="chip">Picked by hand</span>
+            <button className="btn btn-sm ml-auto" onClick={onBack}>
+              {round ? `Back to round ${round.index + 1}` : "Back to getting ready"}
+            </button>
+          </>
+        )}
+        {elsewhere && (
+          <button className="btn btn-sm ml-auto" onClick={() => onPick(elsewhere)}>
+            The TV has {TABS.find(([t]) => t === elsewhere)?.[1]} going: show its controls
+          </button>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 p-4 desk:overflow-y-auto">
+        {tool === "wiki" ? (
+          <WikiTool live={live} used={used} round={round} />
+        ) : tool === "pictionary" ? (
+          <PictionaryTool live={live} round={round} />
+        ) : tool ? (
+          <CardTool key={`${tool}:${filter}:${pick}`} game={tool} live={live} used={used} initial={filter} pick={pick} round={round} />
+        ) : round ? (
+          <ActivityStage live={live} round={round} />
+        ) : (
+          <SetupSteps live={live} rows={rows} lineup={lineup} onTeams={onTeams} onPlayers={onPlayers} onTv={onTv} onEdit={onEdit} />
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Before round 1: what's ready and what isn't, each with the way to it. The controls themselves live in one place. */
+function SetupSteps({
+  live,
+  rows,
+  lineup,
+  onTeams,
+  onPlayers,
+  onTv,
+  onEdit,
+}: {
+  live: Live;
+  rows: Row[];
+  lineup: LineupItem[];
+  onTeams: () => void;
+  onPlayers: () => void;
+  onTv: () => void;
+  onEdit: () => void;
+}) {
+  const code = useJoinCode();
+  const w = teamWords(live.teamSize === 1);
+  const lobby = live.screen.mode === "lobby";
+  const teams = live.teams.length > 0;
+  const mode = MODES.find(([size]) => size === live.teamSize)?.[1] ?? "Teams";
+  const steps: { ok: boolean; title: string; detail: string; go?: [string, () => void] }[] = [
+    {
+      ok: lobby,
+      title: lobby ? "The join screen is on the TV" : `The TV shows: ${tvNow(live)}`,
+      detail: `Phones join at ${CLUB.url}/join with code ${code ?? "…"}.`,
+      go: lobby ? undefined : ["TV controls", onTv],
+    },
+    {
+      ok: teams || live.autoTeams,
+      title: teams
+        ? `${mode}: ${live.teams.length} ${live.teams.length === 1 ? w.team : w.teams}`
+        : live.autoTeams
+          ? `${mode}, with Auto teams`
+          : "How is tonight played?",
+      detail: live.autoTeams ? w.autoOn(live.teamSize) : teams ? w.autoOff : w.nobodyPlaying.split(". ")[0] + ".",
+      go: ["Team settings", onTeams],
+    },
+    {
+      ok: rows.length > 0,
+      title: `Players: ${rows.length} joined`,
+      detail: "They show up as they join. Someone without a phone? Add them by hand.",
+      go: ["Players", onPlayers],
+    },
+    {
+      ok: lineup.length > 0,
+      title: `Tonight’s lineup: ${lineup.length} ${lineup.length === 1 ? "round" : "rounds"}`,
+      detail: lineup.map((g) => g.label).join(" · ") || "Nothing planned yet.",
+      go: ["Edit lineup", onEdit],
+    },
+  ];
+  return (
+    <ol className="divide-y divide-line">
+      {steps.map((s, i) => (
+        <li key={s.title} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 py-3 first:pt-0">
+          <span
+            className={`grid size-8 place-items-center rounded-full font-extrabold ${s.ok ? "bg-pine text-white" : "bg-mist text-ink shadow-[inset_0_0_0_1.5px_var(--color-line)]"}`}
+          >
+            {s.ok ? "✓" : i + 1}
+            <span className="sr-only">{s.ok ? " done" : " to do"}</span>
+          </span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="min-w-0 flex-1 basis-60">
+              <p className="font-bold">{s.title}</p>
+              <p className="text-sm text-dim">{s.detail}</p>
+            </div>
+            {s.go && (
+              <button className="btn btn-sm" onClick={s.go[1]}>
+                {s.go[0]}
+              </button>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** A round without its own tools (an idea from the library, a custom activity): how it goes and how it's scored. */
+function ActivityStage({ live, round }: { live: Live; round: Round }) {
+  const game = GAMES.find((g) => g.id === (round.game ?? gamesIn(round.label)[0]));
+  const idea = ideaFor(round.label);
+  const w = teamWords(live.teamSize === 1);
+  return (
+    <div className="max-w-[60ch] space-y-3">
+      <p>{idea?.how ?? game?.gist ?? "An activity you run in the room."}</p>
+      {(idea || game) && (
+        <p className="text-sm text-dim">
+          {[idea?.time ?? game?.time, idea?.need ?? game?.need].filter(Boolean).join(" · ")}
+          {idea?.link && (
+            <>
+              {" · "}
+              <a href={idea.link} target="_blank" rel="noreferrer" className="link">
+                Where to play ↗
+              </a>
+            </>
+          )}
+        </p>
+      )}
+      <p className="rounded-[6px] bg-mist p-3 text-sm">
+        <strong>Score it by hand</strong> with each {w.team}’s + buttons under Scores{game ? `: ${game.scoring}` : "."} Time it with the
+        clock; Big timer puts it on the TV.
       </p>
-      {/* One row that scrolls sideways on phones, so the controls start right under the header. */}
-      <nav className="-mx-1 flex w-full items-center gap-1 overflow-x-auto px-1 *:shrink-0 sm:ml-auto sm:w-auto sm:flex-wrap sm:overflow-visible">
-        <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="btn btn-sm">
-          Open TV view
-        </a>
-        <Link to="/hello-world/kickoff" className="btn btn-sm">
-          Kickoff slides
-        </Link>
-        <Link to="/hello-world/schedule" className="btn btn-sm">
-          Plan the season
-        </Link>
-        <Link to="/hello-world/kit" className="btn btn-sm">
-          Game plan
-        </Link>
-        <Link to="/hello-world/test" className="btn btn-sm">
-          Test the decks
-        </Link>
-        <button className="btn btn-sm btn-neon" disabled={busy} onClick={() => endNight()}>
-          End night
-        </button>
-        <span className="ml-2">
-          <UserButton />
-        </span>
-      </nav>
-    </header>
+    </div>
   );
 }
 
@@ -390,8 +804,8 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
   const [week, setWeek] = useState(() => likelyWeek(plan));
   const [practice, setPractice] = useState(false);
   return (
-    <div className="grid gap-6 max-lg:pt-6 lg:grid-cols-2">
-      <Panel title="Start tonight" className="ring-2 ring-gold">
+    <div className="grid items-start gap-6 lg:grid-cols-2">
+      <Panel title="Start tonight" className="card p-5 ring-2 ring-gold">
         <p className="text-dim">Starting opens joining and puts the QR code on the TV.</p>
         <SearchPicker
           className="mt-4"
@@ -435,8 +849,10 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
           .
         </p>
       </Panel>
-      <LineupPanel week={week} />
-      <Panel title="Past nights">
+      <Panel title={`Week ${week} lineup`} className="card p-5">
+        <LineupPanel week={week} />
+      </Panel>
+      <Panel title="Past nights" className="card p-5">
         {recent.length === 0 ? (
           <p className="text-dim">Nothing yet. Attendance exports show up here after each night.</p>
         ) : (
@@ -593,53 +1009,6 @@ function ScreenPanel({ live }: { live: Live }) {
   );
 }
 
-function TimerPanel({ live }: { live: Live }) {
-  const run = useAction();
-  const timer = useMutation(api.sessions.timer);
-  const remaining = useRemaining(live.timer);
-  const running = !!live.timer.startedAt;
-  return (
-    <Panel title="Timer">
-      <p className={`text-center narrow font-extrabold text-7xl tabular-nums ${running && remaining <= 10_000 ? "text-signal" : ""}`}>
-        {running && remaining === 0 ? "TIME" : fmtClock(remaining)}
-      </p>
-      <div className="mt-3 flex flex-wrap justify-center gap-2">
-        <button className="btn btn-coin" onClick={() => run(timer({ action: "toggle" }))}>
-          {running ? "Pause" : "Start"}
-        </button>
-        <button className="btn" onClick={() => run(timer({ action: "reset" }))}>
-          Reset
-        </button>
-        <button className="btn" onClick={() => run(timer({ action: "add" }))}>
-          +30s
-        </button>
-      </div>
-      <div className="mt-2 flex flex-wrap justify-center gap-2">
-        {[30, 45, 60, 90, 120, 300, 720].map((s) => (
-          <button
-            key={s}
-            className="btn btn-sm"
-            onClick={() => run(timer({ action: "set", seconds: s, relay: live.teamSize > 1 && s === 720 }))}
-          >
-            {fmtClock(s * 1000)}
-          </button>
-        ))}
-      </div>
-      <Switch.Root
-        nativeButton
-        render={<button type="button" />}
-        checked={live.timer.relay}
-        className={`btn btn-sm mt-2 w-[calc(100%-8px)] ${live.timer.relay ? "btn-on" : ""}`}
-        onCheckedChange={() => {
-          void run(timer({ action: "relay" }));
-        }}
-      >
-        {live.timer.relay ? "Relay chime every 2 min: on" : "Relay chime every 2 min: off"}
-      </Switch.Root>
-    </Panel>
-  );
-}
-
 // How tonight is played. A night is all solo or all teams; solo is the default.
 const MODES = [
   [1, "Solo"],
@@ -647,7 +1016,53 @@ const MODES = [
   [3, "Teams of 3"],
 ] as const;
 
-function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | null> }) {
+/** The standings with +1 +2 +3 at hand, under a one-line summary of how tonight is played and its settings. */
+function ScoresPane({
+  live,
+  keys,
+  open,
+  setOpen,
+}: {
+  live: Live;
+  keys: Record<string, string | null>;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}) {
+  const w = teamWords(live.teamSize === 1);
+  const mode = MODES.find(([s]) => s === live.teamSize)?.[1] ?? "Teams";
+  return (
+    <section aria-label="Scores">
+      <Collapsible.Root open={open} onOpenChange={setOpen}>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="min-w-0 flex-1 text-sm font-semibold">
+            {mode}
+            {live.autoTeams ? " · Auto teams on" : ""}
+            {live.double ? " · Double points on" : ""}
+          </p>
+          <Collapsible.Trigger className={`btn btn-sm ${open ? "btn-on" : ""}`}>
+            Team settings <span aria-hidden>{open ? "▴" : "▾"}</span>
+          </Collapsible.Trigger>
+        </div>
+        {/* Mounted while closed, so a confirmation it opened still finishes. */}
+        <Collapsible.Panel keepMounted className="mt-3 rounded-[8px] bg-mist p-3 data-closed:hidden">
+          <TeamSettings live={live} />
+        </Collapsible.Panel>
+      </Collapsible.Root>
+      {live.teams.length === 0 ? (
+        <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>
+      ) : (
+        <ol className="mt-2 divide-y divide-line">
+          {live.teams.map((t) => (
+            <TeamRow key={t._id} t={t} double={live.double} teamKey={keys[t._id]} keyTitle={w.keyTitle} />
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** How tonight is played (remaking teams), Auto teams, Double points, Add team, and resetting every score. */
+function TeamSettings({ live }: { live: Live }) {
   const run = useAction();
   const make = useMutation(api.teams.make);
   const add = useMutation(api.teams.add);
@@ -673,7 +1088,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
     });
 
   return (
-    <Panel title="Teams & scores">
+    <div>
       <div className="flex flex-wrap items-center gap-2">
         <ToggleGroup
           data-own-keys
@@ -684,7 +1099,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
           }}
           disabled={busy || live.unrevealed.length > 0}
           aria-label="How tonight is played"
-          className="inline-flex flex-wrap rounded-[6px] bg-mist p-1"
+          className="inline-flex flex-wrap rounded-[6px] bg-paper p-1"
         >
           {MODES.map(([size, label]) => (
             <Toggle
@@ -705,17 +1120,8 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
             {live.teamSize === 1 ? "Remake solo teams" : "Reshuffle teams"}
           </button>
         )}
-        <Switch.Root
-          nativeButton
-          render={<button type="button" />}
-          checked={live.double}
-          className={`btn btn-sm ${live.double ? "btn-on" : ""}`}
-          onCheckedChange={(on) => {
-            void run(setDouble({ on }));
-          }}
-        >
-          Double points
-        </Switch.Root>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <Switch.Root
           nativeButton
           render={<button type="button" />}
@@ -726,6 +1132,17 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
           }}
         >
           Auto teams
+        </Switch.Root>
+        <Switch.Root
+          nativeButton
+          render={<button type="button" />}
+          checked={live.double}
+          className={`btn btn-sm ${live.double ? "btn-on" : ""}`}
+          onCheckedChange={(on) => {
+            void run(setDouble({ on }));
+          }}
+        >
+          Double points
         </Switch.Root>
         {!w.solo && (
           <button className="btn btn-sm" onClick={() => run(add())}>
@@ -739,15 +1156,6 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
           Finish the round first: reveal {live.unrevealed.map(cardName).join(", ")} (put it back on the TV if it’s gone), then you can
           switch modes.
         </p>
-      )}
-      {live.teams.length === 0 ? (
-        <p className="mt-4 text-dim">{live.autoTeams ? w.emptyAuto : w.emptyManual}</p>
-      ) : (
-        <ol className="mt-3 divide-y divide-line">
-          {live.teams.map((t) => (
-            <TeamRow key={t._id} t={t} double={live.double} teamKey={keys[t._id]} keyTitle={w.keyTitle} />
-          ))}
-        </ol>
       )}
       {live.teams.length > 0 && (
         <button
@@ -772,7 +1180,7 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
           Reset scores to 0
         </button>
       )}
-    </Panel>
+    </div>
   );
 }
 
@@ -908,28 +1316,13 @@ function TeamRow({
   );
 }
 
-/**
- * A week's games in order. Edits save to the season plan right away, so swapping a game mid-night
- * also updates the season page. While a night runs, picking a game opens its deck below.
- */
-function LineupPanel({
-  week,
-  playing,
-  onPlay,
-  className = "",
-}: {
-  week: number;
-  playing?: number | null;
-  onPlay?: (i: number, item: LineupItem) => void;
-  className?: string;
-}) {
+/** A week's games in order, to edit. Edits save to the season plan right away, so swapping a game mid-night also
+ *  updates the season page. */
+function LineupPanel({ week }: { week: number }) {
   const run = useAction();
   const save = useMutation(api.schedule.save);
   const w = useSchedule()[week - 1];
   const lineup = w.lineup;
-  // While a night runs, the editing buttons stay out of the way until Edit.
-  const [editing, setEditing] = useState(!onPlay);
-  const edit = editing || lineup.length === 0;
   const update = (next: LineupItem[]) =>
     run(
       save({
@@ -955,18 +1348,7 @@ function LineupPanel({
   }
 
   return (
-    <Panel
-      title={onPlay ? "Tonight’s lineup" : `Week ${week} lineup`}
-      action={
-        onPlay &&
-        lineup.length > 0 && (
-          <Toggle className={`btn btn-sm ${editing ? "btn-on" : ""}`} pressed={editing} onPressedChange={setEditing}>
-            {editing ? "Done" : "Edit"}
-          </Toggle>
-        )
-      }
-      className={className}
-    >
+    <div>
       {lineup.length === 0 ? (
         <p className="text-dim">No games planned. Add one below.</p>
       ) : (
@@ -974,80 +1356,65 @@ function LineupPanel({
           {lineup.map((g, i) => {
             const id = gamesIn(g.label)[0];
             const gt = id ? GAME_TILE[id] : null;
-            const on = playing === i;
             return (
-              <li
-                key={`${i}-${g.label}`}
-                className={`flex items-center gap-2 p-2 ${edit ? "flex-wrap" : ""} ${on ? "bg-sun/30" : "bg-mist"}`}
-              >
+              <li key={`${i}-${g.label}`} className="flex flex-wrap items-center gap-2 bg-mist p-2">
                 <span className="narrow w-6 text-center text-lg font-extrabold">{i + 1}</span>
                 <span className={`tile ${gt?.tile ?? ideaTile(g.label) ?? "bg-line"} size-8 shrink-0`}>
                   {gt && <Picto id={gt.picto} className="absolute inset-[10%]" />}
                 </span>
-                <span className={`flex-1 font-bold ${edit ? "min-w-32" : "min-w-0"}`}>
+                <span className="min-w-32 flex-1 font-bold">
                   {g.label}
                   {g.double && <span className="chip ml-2">Double points</span>}
                 </span>
-                {onPlay && (
-                  <button className={`btn btn-sm ${on ? "btn-on" : "btn-coin"}`} onClick={() => onPlay(i, g)}>
-                    {on ? "Playing" : "Play"}
-                  </button>
-                )}
-                {edit && (
-                  <>
-                    <SearchPicker
-                      className="w-full sm:w-48"
-                      value={null}
-                      onValueChange={(label) => {
-                        if (label) void setLine(i, { label });
-                      }}
-                      label={`Swap game ${i + 1}`}
-                      placeholder="Swap…"
-                      options={options}
-                    />
-                    <Toggle
-                      pressed={g.double}
-                      className={`btn btn-sm ${g.double ? "btn-on" : ""}`}
-                      onPressedChange={(double) => {
-                        void setLine(i, { double });
-                      }}
-                      title="Double points"
-                    >
-                      Double
-                    </Toggle>
-                    <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
-                      ↑
-                    </button>
-                    <button className="btn btn-sm" onClick={() => move(i, 1)} disabled={i === lineup.length - 1} aria-label="Move down">
-                      ↓
-                    </button>
-                    <button
-                      className="btn btn-sm text-dim"
-                      onClick={() => update(lineup.filter((_, j) => j !== i))}
-                      aria-label={`Remove ${g.label}`}
-                    >
-                      ✕
-                    </button>
-                  </>
-                )}
+                <SearchPicker
+                  className="w-full sm:w-48"
+                  value={null}
+                  onValueChange={(label) => {
+                    if (label) void setLine(i, { label });
+                  }}
+                  label={`Swap game ${i + 1}`}
+                  placeholder="Swap…"
+                  options={options}
+                />
+                <Toggle
+                  pressed={g.double}
+                  className={`btn btn-sm ${g.double ? "btn-on" : ""}`}
+                  onPressedChange={(double) => {
+                    void setLine(i, { double });
+                  }}
+                  title="Double points"
+                >
+                  Double
+                </Toggle>
+                <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
+                  ↑
+                </button>
+                <button className="btn btn-sm" onClick={() => move(i, 1)} disabled={i === lineup.length - 1} aria-label="Move down">
+                  ↓
+                </button>
+                <button
+                  className="btn btn-sm text-dim"
+                  onClick={() => update(lineup.filter((_, j) => j !== i))}
+                  aria-label={`Remove ${g.label}`}
+                >
+                  ✕
+                </button>
               </li>
             );
           })}
         </ol>
       )}
-      {edit && (
-        <SearchPicker
-          className="mt-3"
-          value={null}
-          onValueChange={(label) => {
-            if (label) void update([...lineup, { label, double: false }]);
-          }}
-          label="Add a game"
-          placeholder="+ Add a game…"
-          options={options}
-        />
-      )}
-    </Panel>
+      <SearchPicker
+        className="mt-3"
+        value={null}
+        onValueChange={(label) => {
+          if (label) void update([...lineup, { label, double: false }]);
+        }}
+        label="Add a game"
+        placeholder="+ Add a game…"
+        options={options}
+      />
+    </div>
   );
 }
 
@@ -1058,7 +1425,9 @@ const cardName = (key: string) => {
     ? `Wiki Race: ${rest.replace(">", " → ")}`
     : game === "draw"
       ? `Drawing ${rest}`
-      : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
+      : game === "puzzle"
+        ? `Puzzle: ${puzzleTitle(Number(rest))}`
+        : `${TABS.find(([id]) => id === game)?.[1] ?? game} #${Number(rest) + 1}`;
 };
 
 type Tab = GameId | "wiki" | "pictionary";
@@ -1080,58 +1449,24 @@ const tabFor = (label: string | null) => {
   return TABS.find(([t]) => t === id)?.[0];
 };
 
-function DeckPanel({
+function CardTool({
+  game,
   live,
-  tab,
-  setTab,
   used,
-  filter,
+  initial,
   pick,
+  round,
 }: {
+  game: GameId;
   live: Live;
-  tab: Tab;
-  setTab: (t: Tab) => void;
   used: string[];
-  filter: Filter;
-  /** A puzzle to start on, from the lineup round being played. */
+  initial: Filter;
   pick?: number;
+  /** The round being played, whose big button reveals its own cards. */
+  round: Round | null;
 }) {
-  return (
-    <Panel title="Games" className="">
-      <Tabs.Root value={tab} onValueChange={(v) => isTab(v) && setTab(v)}>
-        <Tabs.List
-          className="-mx-4 flex gap-1 overflow-x-auto border-b-4 border-line px-4 pb-2 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
-          aria-label="Games"
-        >
-          {TABS.map(([id, label]) => (
-            <Tabs.Tab
-              key={id}
-              value={id}
-              className={`shrink-0 px-3 py-2 font-bold whitespace-nowrap ${tab === id ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
-            >
-              {label}
-            </Tabs.Tab>
-          ))}
-        </Tabs.List>
-        {/* Only the picked game's tool is mounted, so a card tool starts fresh each time its tab opens. */}
-        {TABS.map(([id]) => (
-          <Tabs.Panel key={id} value={id} className="mt-4">
-            {id === "wiki" ? (
-              <WikiTool live={live} used={used} />
-            ) : id === "pictionary" ? (
-              <PictionaryTool live={live} />
-            ) : (
-              <CardTool key={`${filter}:${pick}`} game={id} live={live} used={used} initial={filter} pick={pick} />
-            )}
-          </Tabs.Panel>
-        ))}
-      </Tabs.Root>
-    </Panel>
-  );
-}
-
-function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Live; used: string[]; initial: Filter; pick?: number }) {
   const run = useAction();
+  const reveal = useReveal(live);
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const s = live.screen;
@@ -1191,7 +1526,7 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
   // The card held under the scores or join screen comes back as it was, its parked clock and all. Any other card goes
   // up with its own clock running, so the clock always belongs to the card on the TV and 0:00 closes its answers. A card
   // that already has answers or a score tonight comes back with the clock it left with (that's the server's job): a fresh
-  // one would reopen it and hand every lock the early bonus. Start is there to give it one on purpose.
+  // one would reopen it and hand every lock the early bonus. Restart is there to give it one on purpose.
   const okToLeave = useOkToLeave(live);
   const { busy, act } = useGuardedAction(JSON.stringify([liveActionKey(live), game, index]));
   const showOnTv = async (current: () => boolean) => {
@@ -1203,14 +1538,80 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
     if (!scored && !live.unrevealed.includes(key)) await start();
   };
 
+  const key = cardKey(game, index);
+  // Its clock waits (parked) while the scores, join screen, or a message are up over it.
+  const held = !onTv && heldKey(s) === key;
+  const noun = nounFor(game);
+  // The round's big button reveals the round's own cards, so the reveal here is only for a card picked by hand.
+  const byButton =
+    !!round && revealable(round) && (round.kind === "deck" ? round.game === game : round.kind === "puzzle" && round.puzzle === index);
+  const level = cardLevel(game, index);
+  // Browsing away from the card on the TV: name the one the big button acts on, with a way back to it.
+  const upKey = heldKey(s) && !s.revealed && !onTv ? heldKey(s) : null;
+  const status =
+    onTv && isAnswerGame(game) ? (
+      <AnswerStatus live={live} />
+    ) : onTv && game === "fix" ? (
+      <FixStatus live={live} />
+    ) : onTv && game === "puzzle" ? (
+      <PuzzleStatus live={live} index={index} />
+    ) : null;
+
   return (
-    <div>
+    <div className="@container">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <StageTag state={onTv ? "live" : held ? "held" : "preview"} />
+        <p className="min-w-0 font-bold">
+          {cardName(key)}
+          <span className="font-semibold text-dim">
+            {level ? ` · ${level}` : ""} · {fmtClock(secs * 1000)}
+          </span>
+          {!onTv && !held && isUsed(index) && <span className="chip ml-2">shown before</span>}
+        </p>
+        <span className="inline-flex items-center gap-1" role="group" aria-label="Browse the deck">
+          <button className="btn btn-sm" onClick={() => go(-1)} aria-label="Previous card">
+            ‹ Prev
+          </button>
+          <span className="narrow min-w-14 text-center font-bold text-dim">
+            {Math.min(pos, indexes.length - 1) + 1} / {indexes.length}
+          </span>
+          <button className="btn btn-sm" onClick={() => go(1)} aria-label="Next card">
+            Next ›
+          </button>
+        </span>
+        <span className="ml-auto flex flex-wrap gap-2">
+          {onTv ? (
+            s.revealed ? (
+              // Scoring happens once, so hiding and showing the answer again never scores twice.
+              <button className="btn btn-sm" onClick={() => run(setScreen({ screen: { ...s, revealed: false } }))}>
+                Hide answer on TV
+              </button>
+            ) : (
+              !byButton && (
+                <button className="btn btn-sm" disabled={busy} onClick={() => act(() => reveal("card"))}>
+                  Reveal answer on TV
+                </button>
+              )
+            )
+          ) : (
+            <button className="btn btn-sm" disabled={busy} onClick={() => act(showOnTv)}>
+              {held ? "Put it back on the TV" : heldKey(s) ? "Show this one on TV instead" : "Show on TV"}
+            </button>
+          )}
+          {/* A fresh clock for the card on the TV (and a fresh early-bonus window if nobody has answered yet). */}
+          {onTv && !s.revealed && (
+            <button className="btn btn-sm" disabled={busy} onClick={() => run(start())}>
+              Restart the {noun}’s clock: {fmtClock(secs * 1000)}
+            </button>
+          )}
+        </span>
+      </div>
       {filters.length > 0 && (
         <RadioGroup<Filter>
           value={filter}
           data-own-keys
           aria-label="Filter cards"
-          className="mb-3 flex flex-wrap gap-1.5"
+          className="mt-2 flex flex-wrap gap-1.5"
           onValueChange={(f) => {
             setFilter(f);
             setPos(firstFresh(deckFor(game, f)));
@@ -1229,53 +1630,54 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
           ))}
         </RadioGroup>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <button className="btn btn-sm" onClick={() => go(-1)}>
-          ‹ Prev
-        </button>
-        <span className="mx-2 font-bold text-dim">
-          {Math.min(pos, indexes.length - 1) + 1} / {indexes.length}
-          {!onTv && isUsed(index) && <span className="chip ml-2">shown before</span>}
-        </span>
-        <button className="btn btn-sm" onClick={() => go(1)}>
-          Next ›
-        </button>
-        <span className="ml-auto" />
-        {onTv ? (
-          <button
-            className={`btn btn-sm ${s.revealed ? "" : "btn-coin"}`}
-            onClick={() => run(setScreen({ screen: { ...s, revealed: !s.revealed } }))}
-          >
-            {s.revealed ? "Hide answer on TV" : "Reveal answer on TV"}
-          </button>
-        ) : (
-          <button className="btn btn-sm btn-neon" disabled={busy} onClick={() => act(showOnTv)}>
-            Show on TV
-          </button>
-        )}
-        {/* A restart for this card's clock. Previewing another card, its clock would time the one on the TV. */}
-        {(onTv || !heldKey(s)) && (
-          <button className="btn btn-sm" onClick={() => run(start())}>
-            Start {fmtClock(secs * 1000)}
-          </button>
-        )}
-      </div>
-      <p className="mt-3 text-sm text-dim">
-        {onTv
-          ? s.revealed
-            ? "On the TV with the answer."
-            : "On the TV. The answer below is only on your screen."
-          : "Preview. The answer is only on your screen."}
-      </p>
-      {onTv && isAnswerGame(game) && <AnswerStatus live={live} />}
-      {onTv && game === "fix" && <FixStatus live={live} />}
-      {onTv && game === "puzzle" && <PuzzleStatus live={live} index={index} />}
-      <div className="mt-2 border-4 border-line bg-mist p-4">
-        <CardView game={game} index={index} answer />
+      {upKey && (
+        <p className="mt-2 flex flex-wrap items-center gap-2 rounded-[6px] bg-sun/20 px-3 py-1.5 text-sm">
+          <span>
+            On the TV: <strong>{cardName(upKey)}</strong>. The big button acts on that one.
+          </span>
+          {tvIndex !== undefined && (
+            <button className="btn btn-sm" onClick={() => setPos(Math.max(0, indexes.indexOf(tvIndex)))}>
+              Back to it
+            </button>
+          )}
+        </p>
+      )}
+      {/* The card and, beside it when there's room, what the phones and team computers are doing. */}
+      <div className={`mt-3 grid items-start gap-3 ${status ? "@2xl:grid-cols-[minmax(0,1fr)_minmax(15rem,20rem)]" : ""}`}>
+        <div
+          className={`min-w-0 rounded-[8px] p-4 ${onTv ? "bg-mist shadow-[inset_0_0_0_3px_var(--color-pine)]" : "border-2 border-dashed border-line"}`}
+        >
+          <p className="mb-2 text-xs font-extrabold tracking-wide text-dim uppercase">
+            {onTv
+              ? s.revealed
+                ? "Answer is on the TV"
+                : `Answer only on your screen${byButton ? " · the big button reveals it" : ""}`
+              : held
+                ? "Off the TV for now · its clock waits until it’s back"
+                : "Preview · only you see this, answer too"}
+          </p>
+          <CardView game={game} index={index} answer />
+        </div>
+        {status && <div className="min-w-0 @2xl:sticky @2xl:top-0 [&>div]:mt-0">{status}</div>}
       </div>
     </div>
   );
 }
+
+/** Whether the stage shows what's on the TV, what's waiting under it, or a private preview. */
+const StageTag = ({ state }: { state: "live" | "held" | "preview" }) => (
+  <span
+    className={`shrink-0 rounded-[4px] px-2 py-0.5 text-xs font-extrabold tracking-wide uppercase ${
+      state === "live"
+        ? "bg-pine text-white"
+        : state === "held"
+          ? "bg-sun/40 text-ink"
+          : "text-dim shadow-[inset_0_0_0_1.5px_var(--color-dim)]"
+    }`}
+  >
+    {state === "live" ? "Live on TV" : state === "held" ? "Off the TV for now" : "Preview, not on TV"}
+  </span>
+);
 
 const mark = (ok?: boolean) => (ok ? "✓" : "✗");
 
@@ -1575,9 +1977,11 @@ function WikiStatus({ live }: { live: Live }) {
   );
 }
 
-function WikiTool({ live, used }: { live: Live; used: string[] }) {
+function WikiTool({ live, used, round }: { live: Live; used: string[]; round: Round | null }) {
   const run = useAction();
-  const setScreen = useMutation(api.sessions.setScreen);
+  const reveal = useReveal(live);
+  // In a Wiki Race round the big button starts and ends its races; these are for a race picked by hand.
+  const byButton = round?.kind === "wiki";
   const timer = useMutation(api.sessions.timer);
   const readyRace = useReadyRace();
   const startRace = useStartRace();
@@ -1645,7 +2049,11 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
       </div>
       {race && (
         <>
-          <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-4 border-line bg-mist p-4 text-center">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <StageTag state={onTv ? "live" : s.wikiFrom === race.from && s.wikiTo === race.to ? "held" : "preview"} />
+            {s.revealed && onTv && <span className="text-sm font-bold text-dim">Race over</span>}
+          </div>
+          <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-4 border-line bg-mist p-4 text-center">
             <a href={wikiUrl(race.from)} target="_blank" rel="noreferrer" className="font-bold text-2xl hover:underline">
               {race.from}
             </a>
@@ -1656,20 +2064,21 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {onTv && s.wikiReady ? (
-              <button className="btn btn-sm btn-coin" onClick={() => run(startRace(s))}>
-                Start the race: {fmtClock(wikiSeconds(clicks) * 1000)}
-              </button>
+              !byButton && (
+                <button className="btn btn-sm" disabled={busy} onClick={() => act(() => startRace(s))}>
+                  Start the race: {fmtClock(wikiSeconds(clicks) * 1000)}
+                </button>
+              )
             ) : onTv ? (
-              <button
-                className={`btn btn-sm ${s.revealed ? "" : "btn-coin"}`}
-                disabled={!!s.revealed}
-                onClick={() => run(setScreen({ screen: { ...s, revealed: true } }))}
-              >
-                {s.revealed ? "Race over" : "End race and score"}
-              </button>
+              !s.revealed &&
+              !byButton && (
+                <button className="btn btn-sm" disabled={busy} onClick={() => act(() => reveal("wiki"))}>
+                  End race and score
+                </button>
+              )
             ) : (
               <button
-                className="btn btn-sm btn-neon"
+                className="btn btn-sm"
                 // The get-ready screen first, so every team is on /wiki before the race shows.
                 disabled={busy}
                 onClick={() =>
@@ -1679,19 +2088,22 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
                   })
                 }
               >
-                Show on TV
+                {s.wikiFrom ? "Show this race on TV instead" : "Show on TV"}
               </button>
             )}
-            <button className="btn btn-sm" onClick={() => setRace({ from: race.to, to: race.from })}>
-              Reverse
-            </button>
-            {/* While any race waits on its get-ready screen, only Start the race starts the clock. */}
-            {!(s.mode === "wiki" && s.wikiReady) && (
+            {!onTv && (
+              <button className="btn btn-sm" onClick={() => setRace({ from: race.to, to: race.from })}>
+                Reverse
+              </button>
+            )}
+            {/* A fresh clock for this race only, once it's running: get ready's Start starts it the first time. */}
+            {onTv && !s.wikiReady && !s.revealed && (
               <button
                 className="btn btn-sm"
+                disabled={busy}
                 onClick={() => run(timer({ action: "set", seconds: wikiSeconds(clicks), relay: false, autostart: true }))}
               >
-                Start {fmtClock(wikiSeconds(clicks) * 1000)}
+                Restart the race clock: {fmtClock(wikiSeconds(clicks) * 1000)}
               </button>
             )}
           </div>
@@ -1709,53 +2121,52 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
 }
 
 /** Tech Pictionary outside the big button: a new drawing (the next drawer in turn), the reveal, and the drawing's controls. */
-function PictionaryTool({ live }: { live: Live }) {
+function PictionaryTool({ live, round }: { live: Live; round: Round | null }) {
   const confirm = useConfirm();
   const okToLeave = useOkToLeave(live);
   const { busy, act } = useGuardedAction(liveActionKey(live));
   const newDrawing = useNewDrawing();
-  const setScreen = useMutation(api.sessions.setScreen);
-  const timer = useMutation(api.sessions.timer);
-  const remaining = useRemaining(live.timer);
+  const reveal = useReveal(live);
   const s = live.screen;
-  // Like the big button: the reveal stops a running clock so the buzzer doesn't go off over the word.
-  // The drawing comes back on the TV for its reveal, even after the scoreboard or join screen went up meanwhile.
-  const reveal = async () => {
-    await setScreen({ screen: { ...s, mode: "draw", revealed: true } });
-    if (live.timer.startedAt && remaining > 0) await timer({ action: "pause" });
-  };
+  // In a Pictionary round the big button starts and reveals drawings; these are for a drawing outside one.
+  const byButton = round?.kind === "pictionary";
   // A drawing up and still open: not revealed, and not scored by the TV moving on.
   const up = s.drawing !== undefined && !s.revealed && !live.scored.includes(drawKey(s.drawing));
   return (
     <div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          className="btn btn-sm btn-neon"
-          disabled={busy}
-          onClick={() =>
-            act(async (current) => {
-              if (
-                up &&
-                !(await confirm({
-                  title: "Replace the current drawing?",
-                  description: "A drawing is still up. Score it as it stands and start a new one?",
-                  confirmLabel: "Score and replace drawing",
-                }))
-              )
-                return;
-              if (!current() || !(await okToLeave()) || !current()) return;
-              await newDrawing();
-            })
-          }
-        >
-          New drawing, {fmtClock(DRAW_SECONDS * 1000)}
-        </button>
-        {up && (
-          <button className="btn btn-sm btn-coin" disabled={busy} onClick={() => act(reveal)}>
-            Reveal the word and score
+      {byButton ? (
+        <p className="text-sm text-dim">The big button starts each drawing and reveals the word.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="btn btn-sm"
+            disabled={busy}
+            onClick={() =>
+              act(async (current) => {
+                if (
+                  up &&
+                  !(await confirm({
+                    title: "Replace the current drawing?",
+                    description: "A drawing is still up. Score it as it stands and start a new one?",
+                    confirmLabel: "Score and replace drawing",
+                  }))
+                )
+                  return;
+                if (!current() || !(await okToLeave()) || !current()) return;
+                await newDrawing();
+              })
+            }
+          >
+            New drawing, {fmtClock(DRAW_SECONDS * 1000)}
           </button>
-        )}
-      </div>
+          {up && (
+            // The drawing comes back on the TV for its reveal, even after the scoreboard or join screen went up.
+            <button className="btn btn-sm" disabled={busy} onClick={() => act(() => reveal("draw"))}>
+              Reveal the word and score
+            </button>
+          )}
+        </div>
+      )}
       <DrawHost live={live} />
       <p className="mt-3 text-sm text-dim">
         The drawer draws on their phone or the officer tablet, everyone else guesses on theirs, and revealing scores it once.
@@ -1860,8 +2271,33 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
           <ExportButton sessionId={sessionId} />
         </div>
       )}
+      <form
+        className="mb-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void run(addPlayer(form).then(() => setForm({ name: "", email: "" })));
+        }}
+      >
+        <input
+          className="field"
+          placeholder="Name (no phone? add them)"
+          aria-label="Player name"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
+        />
+        <input
+          className="field"
+          type="email"
+          placeholder="HawkMail"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          required
+        />
+        <button className="btn btn-sm">Add player</button>
+      </form>
       {rows.length === 0 ? (
-        <p className="text-dim">Nobody yet. Put the join screen on the TV.</p>
+        <p className="text-dim">Nobody yet. They show up here as they join from the TV’s code.</p>
       ) : (
         <ul className="divide-y divide-line">
           {rows.map((r) => (
@@ -1917,30 +2353,6 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
           ))}
         </ul>
       )}
-      <form
-        className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(addPlayer(form).then(() => setForm({ name: "", email: "" })));
-        }}
-      >
-        <input
-          className="field"
-          placeholder="Name (no phone? add them here)"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
-        />
-        <input
-          className="field"
-          type="email"
-          placeholder="HawkMail"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          required
-        />
-        <button className="btn btn-sm">Add player</button>
-      </form>
     </Panel>
   );
 }

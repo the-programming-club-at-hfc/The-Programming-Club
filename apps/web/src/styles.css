@@ -26,6 +26,9 @@
 /* A phone on its side: short and landscape, under the lg breakpoint so it never meets the wide layout. */
 @custom-variant short (@media (orientation: landscape) and (max-height: 500px) and (width < 64rem));
 
+/* The host console as one screen: a laptop or bigger that's tall enough. Shorter screens scroll the page instead. */
+@custom-variant desk (@media (width >= 64rem) and (height >= 42.5rem));
+
 @layer base {
   .theme-pine {
     --color-paper: #0f2b24;

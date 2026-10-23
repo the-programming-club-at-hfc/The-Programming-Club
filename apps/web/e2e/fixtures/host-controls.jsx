@@ -1,10 +1,9 @@
 // This fixture mounts real source controls once, after the test intercepts their service imports.
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Tabs } from "@base-ui/react/tabs";
 import { FeedbackProvider } from "../../src/components/feedback";
 import { NextPanel } from "../../src/components/next";
-import { PhoneBar, TeamsPanel, ScreenPanel } from "../../src/routes/hello-world/host.tsx?tsr-split=component";
+import { HostBar, ScoresPane, ScreenPanel } from "../../src/routes/hello-world/host.tsx?tsr-split=component";
 import { PlayTonight } from "../../src/routes/hello-world/join.tsx?tsr-split=component";
 import { useRecordedCalls } from "./host-controls-convex.jsx";
 
@@ -12,7 +11,7 @@ const live = {
   _id: "local-session",
   week: 1,
   double: false,
-  screen: { mode: "join" },
+  screen: { mode: "lobby" },
   timer: { durationMs: 90000, remainingMs: 90000, relay: false },
   sound: { music: false, volume: 0 },
   card: null,
@@ -30,7 +29,7 @@ const lineup = [{ label: "Bug Hunt", double: false }];
 
 function Fixture() {
   const [view, setView] = useState("phone");
-  const [pane, setPane] = useState("run");
+  const [settingsOpen, setSettingsOpen] = useState(true);
   const [changed, setChanged] = useState(false);
   const [playing, setPlaying] = useState(true);
   const calls = useRecordedCalls();
@@ -49,12 +48,8 @@ function Fixture() {
             </button>
           ))}
         </nav>
-        {view === "phone" && (
-          <Tabs.Root value={pane} onValueChange={setPane}>
-            <PhoneBar live={live} pane={pane} />
-          </Tabs.Root>
-        )}
-        {view === "teams" && <TeamsPanel live={changed ? roundLive : live} keys={{}} />}
+        {view === "phone" && <HostBar live={live} />}
+        {view === "teams" && <ScoresPane live={changed ? roundLive : live} keys={{}} open={settingsOpen} setOpen={setSettingsOpen} />}
         {view === "screen" && <ScreenPanel live={{ ...live, screen: { game: "bug", index: 0, revealed: false, mode: "lobby" } }} />}
         {view === "tonight" && (
           <>

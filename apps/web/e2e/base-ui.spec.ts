@@ -3,12 +3,6 @@ import type { Page } from "@playwright/test";
 
 async function mountControls(page: Page) {
   await page.routeWebSocket(/.*/, () => {});
-  // Expose the actual private pane wrapper only to this test browser. Auth and source stay intact.
-  await page.route("**/src/routes/hello-world/host.tsx?*", async (route) => {
-    if (new URL(route.request().url()).searchParams.get("tsr-split") !== "component") return route.continue();
-    const response = await route.fetch();
-    await route.fulfill({ response, body: `${await response.text()}\nexport { PanePanel };\n` });
-  });
   await page.route("**/__cup_control_test", (route) =>
     route.fulfill({
       contentType: "text/html",
@@ -129,29 +123,6 @@ test("game search supports keyboard selection, empty results, and repeat additio
   await expect(page.getByLabel("Added games")).toHaveText("draw,draw");
   await picker.fill("No matching test game");
   await expect(page.getByRole("option")).toHaveCount(0);
-});
-
-test("responsive panes preserve forms and expose all desktop controls", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await mountControls(page);
-  await page.getByRole("button", { name: "panes", exact: true }).click();
-  const panes = page.getByRole("region", { name: "Responsive panes" });
-  await expect(panes.getByRole("tabpanel")).toHaveCount(1);
-  await panes.getByRole("textbox", { name: "Run draft" }).fill("preserved draft");
-  await panes.getByRole("tab", { name: "Run", exact: true }).focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(panes.getByRole("tab", { name: "Scores", exact: true })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(panes.getByRole("tabpanel")).toHaveCount(1);
-  await expect(panes.getByRole("textbox", { name: "Scores draft" })).toBeVisible();
-  await panes.getByRole("tab", { name: "Run", exact: true }).click();
-  await expect(panes.getByRole("textbox", { name: "Run draft" })).toHaveValue("preserved draft");
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(panes.getByRole("tabpanel")).toHaveCount(5);
-  await expect(panes.getByRole("textbox")).toHaveCount(5);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(panes.getByRole("tabpanel")).toHaveCount(1);
-  await expect(panes.getByRole("textbox", { name: "Run draft" })).toHaveValue("preserved draft");
 });
 
 test("game search follows controlled selection and disabled state", async ({ page }) => {

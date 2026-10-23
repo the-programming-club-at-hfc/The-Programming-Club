@@ -1,5 +1,5 @@
 // Loaded only by Playwright through the Vite development server. All action data is local.
-import { StrictMode, Suspense, lazy, useState } from "react";
+import { StrictMode, Suspense, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ConvexError } from "convex/values";
 import { NO_PICK, PhoneRound } from "../../src/components/answer";
@@ -9,8 +9,6 @@ import { SearchPicker } from "../../src/components/search-picker";
 import { FixRound } from "../../src/components/fix";
 import { PuzzleRound } from "../../src/components/puzzle";
 import { choices } from "../../src/lib/grading";
-
-const Panes = lazy(() => import("./host-panes.jsx"));
 
 function Answers() {
   const [game, setGame] = useState("lang");
@@ -182,7 +180,7 @@ function Fixture() {
     <FeedbackProvider>
       <div id="cup-control-fixture" className="fixed inset-0 z-[90] overflow-auto bg-paper p-5 text-ink">
         <nav aria-label="Test cases" className="mb-5 flex flex-wrap gap-2">
-          {["feedback", "answers", "picker", "panes", "code"].map((id) => (
+          {["feedback", "answers", "picker", "code"].map((id) => (
             <button key={id} className="btn" onClick={() => setView(id)}>
               {id}
             </button>
@@ -192,17 +190,7 @@ function Fixture() {
           </button>
         </nav>
         <Suspense fallback={<p>Loading test case…</p>}>
-          {view === "feedback" ? (
-            <FeedbackCases />
-          ) : view === "answers" ? (
-            <Answers />
-          ) : view === "picker" ? (
-            <Pickers />
-          ) : view === "code" ? (
-            <CodeCases />
-          ) : (
-            <Panes />
-          )}
+          {view === "feedback" ? <FeedbackCases /> : view === "answers" ? <Answers /> : view === "picker" ? <Pickers /> : <CodeCases />}
         </Suspense>
       </div>
     </FeedbackProvider>

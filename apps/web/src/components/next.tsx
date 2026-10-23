@@ -2,7 +2,7 @@
 // lineup. Everything it shows comes from the session (see src/lib/flow.ts), so a reload picks up where it left off.
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { DECKS, fmtClock, useRemaining } from "./game";
 import type { Screen } from "./game";
@@ -82,6 +82,55 @@ export function useGuardedAction(snapshot: string) {
   return { busy, act };
 }
 
+// Which focused things own which of the night's keys. Text entry owns every key. Space presses whatever focusable control
+// has focus, so any of them owns it. Arrows move within tabs, radios, menus, sliders, and similar groups, and N types
+// ahead in menus and lists, so those own them; a plain button or link owns neither, so after clicking +1 the arrow still
+// advances the night. Anything marked data-own-keys owns them all.
+const roles = (...names: string[]) => names.map((r) => `[role="${r}"]`);
+const TEXT = [
+  "input",
+  "textarea",
+  "select",
+  '[contenteditable]:not([contenteditable="false"])',
+  "[data-own-keys]",
+  ...roles("textbox", "searchbox", "spinbutton", "combobox"),
+];
+const SPACE_OWNERS = [
+  ...TEXT,
+  "button",
+  "a[href]",
+  "summary",
+  // A tab panel takes focus when its empty space is clicked, so it doesn't count.
+  '[tabindex]:not([tabindex="-1"]):not([role="tabpanel"])',
+  ...roles("button", "link", "checkbox", "radio", "switch", "slider", "tab", "option", "menuitem", "menuitemradio", "menuitemcheckbox"),
+].join(", ");
+const ARROW_OWNERS = [
+  ...TEXT,
+  ...roles(
+    "tab",
+    "radio",
+    "slider",
+    "option",
+    "listbox",
+    "menu",
+    "menuitem",
+    "menuitemradio",
+    "menuitemcheckbox",
+    "toolbar",
+    "grid",
+    "tree",
+  ),
+].join(", ");
+const N_OWNERS = [...TEXT, ...roles("listbox", "option", "menu", "menuitem", "menuitemradio", "menuitemcheckbox", "tree", "grid")].join(
+  ", ",
+);
+/** A dialog, confirmation, or popover is open: it has the keyboard, wherever focus is. Notifications (see feedback.tsx)
+ *  also use dialog roles but never take the keyboard, so they don't count, and every match is checked so a notification
+ *  can't hide a real dialog behind it. */
+const OVERLAY = '[role="dialog"], [role="alertdialog"], [aria-modal="true"]';
+const overlayOpen = () =>
+  [...document.querySelectorAll(OVERLAY)].some((el) => !el.closest('[data-feedback="notifications"]') && el.getClientRects().length > 0);
+
 /** Changes that invalidate an approval to replace or finish the current game. */
 export const liveActionKey = (live: Live) =>
   JSON.stringify([live._id, live.round, live.screen, live.unrevealed, live.scored, live.teamSize, live.double, live.timer]);
@@ -110,7 +159,8 @@ export function WordPeek({ word }: { word: string }) {
   );
 }
 
-const level = (game: GameId, i: number) =>
+/** A Bug Hunt, Fix it for real, or Code Relay card's difficulty. */
+export const cardLevel = (game: GameId, i: number) =>
   game === "bug" ? BUGS[i].level : game === "fix" ? FIXES[i].level : game === "relay" ? RELAYS[i].level : null;
 
 /**
@@ -175,6 +225,23 @@ export function useNewDrawing() {
     const drawing = await start();
     await setScreen({ screen: { mode: "draw", drawing, revealed: false } });
     await timer({ action: "set", seconds: DRAW_SECONDS, relay: false, autostart: true });
+  };
+}
+
+/**
+ * Reveal the TV's card, race, or drawing, bringing it back on the TV first if something else went up over it. A clock
+ * still running stops so the buzzer doesn't go off over the answer; one that ran out stays at "time". The server scores a
+ * reveal once, so revealing again after hiding the answer never scores twice.
+ */
+export function useReveal(live: Live) {
+  const setScreen = useMutation(api.sessions.setScreen);
+  const timer = useMutation(api.sessions.timer);
+  // Time left as of the press, read then rather than ticking here, so the callers don't redraw every 200 ms.
+  return async (mode: "card" | "wiki" | "draw") => {
+    const t = live.timer;
+    const running = t.startedAt !== undefined && t.remainingMs - (Date.now() - t.startedAt) > 0;
+    await setScreen({ screen: { ...live.screen, mode, revealed: true } });
+    if (running) await timer({ action: "pause" });
   };
 }
 
@@ -303,6 +370,7 @@ export function NextPanel({
   const readyRace = useReadyRace();
   const startRace = useStartRace();
   const newDrawing = useNewDrawing();
+  const revealNow = useReveal(live);
   const remaining = useRemaining(live.timer);
   const confirm = useConfirm();
   const notify = useNotify();
@@ -424,10 +492,7 @@ export function NextPanel({
           : r?.kind === "pictionary"
             ? "Reveal the word and score"
             : "Reveal answer",
-    go: async () => {
-      await setScreen({ screen: { ...s, mode: home, revealed: true } });
-      await pause();
-    },
+    go: () => revealNow(home),
   };
   let primary: Action | null = null;
   let alt: Action | null = null;
@@ -478,31 +543,26 @@ export function NextPanel({
 
   const act = (a: Action) => guardedAct(a.go);
 
-  // Space or → for the big button, N for the next round. Typing in a field, a control with its own keys, an open menu,
-  // and a phone's other panes (where this panel is hidden) are left alone.
+  // Space or → for the big button, N for the second one, unless what has focus owns that key (see SPACE_OWNERS) or a
+  // dialog is open. A focused button gets its own Space press, the big button included, exactly once; nothing is blurred.
+  // Keys another handler already took are left alone, and so is this panel while it's hidden.
   const keys = useRef({ primary, alt, busy, act });
   keys.current = { primary, alt, busy, act };
   const panel = useRef<HTMLElement>(null);
+  const panelId = useId();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target instanceof HTMLElement ? e.target : null;
-      if (
-        e.repeat ||
-        e.metaKey ||
-        e.ctrlKey ||
-        e.altKey ||
-        t?.closest(
-          'input, textarea, select, summary, details[open], [contenteditable], [data-own-keys], [role="dialog"], [role="alertdialog"], [role="menu"], [role="combobox"], [role="radio"], [role="switch"], [role="slider"], [role="tab"]',
-        ) ||
-        !panel.current?.offsetParent
-      )
-        return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (e.defaultPrevented || e.repeat || e.metaKey || e.ctrlKey || e.altKey || !panel.current?.offsetParent) return;
+      const space = e.key === " ";
+      const arrow = e.key === "ArrowRight";
+      const n = e.key === "n" || e.key === "N";
+      if (!(space || arrow || n) || overlayOpen()) return;
+      if (t?.closest(space ? SPACE_OWNERS : arrow ? ARROW_OWNERS : N_OWNERS)) return;
       const k = keys.current;
-      const a = e.key === " " || e.key === "ArrowRight" ? k.primary : e.key === "n" || e.key === "N" ? k.alt : null;
+      const a = n ? k.alt : k.primary;
       if (!a || a.keys === false) return;
       e.preventDefault();
-      // A focused button would also click on Space in some browsers, so let go of it.
-      if (t instanceof HTMLButtonElement) t.blur();
       if (!k.busy) void k.act(a);
     };
     window.addEventListener("keydown", onKey);
@@ -514,84 +574,83 @@ export function NextPanel({
     (step === "scores" || step === "choose" || step === "done" || step === "next") &&
     !(r.kind === "wiki" || r.kind === "puzzle" || r.kind === "pictionary" || (r.kind === "deck" && r.game !== "relay"));
   const rules = r && GAMES.find((g) => g.id === (r.game ?? r.kind));
+  // The details under the button, one short line each: where the night is, what's up, what's next.
+  const nextCardLine =
+    r?.kind === "deck" && r.game && between
+      ? `Next ${thing}: ${
+          card === null
+            ? "none left tonight"
+            : `${DECKS[r.game].name} #${card + 1}${cardLevel(r.game, card) ? `, ${cardLevel(r.game, card)}` : ""}, ${fmtClock(cardSeconds(r.game, card) * 1000)}`
+        } · ${freshLeft(r, used, shown)} fresh left`
+      : r?.kind === "puzzle" && r.puzzle !== undefined && step === "show"
+        ? `Next puzzle: ${puzzleTitle(r.puzzle)}, ${fmtClock(cardSeconds("puzzle", r.puzzle) * 1000)}${
+            !w.solo && PUZZLES[r.puzzle].relay ? " with relay chimes every 2 minutes" : ""
+          } · ${w.computers} at /hello-world/fix`
+        : race && between
+          ? `Next race: ${race.from} → ${race.to}, ${race.clicks ? "Fewest Clicks, " : ""}${fmtClock(wikiSeconds(race.clicks) * 1000)}`
+          : null;
   return (
-    <section ref={panel} className={`card p-5 ring-2 ring-gold max-lg:p-4 ${className}`}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-2xl max-lg:text-lg">Run the night</h2>
-        <p className="text-dim">
+    <section ref={panel} aria-labelledby={`${panelId}-title`} className={`min-w-0 ${className}`}>
+      <h2 id={`${panelId}-title`} className="sr-only">
+        Run the night
+      </h2>
+      {!primary ? (
+        <p className="card p-4 text-dim">No games in tonight’s lineup yet. Add some with Edit lineup.</p>
+      ) : (
+        <div className={`grid gap-2 ${alt ? "grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]" : ""}`}>
+          <button
+            className={`btn btn-coin min-h-14 w-full aria-disabled:cursor-wait aria-disabled:opacity-60 text-lg leading-tight whitespace-normal short:min-h-11 short:py-2 short:text-base lg:min-h-16 lg:text-2xl ${ready ? "ring-4 ring-sun ring-offset-2" : ""}`}
+            // Not disabled while it works: a disabled button drops focus, and the next key would land nowhere. The
+            // guard ignores presses until the last one finishes.
+            aria-disabled={busy || undefined}
+            onClick={() => act(primary)}
+          >
+            {primary.label}
+          </button>
+          {alt && (
+            <button
+              className="btn min-h-14 w-full text-sm aria-disabled:cursor-wait aria-disabled:opacity-60 leading-tight whitespace-normal short:min-h-11 short:py-2 lg:min-h-16 lg:text-base"
+              aria-disabled={busy || undefined}
+              onClick={() => act(alt)}
+            >
+              {alt.label}
+            </button>
+          )}
+        </div>
+      )}
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-dim">
+        {ready && (
+          <p className="font-bold text-pine">
+            {allIn ? (drawing ? "Everyone guessing got it." : `Every ${w.team} ${allStars ? "has both stars" : "is in"}.`) : "Time’s up."}
+          </p>
+        )}
+        {teams === 0 && (step === "start" || step === "show") && (
+          <p className="font-semibold text-signal">
+            {w.solo ? "Nobody’s playing yet." : "No teams yet."}{" "}
+            {live.autoTeams
+              ? "Players go on as they join from the TV’s code."
+              : "Pick how tonight is played under Team settings (or turn on Auto teams) so phones can play."}
+          </p>
+        )}
+        <p className="short:hidden">
           {r ? (
             <>
-              Round {r.index + 1} of {rounds.length}: <strong className="text-ink">{r.label}</strong>
+              Round {r.index + 1} of {rounds.length}
+              {held ? `, ${held.toLowerCase()}` : ""}
             </>
           ) : (
             "Not started yet"
           )}
           {live.double && <span className="chip ml-2">Double points</span>}
         </p>
-      </div>
-      {!primary ? (
-        <p className="mt-3 text-dim">No games in tonight’s lineup yet. Add some below.</p>
-      ) : (
-        <div className={`mt-4 grid gap-2 ${alt ? "sm:grid-cols-[1.4fr_1fr]" : ""}`}>
-          <button
-            className={`btn btn-coin min-h-20 w-full text-2xl ${ready ? "ring-4 ring-sun ring-offset-2" : ""}`}
-            disabled={busy}
-            onClick={() => act(primary)}
-          >
-            {primary.label}
-          </button>
-          {alt && (
-            <button className="btn min-h-20 w-full text-xl" disabled={busy} onClick={() => act(alt)}>
-              {alt.label}
-            </button>
-          )}
-        </div>
-      )}
-      {ready && (
-        <p className="mt-2 font-bold text-pine">
-          {allIn ? (drawing ? "Everyone guessing got it." : `Every ${w.team} ${allStars ? "has both stars" : "is in"}.`) : "Time’s up."}
-        </p>
-      )}
-      {teams === 0 && (step === "start" || step === "show") && <p className="mt-2 font-semibold text-signal">{w.nobodyPlaying}</p>}
-      {r?.kind === "pictionary" && <DrawHost live={live} />}
-      {manual && (
-        <p className="mt-3 text-sm">
-          <strong>Score this one by hand</strong> with the score buttons{rules ? `: ${rules.scoring}` : "."}
-        </p>
-      )}
-      <div className="mt-3 space-y-0.5 text-sm text-dim">
-        {held && <p className="font-bold text-ink">{held}</p>}
-        {r?.kind === "deck" && r.game && between && (
-          <p>
-            Next {thing}:{" "}
-            {card === null
-              ? "none left tonight"
-              : `${DECKS[r.game].name} #${card + 1}${level(r.game, card) ? `, ${level(r.game, card)}` : ""}, ${fmtClock(cardSeconds(r.game, card) * 1000)}`}
-            {" · "}
-            {freshLeft(r, used, shown)} fresh left
-          </p>
-        )}
-        {r?.kind === "puzzle" && r.puzzle !== undefined && step === "show" && (
-          <p>
-            Next puzzle: {puzzleTitle(r.puzzle)}, {fmtClock(cardSeconds("puzzle", r.puzzle) * 1000)}
-            {!w.solo && PUZZLES[r.puzzle].relay ? " with relay chimes every 2 minutes" : ""}
-            {" · "}
-            {w.computers} at /hello-world/fix
-          </p>
-        )}
         {step === "hint" && <p>Half the time is gone, so the hint is unlocked.</p>}
         {step === "go" && (
           <p>
             On the TV: open {CLUB.url}/wiki. Start shows {s.wikiFrom} → {s.wikiTo} and sends every {w.computer} there at once.
           </p>
         )}
-        {race && between && (
-          <p>
-            Next race: {race.from} → {race.to}, {race.clicks ? "Fewest Clicks, " : ""}
-            {fmtClock(wikiSeconds(race.clicks) * 1000)}
-          </p>
-        )}
-        <p>
+        {nextCardLine && <p className="max-lg:hidden">{nextCardLine}</p>}
+        <p className="max-lg:hidden">
           {after ? (
             <>
               Up next: round {after.index + 1}, {after.label}
@@ -602,11 +661,16 @@ export function NextPanel({
           )}
         </p>
         {primary && primary.keys !== false && (
-          <p className="text-xs max-lg:hidden">
-            Keys: Space or → for “{primary.label}”{alt && alt.keys !== false ? `, N for “${alt.label}”` : ""}.
+          <p className="max-lg:hidden">
+            Keys: Space or → for “{primary.label}”{alt && alt.keys !== false ? `, N for “${alt.label}”` : ""}
           </p>
         )}
       </div>
+      {manual && (
+        <p className="mt-1.5 text-sm">
+          <strong>Score this one by hand</strong> with the score buttons{rules ? `: ${rules.scoring}` : "."}
+        </p>
+      )}
     </section>
   );
 }
