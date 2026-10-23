@@ -1,7 +1,13 @@
+import { Checkbox } from "@base-ui/react/checkbox";
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ConvexError } from "convex/values";
 import { useEffect, useMemo, useState } from "react";
 import { NO_PICK, PhoneRound } from "#/components/answer";
+import { useNotify } from "#/components/feedback";
 import { FixRound } from "#/components/fix";
 import { PuzzleRound } from "#/components/puzzle";
 import type { PickArgs, TeamPick } from "#/components/answer";
@@ -121,20 +127,29 @@ function Tester() {
         </Link>
       </header>
 
-      <div className="mt-6 flex flex-wrap gap-1 border-b-4 border-line pb-2">
+      <RadioGroup<TestGame>
+        name="deck"
+        required
+        aria-label="Challenge deck"
+        value={game}
+        onValueChange={(next) => {
+          setGame(next);
+          setIndex(0);
+        }}
+        className="mt-6 flex flex-wrap gap-1 border-b-4 border-line pb-2"
+      >
         {GAMES.map((g) => (
-          <button
+          <Radio.Root
             key={g}
-            onClick={() => {
-              setGame(g);
-              setIndex(0);
-            }}
+            value={g}
+            render={<button type="button" />}
+            nativeButton
             className={`px-3 py-1.5 font-bold ${game === g ? "bg-ink text-paper" : "text-dim hover:text-ink"}`}
           >
             {deckName(g)}
-          </button>
+          </Radio.Root>
         ))}
-      </div>
+      </RadioGroup>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button className="btn btn-sm" onClick={() => go(-1)}>
@@ -149,7 +164,14 @@ function Tester() {
           Next ›
         </button>
         <label className="ml-auto flex items-center gap-2 text-sm font-bold">
-          <input type="checkbox" className="size-4 accent-ink" checked={tv} onChange={(e) => setTv(e.target.checked)} />
+          <Checkbox.Root
+            name="tv-view"
+            className="flex size-4 shrink-0 items-center justify-center rounded-[3px] border border-ink data-checked:bg-ink data-checked:text-paper"
+            checked={tv}
+            onCheckedChange={setTv}
+          >
+            <Checkbox.Indicator>✓</Checkbox.Indicator>
+          </Checkbox.Root>
           Show the TV view
         </label>
       </div>
@@ -288,9 +310,9 @@ function Play({ game, index, tv }: { game: AnswerGame; index: number; tv: boolea
           <button className="btn btn-sm" onClick={() => restart(false)}>
             Reset, no timer
           </button>
-          <button className={`btn btn-sm ${double ? "btn-on" : ""}`} onClick={() => setDouble(!double)} aria-pressed={double}>
+          <Toggle className={`btn btn-sm ${double ? "btn-on" : ""}`} onPressedChange={setDouble} pressed={double}>
             Double points
-          </button>
+          </Toggle>
         </div>
         <p className="mt-3 text-sm text-dim">
           {early
@@ -379,18 +401,18 @@ function FixPlay({ index, tv, py }: { index: number; tv: boolean; py: Python }) 
               Reveal
             </button>
           )}
-          <button className={`btn btn-sm ${hint ? "btn-on" : ""}`} onClick={() => setHint(!hint)} aria-pressed={hint} disabled={revealed}>
+          <Toggle className={`btn btn-sm ${hint ? "btn-on" : ""}`} onPressedChange={setHint} pressed={hint} disabled={revealed}>
             Show hint
-          </button>
+          </Toggle>
           <button className="btn btn-sm" onClick={() => restart(true)}>
             Start {fmtClock(secs * 1000)} timer
           </button>
           <button className="btn btn-sm" onClick={() => restart(false)}>
             Reset, no timer
           </button>
-          <button className={`btn btn-sm ${double ? "btn-on" : ""}`} onClick={() => setDouble(!double)} aria-pressed={double}>
+          <Toggle className={`btn btn-sm ${double ? "btn-on" : ""}`} onPressedChange={setDouble} pressed={double}>
             Double points
-          </button>
+          </Toggle>
         </div>
         <p className="mt-3 text-sm text-dim">
           +{FIX_POINTS} for a fix in time, +{FIRST_FIX_BONUS} more for the first team. You’re the only team here, so a fix is first.
@@ -520,18 +542,18 @@ function PuzzlePlay({ index, tv, py }: { index: number; tv: boolean; py: Python 
               Reveal
             </button>
           )}
-          <button className={`btn btn-sm ${hint ? "btn-on" : ""}`} onClick={() => setHint(!hint)} aria-pressed={hint} disabled={revealed}>
+          <Toggle className={`btn btn-sm ${hint ? "btn-on" : ""}`} onPressedChange={setHint} pressed={hint} disabled={revealed}>
             Show hint
-          </button>
+          </Toggle>
           <button className="btn btn-sm" onClick={() => restart(true)}>
             Start {fmtClock(secs * 1000)} timer{p.relay ? " (relay)" : ""}
           </button>
           <button className="btn btn-sm" onClick={() => restart(false)}>
             Reset, no timer
           </button>
-          <button className={`btn btn-sm ${double ? "btn-on" : ""}`} onClick={() => setDouble(!double)} aria-pressed={double}>
+          <Toggle className={`btn btn-sm ${double ? "btn-on" : ""}`} onPressedChange={setDouble} pressed={double}>
             Double points
-          </button>
+          </Toggle>
         </div>
         <p className="mt-3 text-sm text-dim">
           +{PART1_POINTS} for part 1, +{PART2_POINTS} for part 2, and +{FIRST_STAR_BONUS} more for the first team to each star. You’re the
@@ -639,35 +661,56 @@ function WikiPlay({ index, tv }: { index: number; tv: boolean }) {
           <button className="btn btn-sm" onClick={() => restart(false)}>
             Reset, no timer
           </button>
-          <button className={`btn btn-sm ${clicks ? "btn-on" : ""}`} onClick={() => restart(timed, !clicks)} aria-pressed={clicks}>
+          <Toggle
+            className={`btn btn-sm ${clicks ? "btn-on" : ""}`}
+            onPressedChange={(pressed) => restart(timed, pressed)}
+            pressed={clicks}
+          >
             Fewest Clicks
-          </button>
-          <button className={`btn btn-sm ${double ? "btn-on" : ""}`} onClick={() => setDouble(!double)} aria-pressed={double}>
+          </Toggle>
+          <Toggle className={`btn btn-sm ${double ? "btn-on" : ""}`} onPressedChange={setDouble} pressed={double}>
             Double points
-          </button>
+          </Toggle>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1 text-sm">
           <span className="font-bold">Referee:</span>
-          <button
-            className={`btn btn-sm ${finish?.ok === true ? "btn-on" : ""}`}
+          <ToggleGroup<"accepted" | "rejected">
+            aria-label="Referee decision"
+            value={finish?.ok === true ? ["accepted"] : finish?.ok === false ? ["rejected"] : []}
             disabled={!finish || revealed}
-            onClick={() => finish && setFinish({ ...finish, ok: finish.ok === true ? null : true })}
+            onValueChange={(values) => finish && setFinish({ ...finish, ok: values.length ? values[0] === "accepted" : null })}
+            className="flex gap-1"
           >
-            ✓
-          </button>
-          <button
-            className={`btn btn-sm ${finish?.ok === false ? "btn-neon" : ""}`}
-            disabled={!finish || revealed}
-            onClick={() => finish && setFinish({ ...finish, ok: finish.ok === false ? null : false })}
+            <Toggle value="accepted" aria-label="Accept finish" className={`btn btn-sm ${finish?.ok === true ? "btn-on" : ""}`}>
+              ✓
+            </Toggle>
+            <Toggle value="rejected" aria-label="Reject finish" className={`btn btn-sm ${finish?.ok === false ? "btn-neon" : ""}`}>
+              ✗
+            </Toggle>
+          </ToggleGroup>
+          <span className="ml-2 font-bold" id="teams-ahead-label">
+            Teams ahead of you:
+          </span>
+          <RadioGroup<number>
+            name="teams-ahead"
+            required
+            aria-labelledby="teams-ahead-label"
+            value={ahead}
+            onValueChange={setAhead}
+            className="flex gap-1"
           >
-            ✗
-          </button>
-          <span className="ml-2 font-bold">Teams ahead of you:</span>
-          {[0, 1, 2, 3, 4].map((n) => (
-            <button key={n} className={`chip ${ahead === n ? "bg-ink text-paper" : ""}`} onClick={() => setAhead(n)}>
-              {n}
-            </button>
-          ))}
+            {[0, 1, 2, 3, 4].map((n) => (
+              <Radio.Root
+                key={n}
+                value={n}
+                render={<button type="button" />}
+                nativeButton
+                className={`chip ${ahead === n ? "bg-ink text-paper" : ""}`}
+              >
+                {n}
+              </Radio.Root>
+            ))}
+          </RadioGroup>
         </div>
         <p className="mt-3 text-sm text-dim">
           Scored with you, the teams ahead of you, and one team that doesn’t finish.
@@ -698,6 +741,8 @@ function FlagPanel({
   save: (f: Record<string, Flag>) => void;
   jump: (g: TestGame, i: number) => void;
 }) {
+  const notify = useNotify();
+  const [copyFallback, setCopyFallback] = useState("");
   const key = keyOf(game, index);
   const cur = flags[key] as Flag | undefined;
   const [copied, setCopied] = useState(false);
@@ -723,25 +768,26 @@ function FlagPanel({
   return (
     <section className="card mt-8 max-w-3xl p-5">
       <h2 className="text-2xl">Flag this card</h2>
-      <div className="mt-3 flex flex-wrap gap-1">
+      <ToggleGroup<Flag["flag"]>
+        aria-label="Card flag"
+        value={cur ? [cur.flag] : []}
+        onValueChange={(values) => set(values[0] ? { flag: values[0], note: cur?.note ?? "" } : null)}
+        className="mt-3 flex flex-wrap gap-1"
+      >
         {FLAGS.map((f) => (
-          <button
-            key={f}
-            className={`btn btn-sm capitalize ${cur?.flag === f ? "btn-neon" : ""}`}
-            onClick={() => set(cur?.flag === f ? null : { flag: f, note: cur?.note ?? "" })}
-            aria-pressed={cur?.flag === f}
-          >
+          <Toggle key={f} value={f} className={`btn btn-sm capitalize ${cur?.flag === f ? "btn-neon" : ""}`}>
             {f}
-          </button>
+          </Toggle>
         ))}
-        {cur && (
-          <button className="btn btn-sm text-dim" onClick={() => set(null)}>
-            Clear
-          </button>
-        )}
-      </div>
+      </ToggleGroup>
+      {cur && (
+        <button className="btn btn-sm mt-1 text-dim" onClick={() => set(null)}>
+          Clear
+        </button>
+      )}
       <input
         className="field mt-3"
+        aria-label="Flag note"
         placeholder={cur ? "Short note, e.g. “two choices are both right”" : "Pick a flag first, then add a note"}
         value={cur?.note ?? ""}
         onChange={(e) => cur && set({ ...cur, note: e.target.value })}
@@ -754,16 +800,31 @@ function FlagPanel({
         <button
           className="btn btn-sm btn-coin ml-auto"
           disabled={!list.length}
-          onClick={() =>
-            void navigator.clipboard.writeText(text).then(
-              () => setCopied(true),
-              () => alert(text),
-            )
-          }
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              setCopied(true);
+              setCopyFallback("");
+            } catch {
+              setCopyFallback(text);
+              notify.error("Couldn’t copy. Select and copy the flagged cards from the text box below.");
+            }
+          }}
         >
           {copied ? "Copied" : "Copy flagged cards"}
         </button>
       </div>
+      {copyFallback && (
+        <label className="mt-3 block text-sm font-bold">
+          Copy flagged cards manually
+          <textarea
+            className="field mt-1 min-h-32 font-normal"
+            readOnly
+            value={copyFallback}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+        </label>
+      )}
       {list.length === 0 ? (
         <p className="mt-2 text-sm text-dim">Nothing flagged yet. Flags stay in this browser until you clear them.</p>
       ) : (

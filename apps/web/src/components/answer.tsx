@@ -1,5 +1,7 @@
 // Phone answering for Bug Hunt, Output?, and Guess the Language. Presentational only: the join page wires it
 // to Convex, and the officer test page drives it with local state, so both show exactly the same thing.
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
 import { BUGS, LANGS } from "#/lib/content";
 import { choices, placeOf } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
@@ -180,26 +182,31 @@ function ChoiceList({
   w: TeamWords;
 }) {
   return (
-    <div className="mt-4 grid gap-2">
+    <RadioGroup
+      aria-label={code ? "Choose a fix" : "Choose an answer"}
+      value={pick.choice ?? null}
+      disabled={disabled}
+      onValueChange={(choice) => choice !== null && onPick(choice)}
+      className="mt-4 grid gap-2"
+    >
       {options.map((o) => {
         const on = pick.choice === o;
         return (
-          <button
+          <Radio.Root
             key={o}
-            type="button"
-            disabled={disabled}
-            onClick={() => onPick(o)}
-            aria-pressed={on}
+            value={o}
+            nativeButton
+            render={<button type="button" />}
             className={`code block w-full text-left break-words whitespace-pre-wrap ${on ? "shadow-[inset_0_0_0_4px_var(--color-sun)]" : disabled ? "opacity-60" : ""}`}
           >
             {code
               ? o.split("\n").map((l, i) => <span key={i} className="block" dangerouslySetInnerHTML={{ __html: highlight(l) || " " }} />)
               : o}
             {on && <span className="mt-1 block font-sans text-sm font-bold text-sun">{w.who(pick.choiceBy, w.You)} picked this</span>}
-          </button>
+          </Radio.Root>
         );
       })}
-    </div>
+    </RadioGroup>
   );
 }
 
@@ -214,27 +221,35 @@ function BugAnswer({ index, pick, onPick, onLock, solo }: RoundProps) {
         Find the one bug in this Python. Tap the line it’s on.
         <LevelChip level={b.level} />
       </p>
-      <pre className="code my-3 px-0">
+      <RadioGroup
+        render={<pre />}
+        aria-label="Choose the buggy line"
+        value={pick.line ?? null}
+        disabled={!canTap}
+        onValueChange={(line) => line !== null && onPick({ line })}
+        className="code my-3 px-0"
+      >
         <code className="block w-max min-w-full">
           {b.code.split("\n").map((l, i) => {
             const n = i + 1;
             const on = pick.line === n;
             return (
-              <button
+              <Radio.Root
                 key={i}
-                type="button"
-                disabled={!canTap || !l.trim()}
-                onClick={() => onPick({ line: n })}
-                aria-pressed={on}
+                value={n}
+                nativeButton
+                render={<button type="button" />}
+                disabled={!l.trim()}
+                aria-label={`Line ${n}: ${l}`}
                 className={`cl w-full px-5 py-2 text-left ${on ? "bg-pine shadow-[inset_5px_0_0_var(--color-sun)]" : canTap && l.trim() ? "hover:bg-white/10" : ""}`}
               >
                 <span className={`ln ${on ? "!text-sun" : ""}`}>{n}</span>
                 <span dangerouslySetInnerHTML={{ __html: highlight(l) || " " }} />
-              </button>
+              </Radio.Root>
             );
           })}
         </code>
-      </pre>
+      </RadioGroup>
       <LockStep
         what={pick.line !== undefined ? `line ${pick.line}` : undefined}
         by={pick.lineBy}
@@ -274,20 +289,25 @@ function LangAnswer({ index, pick, onPick, onLock, solo }: RoundProps) {
   const w = teamWords(solo);
   return (
     <>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <RadioGroup
+        aria-label="Choose a language"
+        value={pick.choice ?? null}
+        disabled={pick.locked}
+        onValueChange={(choice) => choice !== null && onPick({ choice })}
+        className="mt-4 grid grid-cols-2 gap-2"
+      >
         {choices("lang", index).map((l) => (
-          <button
+          <Radio.Root
             key={l}
-            type="button"
+            value={l}
+            nativeButton
+            render={<button type="button" />}
             className={`btn min-h-16 w-full text-lg ${pick.choice === l ? "btn-on disabled:opacity-100" : ""}`}
-            disabled={pick.locked}
-            onClick={() => onPick({ choice: l })}
-            aria-pressed={pick.choice === l}
           >
             {l}
-          </button>
+          </Radio.Root>
         ))}
-      </div>
+      </RadioGroup>
       <LockStep
         what={pick.choice}
         by={pick.choiceBy}

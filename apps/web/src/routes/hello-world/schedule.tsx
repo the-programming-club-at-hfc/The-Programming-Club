@@ -1,7 +1,12 @@
+import { Checkbox } from "@base-ui/react/checkbox";
+import { Toggle } from "@base-ui/react/toggle";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useConfirm } from "#/components/feedback";
+import { SearchPicker } from "#/components/search-picker";
+import type { PickerOption } from "#/components/search-picker";
 import { api } from "../../../convex/_generated/api";
 import { OfficerGate } from "#/components/officer";
 import { GAME_TILE, PageHead, Picto, Wrap, weekTile } from "#/components/ui";
@@ -68,7 +73,7 @@ function Planner() {
         </p>
       </nav>
       {/* key starts a fresh draft whenever another week is picked. */}
-      <Editor key={w.week} w={w} />
+      <Editor key={w.week} w={w} plan={plan} />
     </div>
   );
 }
@@ -90,7 +95,27 @@ const sameDraft = (a: Draft, b: Draft) =>
   JSON.stringify({ ...a, lineup: a.lineup.map((g) => [g.label, g.double]) }) ===
   JSON.stringify({ ...b, lineup: b.lineup.map((g) => [g.label, g.double]) });
 
-function Editor({ w }: { w: WeekPlan }) {
+const CATALOG_OPTIONS: PickerOption[] = [
+  ...CATALOG.flatMap((group) => group.items.map((label) => ({ value: label, label, group: group.name }))),
+  ...IDEA_GROUPS.flatMap((group) => group.ideas.map((idea) => ({ value: idea.name, label: idea.name, group: group.name }))),
+];
+
+function planCustomOptions(...lineups: LineupItem[][]): PickerOption[] {
+  const catalogLabels = new Set(CATALOG_OPTIONS.map((option) => option.value));
+  return lineups
+    .flat()
+    .filter((item) => !catalogLabels.has(item.label))
+    .map((item) => ({
+      value: item.label,
+      label: item.label,
+      group: "Custom activities",
+    }));
+}
+
+function Editor({ w, plan }: { w: WeekPlan; plan: WeekPlan[] }) {
+  const confirm = useConfirm();
+  const restoring = useRef(false);
+  const [resetting, setResetting] = useState(false);
   const save = useMutation(api.schedule.save);
   const reset = useMutation(api.schedule.reset);
   const original = draftOf(w);
@@ -112,6 +137,11 @@ function Editor({ w }: { w: WeekPlan }) {
   };
   const add = (label: string) => label.trim() && set({ lineup: [...d.lineup, { label: label.trim(), double: false }] });
   const inLineup = new Set(d.lineup.map((g) => g.label));
+  const pickerOptions = Array.from(
+    new Map(
+      [...CATALOG_OPTIONS, ...planCustomOptions(...plan.map((week) => week.lineup), d.lineup)].map((option) => [option.value, option]),
+    ).values(),
+  );
 
   async function submit() {
     setError("");
@@ -134,11 +164,28 @@ function Editor({ w }: { w: WeekPlan }) {
   }
 
   async function restore() {
-    if (!confirm(`Put week ${w.week} back to the original plan? Your edits to this week will be lost.`)) return;
+    if (restoring.current) return;
+    restoring.current = true;
+    setResetting(true);
     try {
+      if (
+        !(await confirm({
+          title: `Reset week ${w.week}?`,
+          description: "Put this week back to the original plan? Your edits to this week will be lost.",
+          confirmLabel: "Reset to the original plan",
+          destructive: true,
+        }))
+      )
+        return;
+      setError("");
       await reset({ week: w.week });
+      setD(draftOf(DEFAULT_PLAN[w.week - 1]));
+      setStatus("idle");
     } catch (e) {
       setError(e instanceof ConvexError ? String(e.data) : "Couldn’t reset. Check your connection and try again.");
+    } finally {
+      restoring.current = false;
+      setResetting(false);
     }
   }
 
@@ -186,12 +233,14 @@ function Editor({ w }: { w: WeekPlan }) {
           />
         </label>
         <label className="flex items-center gap-3 self-end pb-3">
-          <input
-            type="checkbox"
-            className="size-5 accent-[#12332b]"
+          <Checkbox.Root
+            name="cancelled"
+            className="flex size-5 shrink-0 items-center justify-center rounded-[3px] border border-ink data-checked:bg-ink data-checked:text-paper"
             checked={d.cancelled}
-            onChange={(e) => set({ cancelled: e.target.checked })}
-          />
+            onCheckedChange={(checked) => set({ cancelled: checked })}
+          >
+            <Checkbox.Indicator>✓</Checkbox.Indicator>
+          </Checkbox.Root>
           <span className="font-bold">No meeting this week</span>
         </label>
       </section>
@@ -207,26 +256,37 @@ function Editor({ w }: { w: WeekPlan }) {
               const id = gamesIn(g.label)[0];
               const gt = id ? GAME_TILE[id] : null;
               return (
-                <li key={i} className="flex items-center gap-2 bg-mist p-2">
+                <li key={i} className="flex flex-wrap items-center gap-2 bg-mist p-2">
                   <span className="narrow w-6 text-center text-lg font-extrabold">{i + 1}</span>
                   <span className={`tile ${gt?.tile ?? ideaTile(g.label) ?? "bg-line"} size-10 shrink-0`}>
                     {gt && <Picto id={gt.picto} className="absolute inset-[10%]" />}
                   </span>
-                  <input
-                    className="field min-w-0 flex-1 py-2"
-                    value={g.label}
-                    onChange={(e) => setLine(i, { label: e.target.value })}
-                    maxLength={80}
-                    aria-label={`Game ${i + 1}`}
-                  />
-                  <button
+                  <div className="min-w-0 flex-1 basis-48">
+                    <input
+                      className="field py-2"
+                      value={g.label}
+                      onChange={(e) => setLine(i, { label: e.target.value })}
+                      maxLength={80}
+                      aria-label={`Game ${i + 1}`}
+                    />
+                    <SearchPicker
+                      className="mt-2"
+                      options={pickerOptions}
+                      value={null}
+                      onValueChange={(label) => label !== null && setLine(i, { label })}
+                      label={`Swap game ${i + 1}`}
+                      placeholder="Search games and activities…"
+                    />
+                  </div>
+                  <Toggle
                     className={`btn btn-sm ${g.double ? "btn-on" : ""}`}
-                    onClick={() => setLine(i, { double: !g.double })}
-                    aria-pressed={g.double}
+                    onPressedChange={(pressed) => setLine(i, { double: pressed })}
+                    pressed={g.double}
+                    aria-label={`Double points for game ${i + 1}`}
                     title="Double points"
                   >
                     Double
-                  </button>
+                  </Toggle>
                   <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
                     ↑
                   </button>
@@ -245,6 +305,14 @@ function Editor({ w }: { w: WeekPlan }) {
         <div className="mt-8">
           <h4 className="text-lg font-extrabold">Add from the catalog</h4>
           <p className="text-sm text-dim">Every game and variant from the whole season. Click one to add it to this night.</p>
+          <SearchPicker
+            className="mt-4 max-w-lg"
+            options={pickerOptions}
+            value={null}
+            onValueChange={(label) => label !== null && add(label)}
+            label="Search the catalog"
+            placeholder="Search games and activities…"
+          />
           <div className="mt-4 grid gap-x-8 gap-y-6 sm:grid-cols-2">
             {CATALOG.map((grp) => {
               const gt = grp.id ? GAME_TILE[grp.id] : null;
@@ -353,10 +421,10 @@ function Editor({ w }: { w: WeekPlan }) {
       </section>
 
       <div className="sticky bottom-0 mt-12 flex flex-wrap items-center gap-3 border-t border-line bg-paper/95 py-4 backdrop-blur">
-        <button className="btn btn-primary" onClick={() => void submit()} disabled={!dirty || status === "saving"}>
+        <button className="btn btn-primary" onClick={() => void submit()} disabled={!dirty || status === "saving" || resetting}>
           {status === "saving" ? "Saving…" : `Save week ${w.week}`}
         </button>
-        <button className="btn" onClick={() => setD(original)} disabled={!dirty}>
+        <button className="btn" onClick={() => setD(original)} disabled={!dirty || resetting}>
           Discard changes
         </button>
         {status === "saved" && !dirty && <span className="font-semibold text-pine">Saved. It’s live.</span>}
@@ -367,7 +435,11 @@ function Editor({ w }: { w: WeekPlan }) {
           </span>
         )}
         {w.edited && (
-          <button className="link ml-auto text-sm" onClick={() => void restore()}>
+          <button
+            className="link ml-auto text-sm disabled:opacity-50"
+            onClick={() => void restore()}
+            disabled={resetting || status === "saving"}
+          >
             Reset to the original plan
           </button>
         )}

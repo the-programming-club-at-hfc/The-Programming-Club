@@ -1,3 +1,10 @@
+import { Menu } from "@base-ui/react/menu";
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
+import { Slider } from "@base-ui/react/slider";
+import { Switch } from "@base-ui/react/switch";
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { Tabs } from "@base-ui/react/tabs";
 import { UserButton } from "@clerk/tanstack-react-start";
 import { Link, createFileRoute } from "@tanstack/react-router";
@@ -9,8 +16,19 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { CardView, DECKS, fmtClock, fmtElapsed, useRemaining } from "#/components/game";
 import { kickoffSlides } from "#/components/kickoff";
 import type { GameId, Screen } from "#/components/game";
-import { DrawHost, NextPanel, okToLeave, useNewDrawing, useReadyRace, useStartRace } from "#/components/next";
-import { ExportButton, OfficerGate, run, useJoinCode } from "#/components/officer";
+import {
+  DrawHost,
+  NextPanel,
+  liveActionKey,
+  useGuardedAction,
+  useOkToLeave,
+  useNewDrawing,
+  useReadyRace,
+  useStartRace,
+} from "#/components/next";
+import { ExportButton, OfficerGate, useAction, useJoinCode } from "#/components/officer";
+import { useConfirm } from "#/components/feedback";
+import { SearchPicker } from "#/components/search-picker";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { WIKI_RACES, wikiUrl } from "#/lib/content";
 import { deckFor, filtersFor, heldKey, nounFor } from "#/lib/flow";
@@ -97,6 +115,8 @@ function Running({
   }, [label, playing]);
   const deck = useRef<HTMLDivElement>(null);
   const setRound = useMutation(api.sessions.setRound);
+  const okToLeave = useOkToLeave(live);
+  const { act } = useGuardedAction(JSON.stringify([liveActionKey(live), lineup]));
   // On a phone, one pane at a time, picked in the bar at the top; on a big screen, everything at once.
   const [pane, setPane] = useState<Pane>("run");
   return (
@@ -109,15 +129,18 @@ function Running({
           week={live.week}
           playing={playing}
           onPlay={(i, item) => {
-            // A double-points lineup round turns double points on; any other round turns it off.
-            void run(setRound({ round: i, double: item.double }));
-            const t = tabFor(item.label);
-            if (!t) return;
-            setTab(t);
-            // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
-            setPane("games");
-            // After the pane shows, so there's something to scroll to.
-            setTimeout(() => deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            void act(async (current) => {
+              if (!(await okToLeave()) || !current()) return;
+              // A double-points lineup round turns double points on; any other round turns it off.
+              await setRound({ round: i, double: item.double });
+              const t = tabFor(item.label);
+              if (!t) return;
+              setTab(t);
+              // The game's controls are in the Games pane on a phone, and further down the page on a big screen.
+              setPane("games");
+              // After the pane shows, so there's something to scroll to.
+              setTimeout(() => deck.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+            });
           }}
           className="mt-6"
         />
@@ -171,30 +194,43 @@ const PanePanel = ({ className = "", ...props }: Omit<Tabs.Panel.Props, "classNa
   <Tabs.Panel keepMounted hidden={false} inert={false} className={`max-lg:data-hidden:hidden ${className}`} {...props} />
 );
 
+function useEndNight(live: Live) {
+  const end = useMutation(api.sessions.end);
+  const confirm = useConfirm();
+  const { busy, act } = useGuardedAction(JSON.stringify([liveActionKey(live), live.teams]));
+  return {
+    busy,
+    endNight: () =>
+      act(async (current) => {
+        if (
+          !(await confirm({
+            title: "End the night?",
+            description: "Place XP goes out from the current standings.",
+            confirmLabel: "End night",
+            destructive: true,
+          })) ||
+          !current()
+        )
+          return;
+        await end();
+      }),
+  };
+}
+
 /** On a phone, pinned to the top: the night, the join code, the clock (tap to start or pause), the rest under ⋯, and the
  *  panes. The big screen's header does all this with room to spare. */
 function PhoneBar({ live, pane }: { live: Live; pane: Pane }) {
-  const end = useMutation(api.sessions.end);
+  const run = useAction();
+  const { busy, endNight } = useEndNight(live);
   const timer = useMutation(api.sessions.timer);
   const remaining = useRemaining(live.timer);
   const code = useJoinCode();
   const plan = useSchedule();
   const running = !!live.timer.startedAt;
-  // The ⋯ menu closes on a tap outside it or Escape, so it never sits over a pane.
-  const menu = useRef<HTMLDetailsElement>(null);
-  useEffect(() => {
-    const close = (e: Event) => {
-      const m = menu.current;
-      if (m?.open && (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target instanceof Node && m.contains(e.target))))
-        m.open = false;
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, []);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useRef<HTMLDivElement>(null);
+  const moreTrigger = useRef<HTMLButtonElement>(null);
+  const dialogHandoff = useRef(false);
   const links = [
     ["/hello-world/kickoff", "Kickoff slides"],
     ["/hello-world/schedule", "Plan the season"],
@@ -221,30 +257,66 @@ function PhoneBar({ live, pane }: { live: Live; pane: Pane }) {
         >
           {running ? "❚❚" : "▶"} {running && remaining === 0 ? "TIME" : fmtClock(remaining)}
         </button>
-        <details ref={menu} className="relative">
-          <summary className="btn btn-sm list-none [&::-webkit-details-marker]:hidden" aria-label="More">
-            ⋯
-          </summary>
-          <div className="card absolute right-0 z-50 mt-2 grid w-60 gap-1 p-2 shadow-lg">
-            <a href="/hello-world/tv" target="_blank" rel="noreferrer" className="btn btn-sm justify-start">
-              Open TV view
-            </a>
-            {links.map(([to, label]) => (
-              <Link key={to} to={to} className="btn btn-sm justify-start">
-                {label}
-              </Link>
-            ))}
-            <button
-              className="btn btn-sm btn-neon justify-start"
-              onClick={() => confirm("End the night? Place XP goes out from the current standings.") && run(end())}
-            >
-              End night
-            </button>
-            <span className="px-2 pt-1">
-              <UserButton />
-            </span>
-          </div>
-        </details>
+        <div ref={menu} data-own-keys>
+          <Menu.Root
+            open={menuOpen}
+            onOpenChange={(open) => {
+              if (open) dialogHandoff.current = false;
+              setMenuOpen(open);
+            }}
+            onOpenChangeComplete={(open) => {
+              if (!open && dialogHandoff.current) {
+                dialogHandoff.current = false;
+                // Wait until the menu releases its focus trap, then give the dialog a durable return target.
+                moreTrigger.current?.focus();
+                void endNight();
+              }
+            }}
+          >
+            <Menu.Trigger ref={moreTrigger} className="btn btn-sm" aria-label="More">
+              ⋯
+            </Menu.Trigger>
+            <Menu.Portal container={menu}>
+              <Menu.Positioner sideOffset={8} align="end" positionMethod="fixed" className="z-50">
+                <Menu.Popup
+                  finalFocus={moreTrigger}
+                  className="card grid max-h-[var(--available-height)] w-60 max-w-[var(--available-width)] gap-1 overflow-y-auto bg-paper p-2 text-ink shadow-lg"
+                >
+                  <Menu.LinkItem
+                    href="/hello-world/tv"
+                    target="_blank"
+                    rel="noreferrer"
+                    closeOnClick
+                    className="btn btn-sm justify-start data-highlighted:bg-mist"
+                  >
+                    Open TV view
+                  </Menu.LinkItem>
+                  {links.map(([to, label]) => (
+                    <Menu.LinkItem
+                      key={to}
+                      render={<Link to={to} />}
+                      closeOnClick
+                      className="btn btn-sm justify-start data-highlighted:bg-mist"
+                    >
+                      {label}
+                    </Menu.LinkItem>
+                  ))}
+                  <Menu.Item
+                    disabled={busy}
+                    className="btn btn-sm btn-neon justify-start data-highlighted:outline-2"
+                    onClick={() => {
+                      dialogHandoff.current = true;
+                      setMenuOpen(false);
+                    }}
+                  >
+                    End night
+                  </Menu.Item>
+                </Menu.Popup>
+              </Menu.Positioner>
+            </Menu.Portal>
+          </Menu.Root>
+        </div>
+        <UserButton />
       </div>
       <Tabs.List className="mt-1 grid grid-cols-5" aria-label="Host controls">
         {PANES.map(([p, label]) => (
@@ -253,7 +325,7 @@ function PhoneBar({ live, pane }: { live: Live; pane: Pane }) {
             value={p}
             className={`border-b-[3px] py-2.5 text-sm font-bold ${pane === p ? "border-ink text-ink" : "border-transparent text-dim"}`}
             onClick={() => {
-              menu.current?.removeAttribute("open");
+              setMenuOpen(false);
               scrollTo({ top: 0 });
             }}
           >
@@ -266,7 +338,7 @@ function PhoneBar({ live, pane }: { live: Live; pane: Pane }) {
 }
 
 function Header({ live }: { live: Live }) {
-  const end = useMutation(api.sessions.end);
+  const { busy, endNight } = useEndNight(live);
   const plan = useSchedule();
   const code = useJoinCode();
   return (
@@ -299,10 +371,7 @@ function Header({ live }: { live: Live }) {
         <Link to="/hello-world/test" className="btn btn-sm">
           Test the decks
         </Link>
-        <button
-          className="btn btn-sm btn-neon"
-          onClick={() => confirm("End the night? Place XP goes out from the current standings.") && run(end())}
-        >
+        <button className="btn btn-sm btn-neon" disabled={busy} onClick={() => endNight()}>
           End night
         </button>
         <span className="ml-2">
@@ -314,6 +383,7 @@ function Header({ live }: { live: Live }) {
 }
 
 function StartPanel({ recent }: { recent: HostData["recent"] }) {
+  const { busy, act } = useGuardedAction(JSON.stringify(recent.map((s) => s._id)));
   const start = useMutation(api.sessions.start);
   const reopen = useMutation(api.sessions.reopen);
   const plan = useSchedule();
@@ -323,19 +393,26 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
     <div className="grid gap-6 max-lg:pt-6 lg:grid-cols-2">
       <Panel title="Start tonight" className="ring-2 ring-gold">
         <p className="text-dim">Starting opens joining and puts the QR code on the TV.</p>
-        <label className="mt-4 block font-bold">
-          Week
-          <select className="field mt-1" value={week} onChange={(e) => setWeek(Number(e.target.value))}>
-            {plan.map((w) => (
-              <option key={w.week} value={w.week}>
-                Week {w.week}: {w.title}
-                {w.cancelled ? " (cancelled)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SearchPicker
+          className="mt-4"
+          label="Week"
+          value={String(week)}
+          disabled={busy}
+          options={plan.map((w) => ({ value: String(w.week), label: `Week ${w.week}: ${w.title}${w.cancelled ? " (cancelled)" : ""}` }))}
+          onValueChange={(value) => {
+            const next = plan.find((w) => String(w.week) === value);
+            if (next) setWeek(next.week);
+          }}
+        />
         <label className="mt-4 flex items-start gap-2">
-          <input type="checkbox" className="mt-1 size-4 accent-ink" checked={practice} onChange={(e) => setPractice(e.target.checked)} />
+          <Switch.Root
+            checked={practice}
+            onCheckedChange={setPractice}
+            disabled={busy}
+            className="mt-1 inline-flex h-6 w-10 shrink-0 rounded-full bg-line p-1 data-checked:bg-ink"
+          >
+            <Switch.Thumb className="size-4 rounded-full bg-paper transition-transform data-checked:translate-x-4" />
+          </Switch.Root>
           <span>
             <strong>Practice night</strong>
             <span className="block text-sm text-dim">
@@ -343,7 +420,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
             </span>
           </span>
         </label>
-        <button className="btn btn-coin mt-4 text-lg" onClick={() => run(start({ week, practice }))}>
+        <button className="btn btn-coin mt-4 text-lg" disabled={busy} onClick={() => act(() => start({ week, practice }))}>
           {practice ? `Start a practice of week ${week}` : `Start week ${week}`}
         </button>
         <p className="mt-4 text-sm text-dim">
@@ -371,7 +448,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
                 {s.practice && <span className="chip">Practice</span>}
                 <span className="ml-auto" />
                 {!s.practice && <ExportButton sessionId={s._id} />}
-                <button className="btn btn-sm" onClick={() => run(reopen({ sessionId: s._id }))}>
+                <button className="btn btn-sm" disabled={busy} onClick={() => act(() => reopen({ sessionId: s._id }))}>
                   Reopen
                 </button>
               </li>
@@ -385,6 +462,7 @@ function StartPanel({ recent }: { recent: HostData["recent"] }) {
 
 // The kickoff deck on the TV: always here on Week 1, and on any other night once the slides go up from "On the TV".
 function SlidesPanel({ live }: { live: Live }) {
+  const run = useAction();
   const setScreen = useMutation(api.sessions.setScreen);
   const count = kickoffSlides(useSchedule()).length;
   const on = live.screen.mode === "slides";
@@ -413,6 +491,7 @@ function SlidesPanel({ live }: { live: Live }) {
 }
 
 function ScreenPanel({ live }: { live: Live }) {
+  const run = useAction();
   const setScreen = useMutation(api.sessions.setScreen);
   const setSound = useMutation(api.sessions.setSound);
   const [message, setMessage] = useState("");
@@ -429,34 +508,38 @@ function ScreenPanel({ live }: { live: Live }) {
   ] as const;
   return (
     <Panel title="On the TV" className="">
-      <div className="flex flex-wrap gap-2">
+      <ToggleGroup<Screen["mode"]>
+        data-own-keys
+        value={[live.screen.mode]}
+        onValueChange={(values) => {
+          if (values.length === 0) return;
+          const [mode] = values;
+          if (mode === live.screen.mode) return;
+          void show({ ...live.screen, mode, ...(mode === "slides" ? { slide: live.screen.slide ?? 0 } : {}) });
+        }}
+        aria-label="On the TV"
+        className="flex flex-wrap gap-2"
+      >
         {/* The game stays here while something else is up (the screens below keep it), one tap from coming back. */}
         {held && (
-          <button
-            className={`btn btn-sm ${live.screen.mode === held ? "btn-on" : "btn-coin"}`}
-            onClick={() => live.screen.mode !== held && show({ ...live.screen, mode: held })}
-            aria-pressed={live.screen.mode === held}
-          >
+          <Toggle value={held} className={`btn btn-sm ${live.screen.mode === held ? "btn-on" : "btn-coin"}`}>
             {live.screen.mode === held ? `The ${thing}` : `Back to the ${thing}`}
-          </button>
+          </Toggle>
         )}
         {modes.map(([mode, label]) => (
-          <button
-            key={mode}
-            className={`btn btn-sm ${live.screen.mode === mode ? "btn-on" : ""}`}
-            onClick={() => show({ ...live.screen, mode })}
-          >
+          <Toggle key={mode} value={mode} className={`btn btn-sm ${live.screen.mode === mode ? "btn-on" : ""}`}>
             {label}
-          </button>
+          </Toggle>
         ))}
-        <button
-          className={`btn btn-sm ${live.screen.mode === "slides" ? "btn-on" : ""}`}
-          onClick={() => live.screen.mode !== "slides" && show({ ...live.screen, mode: "slides", slide: live.screen.slide ?? 0 })}
-        >
+        <Toggle value="slides" className={`btn btn-sm ${live.screen.mode === "slides" ? "btn-on" : ""}`}>
           Kickoff slides
-        </button>
-        {live.screen.mode === "message" && <span className="btn btn-sm btn-on pointer-events-none">Message</span>}
-      </div>
+        </Toggle>
+        {live.screen.mode === "message" && (
+          <Toggle value="message" className="btn btn-sm btn-on">
+            Message
+          </Toggle>
+        )}
+      </ToggleGroup>
       <form
         className="mt-3 flex gap-2"
         onSubmit={(e) => {
@@ -475,31 +558,43 @@ function ScreenPanel({ live }: { live: Live }) {
         <button className="btn btn-sm">Show</button>
       </form>
       <div className="mt-3 flex items-center gap-3">
-        <button
+        <Switch.Root
+          nativeButton
+          render={<button type="button" />}
+          checked={live.sound.music}
           className={`btn btn-sm ${live.sound.music ? "btn-on" : ""}`}
-          onClick={() => run(setSound({ music: !live.sound.music }))}
-          aria-pressed={live.sound.music}
+          onCheckedChange={(music) => {
+            void run(setSound({ music }));
+          }}
         >
           Music {live.sound.music ? "on" : "off"}
-        </button>
-        <label className="flex flex-1 items-center gap-2 text-sm font-bold">
-          Volume
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.1}
-            value={live.sound.volume}
-            onChange={(e) => run(setSound({ volume: Number(e.target.value) }))}
-            className="flex-1 accent-ink"
-          />
-        </label>
+        </Switch.Root>
+        <Slider.Root<number>
+          min={0}
+          max={1}
+          step={0.1}
+          value={live.sound.volume}
+          onValueChange={(volume) => {
+            void run(setSound({ volume }));
+          }}
+          className="flex min-w-24 flex-1 items-center gap-2 text-sm font-bold"
+          data-own-keys
+        >
+          <Slider.Label>Volume</Slider.Label>
+          <Slider.Control className="relative flex h-11 flex-1 touch-none items-center">
+            <Slider.Track className="relative h-2 w-full rounded-full bg-line">
+              <Slider.Indicator className="rounded-full bg-ink" />
+              <Slider.Thumb className="size-5 rounded-full border-2 border-ink bg-paper outline-offset-4" />
+            </Slider.Track>
+          </Slider.Control>
+        </Slider.Root>
       </div>
     </Panel>
   );
 }
 
 function TimerPanel({ live }: { live: Live }) {
+  const run = useAction();
   const timer = useMutation(api.sessions.timer);
   const remaining = useRemaining(live.timer);
   const running = !!live.timer.startedAt;
@@ -530,12 +625,17 @@ function TimerPanel({ live }: { live: Live }) {
           </button>
         ))}
       </div>
-      <button
+      <Switch.Root
+        nativeButton
+        render={<button type="button" />}
+        checked={live.timer.relay}
         className={`btn btn-sm mt-2 w-[calc(100%-8px)] ${live.timer.relay ? "btn-on" : ""}`}
-        onClick={() => run(timer({ action: "relay" }))}
+        onCheckedChange={() => {
+          void run(timer({ action: "relay" }));
+        }}
       >
         {live.timer.relay ? "Relay chime every 2 min: on" : "Relay chime every 2 min: off"}
-      </button>
+      </Switch.Root>
     </Panel>
   );
 }
@@ -548,52 +648,85 @@ const MODES = [
 ] as const;
 
 function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | null> }) {
+  const run = useAction();
   const make = useMutation(api.teams.make);
   const add = useMutation(api.teams.add);
   const setDouble = useMutation(api.sessions.setDouble);
   const resetScores = useMutation(api.teams.resetScores);
   const setAuto = useMutation(api.teams.setAuto);
   const w = teamWords(live.teamSize === 1);
+  const confirm = useConfirm();
+  const { busy, act } = useGuardedAction(JSON.stringify([liveActionKey(live), live.teams]));
   // Picking a mode (even tonight's) remakes tonight's teams. Points carry over: each new team starts from its players' average.
   const setMode = (size: 1 | 2 | 3) =>
-    (!live.teams.length ||
-      confirm(
-        size === 1
-          ? "Put everyone on a team of their own? Everyone keeps their own points."
-          : `Reshuffle everyone into teams of ${size}? Each team starts from its players’ average points.`,
-      )) &&
-    run(make({ size }));
+    act(async (current) => {
+      if (
+        live.teams.length &&
+        !(await confirm({
+          title: size === 1 ? "Put everyone on a team of their own?" : `Reshuffle everyone into teams of ${size}?`,
+          description: size === 1 ? "Everyone keeps their own points." : "Each team starts from its players’ average points.",
+          confirmLabel: size === 1 ? "Play solo" : "Remake teams",
+        }))
+      )
+        return;
+      if (current()) await make({ size });
+    });
 
   return (
     <Panel title="Teams & scores">
       <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="How tonight is played" className="inline-flex rounded-[6px] bg-mist p-1">
+        <ToggleGroup
+          data-own-keys
+          value={[String(live.teamSize)]}
+          onValueChange={([value]) => {
+            const mode = MODES.find(([size]) => String(size) === value);
+            if (mode) void setMode(mode[0]);
+          }}
+          disabled={busy || live.unrevealed.length > 0}
+          aria-label="How tonight is played"
+          className="inline-flex flex-wrap rounded-[6px] bg-mist p-1"
+        >
           {MODES.map(([size, label]) => (
-            <button
+            <Toggle
               key={size}
-              className={`min-h-10 rounded-[4px] px-3 text-sm font-semibold disabled:opacity-50 ${live.teamSize === size ? "bg-ink text-paper" : "text-ink"}`}
-              onClick={() => setMode(size)}
-              disabled={live.unrevealed.length > 0}
-              aria-pressed={live.teamSize === size}
+              value={String(size)}
+              className="min-h-10 rounded-[4px] px-3 text-sm font-semibold text-ink data-pressed:bg-ink data-pressed:text-paper data-disabled:opacity-50"
             >
               {label}
-            </button>
+            </Toggle>
           ))}
-        </div>
-        <button
+        </ToggleGroup>
+        {live.teams.length > 0 && (
+          <button
+            className="btn btn-sm"
+            disabled={busy || live.unrevealed.length > 0}
+            onClick={() => setMode(live.teamSize === 1 ? 1 : live.teamSize === 2 ? 2 : 3)}
+          >
+            {live.teamSize === 1 ? "Remake solo teams" : "Reshuffle teams"}
+          </button>
+        )}
+        <Switch.Root
+          nativeButton
+          render={<button type="button" />}
+          checked={live.double}
           className={`btn btn-sm ${live.double ? "btn-on" : ""}`}
-          onClick={() => run(setDouble({ on: !live.double }))}
-          aria-pressed={live.double}
+          onCheckedChange={(on) => {
+            void run(setDouble({ on }));
+          }}
         >
           Double points
-        </button>
-        <button
+        </Switch.Root>
+        <Switch.Root
+          nativeButton
+          render={<button type="button" />}
+          checked={live.autoTeams}
           className={`btn btn-sm ${live.autoTeams ? "btn-on" : ""}`}
-          onClick={() => run(setAuto({ on: !live.autoTeams }))}
-          aria-pressed={live.autoTeams}
+          onCheckedChange={(on) => {
+            void run(setAuto({ on }));
+          }}
         >
           Auto teams
-        </button>
+        </Switch.Root>
         {!w.solo && (
           <button className="btn btn-sm" onClick={() => run(add())}>
             Add team
@@ -617,7 +750,25 @@ function TeamsPanel({ live, keys }: { live: Live; keys: Record<string, string | 
         </ol>
       )}
       {live.teams.length > 0 && (
-        <button className="btn btn-sm mt-3 text-dim" onClick={() => confirm(`Set every ${w.team}’s score to 0?`) && run(resetScores())}>
+        <button
+          className="btn btn-sm mt-3 text-dim"
+          disabled={busy}
+          onClick={() =>
+            act(async (current) => {
+              if (
+                !(await confirm({
+                  title: "Reset scores to 0?",
+                  description: `Set every ${w.team}’s score to 0.`,
+                  confirmLabel: "Reset scores",
+                  destructive: true,
+                })) ||
+                !current()
+              )
+                return;
+              await resetScores();
+            })
+          }
+        >
           Reset scores to 0
         </button>
       )}
@@ -638,10 +789,14 @@ function TeamRow({
   teamKey?: string | null;
   keyTitle: string;
 }) {
+  const run = useAction();
   const score = useMutation(api.teams.score);
   const rename = useMutation(api.teams.rename);
   const remove = useMutation(api.teams.remove);
   const [more, setMore] = useState(false);
+  const [edit, setEdit] = useState<{ kind: "points" | "name"; value: string } | null>(null);
+  const confirm = useConfirm();
+  const { busy, act } = useGuardedAction(JSON.stringify(t));
   const add = (n: number) => run(score({ teamId: t._id, delta: n }));
   const members = t.members.join(", ");
   return (
@@ -684,29 +839,70 @@ function TeamRow({
           <button
             className="btn btn-sm"
             title="Any amount, e.g. −2 to undo a mistake"
-            onClick={() => {
-              const n = Number(prompt(`Points for ${t.name} (use a minus sign to take away)`)?.replace("−", "-"));
-              if (Number.isInteger(n) && n !== 0) void add(n);
-            }}
+            onClick={() => setEdit({ kind: "points", value: "" })}
           >
             Other amount…
           </button>
-          <button
-            className="btn btn-sm"
-            onClick={() => {
-              const name = prompt("Team name", t.name);
-              if (name) void run(rename({ teamId: t._id, name }));
-            }}
-          >
+          <button className="btn btn-sm" onClick={() => setEdit({ kind: "name", value: t.name })}>
             Rename
           </button>
           <button
             className="btn btn-sm ml-auto text-dim"
-            onClick={() => confirm(`Remove ${t.name}? Its players go back to no team.`) && run(remove({ teamId: t._id }))}
+            disabled={busy}
+            onClick={() =>
+              act(async (current) => {
+                if (
+                  !(await confirm({
+                    title: `Remove ${t.name}?`,
+                    description: "Its players go back to no team.",
+                    confirmLabel: "Remove team",
+                    destructive: true,
+                  })) ||
+                  !current()
+                )
+                  return;
+                await remove({ teamId: t._id });
+              })
+            }
           >
             Remove
           </button>
         </div>
+      )}
+      {more && edit && (
+        <form
+          className="mt-2 flex flex-wrap items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const value = edit.value.trim();
+            const points = Number(value.replace("−", "-"));
+            if (!value || (edit.kind === "points" && (!Number.isInteger(points) || points === 0))) return;
+            void act(async () => {
+              if (edit.kind === "name") await rename({ teamId: t._id, name: value });
+              else await score({ teamId: t._id, delta: points });
+              setEdit(null);
+            });
+          }}
+        >
+          <label className="min-w-0 flex-1 text-sm font-bold">
+            {edit.kind === "name" ? "Team name" : `Points for ${t.name}, use a minus sign to take away`}
+            <input
+              className="field mt-1"
+              autoFocus
+              required
+              disabled={busy}
+              value={edit.value}
+              inputMode={edit.kind === "points" ? "numeric" : "text"}
+              onChange={(event) => setEdit({ ...edit, value: event.target.value })}
+            />
+          </label>
+          <button className="btn btn-sm" disabled={busy}>
+            Save
+          </button>
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => setEdit(null)}>
+            Cancel
+          </button>
+        </form>
       )}
     </li>
   );
@@ -727,6 +923,7 @@ function LineupPanel({
   onPlay?: (i: number, item: LineupItem) => void;
   className?: string;
 }) {
+  const run = useAction();
   const save = useMutation(api.schedule.save);
   const w = useSchedule()[week - 1];
   const lineup = w.lineup;
@@ -751,19 +948,11 @@ function LineupPanel({
     [l[i], l[i + by]] = [l[i + by], l[i]];
     void update(l);
   };
-  const options = (
-    <>
-      {CATALOG.map((grp) => (
-        <optgroup key={grp.name} label={grp.name}>
-          {grp.items.map((label) => (
-            <option key={label} value={label}>
-              {label}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </>
-  );
+  const options = CATALOG.flatMap((group) => group.items.map((label) => ({ value: label, label, group: group.name })));
+  for (const item of lineup) {
+    if (!options.some((option) => option.value === item.label))
+      options.push({ value: item.label, label: item.label, group: "Custom activities" });
+  }
 
   return (
     <Panel
@@ -771,9 +960,9 @@ function LineupPanel({
       action={
         onPlay &&
         lineup.length > 0 && (
-          <button className={`btn btn-sm ${editing ? "btn-on" : ""}`} onClick={() => setEditing(!editing)} aria-pressed={editing}>
+          <Toggle className={`btn btn-sm ${editing ? "btn-on" : ""}`} pressed={editing} onPressedChange={setEditing}>
             {editing ? "Done" : "Edit"}
-          </button>
+          </Toggle>
         )
       }
       className={className}
@@ -806,23 +995,26 @@ function LineupPanel({
                 )}
                 {edit && (
                   <>
-                    <select
-                      className="field w-28 py-1 text-sm"
-                      value=""
-                      onChange={(e) => e.target.value && setLine(i, { label: e.target.value })}
-                      aria-label={`Swap game ${i + 1}`}
-                    >
-                      <option value="">Swap…</option>
-                      {options}
-                    </select>
-                    <button
+                    <SearchPicker
+                      className="w-full sm:w-48"
+                      value={null}
+                      onValueChange={(label) => {
+                        if (label) void setLine(i, { label });
+                      }}
+                      label={`Swap game ${i + 1}`}
+                      placeholder="Swap…"
+                      options={options}
+                    />
+                    <Toggle
+                      pressed={g.double}
                       className={`btn btn-sm ${g.double ? "btn-on" : ""}`}
-                      onClick={() => setLine(i, { double: !g.double })}
-                      aria-pressed={g.double}
+                      onPressedChange={(double) => {
+                        void setLine(i, { double });
+                      }}
                       title="Double points"
                     >
                       Double
-                    </button>
+                    </Toggle>
                     <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">
                       ↑
                     </button>
@@ -844,15 +1036,16 @@ function LineupPanel({
         </ol>
       )}
       {edit && (
-        <select
-          className="field mt-3 text-sm"
-          value=""
-          onChange={(e) => e.target.value && update([...lineup, { label: e.target.value, double: false }])}
-          aria-label="Add a game"
-        >
-          <option value="">+ Add a game…</option>
-          {options}
-        </select>
+        <SearchPicker
+          className="mt-3"
+          value={null}
+          onValueChange={(label) => {
+            if (label) void update([...lineup, { label, double: false }]);
+          }}
+          label="Add a game"
+          placeholder="+ Add a game…"
+          options={options}
+        />
       )}
     </Panel>
   );
@@ -938,6 +1131,7 @@ function DeckPanel({
 }
 
 function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Live; used: string[]; initial: Filter; pick?: number }) {
+  const run = useAction();
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const s = live.screen;
@@ -998,10 +1192,12 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
   // up with its own clock running, so the clock always belongs to the card on the TV and 0:00 closes its answers. A card
   // that already has answers or a score tonight comes back with the clock it left with (that's the server's job): a fresh
   // one would reopen it and hand every lock the early bonus. Start is there to give it one on purpose.
-  const showOnTv = async () => {
+  const okToLeave = useOkToLeave(live);
+  const { busy, act } = useGuardedAction(JSON.stringify([liveActionKey(live), game, index]));
+  const showOnTv = async (current: () => boolean) => {
     const key = cardKey(game, index);
     if (heldKey(s) === key) return setScreen({ screen: { ...s, mode: "card" } });
-    if (!okToLeave(live)) return;
+    if (!(await okToLeave()) || !current()) return;
     const scored = live.scored.includes(key);
     await setScreen({ screen: { mode: "card", game, index, revealed: scored } });
     if (!scored && !live.unrevealed.includes(key)) await start();
@@ -1010,20 +1206,28 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
   return (
     <div>
       {filters.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
+        <RadioGroup<Filter>
+          value={filter}
+          data-own-keys
+          aria-label="Filter cards"
+          className="mb-3 flex flex-wrap gap-1.5"
+          onValueChange={(f) => {
+            setFilter(f);
+            setPos(firstFresh(deckFor(game, f)));
+          }}
+        >
           {filters.map((f) => (
-            <button
+            <Radio.Root
               key={f}
-              className={`chip capitalize ${filter === f ? "bg-ink text-paper" : ""}`}
-              onClick={() => {
-                setFilter(f);
-                setPos(firstFresh(deckFor(game, f)));
-              }}
+              value={f}
+              nativeButton
+              render={<button type="button" />}
+              className="chip capitalize data-checked:bg-ink data-checked:text-paper"
             >
               {f}
-            </button>
+            </Radio.Root>
           ))}
-        </div>
+        </RadioGroup>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <button className="btn btn-sm" onClick={() => go(-1)}>
@@ -1045,7 +1249,7 @@ function CardTool({ game, live, used, initial, pick }: { game: GameId; live: Liv
             {s.revealed ? "Hide answer on TV" : "Reveal answer on TV"}
           </button>
         ) : (
-          <button className="btn btn-sm btn-neon" onClick={() => run(showOnTv())}>
+          <button className="btn btn-sm btn-neon" disabled={busy} onClick={() => act(showOnTv)}>
             Show on TV
           </button>
         )}
@@ -1139,6 +1343,7 @@ function AnswerStatus({ live }: { live: Live }) {
 
 /** Fix it for real on the TV: each team's status and the code that passed, the hint button, then the points. */
 function FixStatus({ live }: { live: Live }) {
+  const run = useAction();
   const data = useQuery(api.fixes.host);
   const setScreen = useMutation(api.sessions.setScreen);
   if (!data) return null;
@@ -1153,13 +1358,15 @@ function FixStatus({ live }: { live: Live }) {
           /hello-world/fix
         </p>
         {!s.revealed && !data.scored && (
-          <button
+          <Toggle
+            pressed={!!s.hint}
             className={`btn btn-sm ml-auto ${s.hint ? "btn-on" : ""}`}
-            onClick={() => run(setScreen({ screen: { ...s, hint: !s.hint } }))}
-            aria-pressed={!!s.hint}
+            onPressedChange={(hint) => {
+              void run(setScreen({ screen: { ...s, hint } }));
+            }}
           >
             {s.hint ? "Hide hint" : "Show hint"}
-          </button>
+          </Toggle>
         )}
       </div>
       {data.teams.length === 0 ? (
@@ -1197,6 +1404,7 @@ function FixStatus({ live }: { live: Live }) {
 
 /** A puzzle on the TV: each team's stars and lockouts, the hint button (lit up at half time), then the points. */
 function PuzzleStatus({ live, index }: { live: Live; index: number }) {
+  const run = useAction();
   const board = useQuery(api.puzzles.board);
   const extra = useQuery(api.puzzles.host);
   const [showKey, setShowKey] = useState(false);
@@ -1229,13 +1437,15 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
           lab computers at /hello-world/fix
         </p>
         {!s.revealed && !board.scored && (
-          <button
+          <Toggle
+            pressed={!!s.hint}
             className={`btn btn-sm ml-auto ${s.hint ? "btn-on" : halfway ? "btn-coin" : ""}`}
-            onClick={() => run(setScreen({ screen: { ...s, hint: !s.hint } }))}
-            aria-pressed={!!s.hint}
+            onPressedChange={(hint) => {
+              void run(setScreen({ screen: { ...s, hint } }));
+            }}
           >
             {s.hint ? "Hide hint" : halfway ? "Halfway: show hint" : "Show hint"}
-          </button>
+          </Toggle>
         )}
       </div>
       {board.teams.length === 0 ? (
@@ -1276,9 +1486,9 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
             ? "Points went on the board when you revealed. Use the score buttons to fix anything."
             : `Each ${w.team} gets a different input. A wrong answer locks the ${w.team} out for 30 seconds. Revealing adds +3 per part 1 star, +5 per part 2 star, and +2 more for the first ${w.team} to each star, doubled on double points. Ending the night scores a puzzle you never revealed.`}
         </p>
-        <button className="btn btn-sm text-dim" onClick={() => setShowKey(!showKey)} aria-pressed={showKey}>
+        <Toggle className="btn btn-sm text-dim" onPressedChange={setShowKey} pressed={showKey}>
           {showKey ? "Hide answers" : `Show each ${w.team}’s answers`}
-        </button>
+        </Toggle>
       </div>
     </div>
   );
@@ -1286,6 +1496,7 @@ function PuzzleStatus({ live, index }: { live: Live; index: number }) {
 
 /** Wiki Race on the TV: the finish order from phones with a ✓/✗ for the referee, then the points. */
 function WikiStatus({ live }: { live: Live }) {
+  const run = useAction();
   const data = useQuery(api.wiki.board);
   const check = useMutation(api.wiki.check);
   if (!data) return null;
@@ -1316,24 +1527,32 @@ function WikiStatus({ live }: { live: Live }) {
               {data.scored ? (
                 <span className="narrow text-xl font-extrabold">+{points.get(f.teamId) ?? 0}</span>
               ) : (
-                <>
-                  <button
-                    className={`btn btn-sm ${f.ok === true ? "btn-on" : ""}`}
-                    onClick={() => run(check({ teamId: f.teamId, card: data.card, ok: f.ok === true ? null : true }))}
-                    aria-pressed={f.ok === true}
-                    aria-label={`${f.name} made it`}
-                  >
+                <ToggleGroup<"correct" | "incorrect">
+                  data-own-keys
+                  aria-label={`Verify ${f.name}’s finish`}
+                  className="flex gap-2"
+                  value={f.ok === true ? ["correct"] : f.ok === false ? ["incorrect"] : []}
+                  onValueChange={(value) => {
+                    void run(
+                      check({
+                        teamId: f.teamId,
+                        card: data.card,
+                        ok: value.length === 0 ? null : value[0] === "correct",
+                      }),
+                    );
+                  }}
+                >
+                  <Toggle value="correct" className={`btn btn-sm ${f.ok === true ? "btn-on" : ""}`} aria-label={`${f.name} made it`}>
                     ✓
-                  </button>
-                  <button
+                  </Toggle>
+                  <Toggle
+                    value="incorrect"
                     className={`btn btn-sm ${f.ok === false ? "btn-neon" : ""}`}
-                    onClick={() => run(check({ teamId: f.teamId, card: data.card, ok: f.ok === false ? null : false }))}
-                    aria-pressed={f.ok === false}
                     aria-label={`${f.name} isn’t there yet`}
                   >
                     ✗
-                  </button>
-                </>
+                  </Toggle>
+                </ToggleGroup>
               )}
             </li>
           ))}
@@ -1357,16 +1576,19 @@ function WikiStatus({ live }: { live: Live }) {
 }
 
 function WikiTool({ live, used }: { live: Live; used: string[] }) {
+  const run = useAction();
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const readyRace = useReadyRace();
   const startRace = useStartRace();
   const s = live.screen;
+  const okToLeave = useOkToLeave(live);
   const [cs, setCs] = useState(false);
   const [clicks, setClicks] = useState(!!s.wikiClicks);
   const [race, setRace] = useState<{ from: string; to: string } | null>(
     s.mode === "wiki" && s.wikiFrom && s.wikiTo ? { from: s.wikiFrom, to: s.wikiTo } : null,
   );
+  const { busy, act } = useGuardedAction(JSON.stringify([liveActionKey(live), race, clicks]));
   // Follow the TV when the Next button or another officer puts up a race.
   useEffect(() => {
     if (s.mode === "wiki" && s.wikiFrom && s.wikiTo) {
@@ -1389,32 +1611,37 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
         <button className="btn btn-sm btn-coin" onClick={draw}>
           Draw a race
         </button>
-        <button className={`chip ml-2 ${cs ? "bg-ink text-paper" : ""}`} onClick={() => setCs(!cs)}>
+        <Switch.Root
+          nativeButton
+          render={<button type="button" />}
+          checked={cs}
+          onCheckedChange={setCs}
+          className={`chip ml-2 ${cs ? "bg-ink text-paper" : ""}`}
+        >
           Computer science targets only
-        </button>
-        <button
-          className={`chip ml-2 ${clicks ? "bg-ink text-paper" : ""} disabled:opacity-50`}
-          onClick={() => setClicks(!clicks)}
-          aria-pressed={clicks}
+        </Switch.Root>
+        <Switch.Root
+          nativeButton
+          render={<button type="button" />}
+          checked={clicks}
+          className={`chip ml-2 ${clicks ? "bg-ink text-paper" : ""} data-disabled:opacity-50`}
+          onCheckedChange={setClicks}
           // A race keeps its style once it's up, so finishes all count the same way.
           disabled={onTv}
         >
           Fewest Clicks
-        </button>
-        <select
-          className="field mt-2 w-full py-1 text-sm"
-          value=""
-          onChange={(e) => e.target.value && setRace(WIKI_RACES[Number(e.target.value)])}
-          aria-label="Pick a race"
-        >
-          <option value="">Or pick a race…</option>
-          {WIKI_RACES.map((r, i) => (
-            <option key={i} value={i}>
-              {r.from} → {r.to}
-              {raced(r) ? " (raced before)" : ""}
-            </option>
-          ))}
-        </select>
+        </Switch.Root>
+        <SearchPicker
+          className="mt-2 w-full"
+          value={null}
+          label="Pick a race"
+          placeholder="Or pick a race…"
+          options={WIKI_RACES.map((r, i) => ({ value: String(i), label: `${r.from} → ${r.to}${raced(r) ? " (raced before)" : ""}` }))}
+          onValueChange={(value) => {
+            const selected = WIKI_RACES.find((_, i) => String(i) === value);
+            if (selected) setRace(selected);
+          }}
+        />
       </div>
       {race && (
         <>
@@ -1444,7 +1671,13 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
               <button
                 className="btn btn-sm btn-neon"
                 // The get-ready screen first, so every team is on /wiki before the race shows.
-                onClick={() => okToLeave(live) && run(readyRace({ ...race, clicks }))}
+                disabled={busy}
+                onClick={() =>
+                  act(async (current) => {
+                    if (!(await okToLeave()) || !current()) return;
+                    await readyRace({ ...race, clicks });
+                  })
+                }
               >
                 Show on TV
               </button>
@@ -1477,18 +1710,14 @@ function WikiTool({ live, used }: { live: Live; used: string[] }) {
 
 /** Tech Pictionary outside the big button: a new drawing (the next drawer in turn), the reveal, and the drawing's controls. */
 function PictionaryTool({ live }: { live: Live }) {
+  const confirm = useConfirm();
+  const okToLeave = useOkToLeave(live);
+  const { busy, act } = useGuardedAction(liveActionKey(live));
   const newDrawing = useNewDrawing();
   const setScreen = useMutation(api.sessions.setScreen);
   const timer = useMutation(api.sessions.timer);
   const remaining = useRemaining(live.timer);
-  const [busy, setBusy] = useState(false);
   const s = live.screen;
-  // One tap at a time, so a double tap never starts two drawings.
-  const act = async (go: () => Promise<unknown>) => {
-    setBusy(true);
-    await run(go());
-    setBusy(false);
-  };
   // Like the big button: the reveal stops a running clock so the buzzer doesn't go off over the word.
   // The drawing comes back on the TV for its reveal, even after the scoreboard or join screen went up meanwhile.
   const reveal = async () => {
@@ -1504,7 +1733,19 @@ function PictionaryTool({ live }: { live: Live }) {
           className="btn btn-sm btn-neon"
           disabled={busy}
           onClick={() =>
-            (!up || confirm("A drawing is still up. Score it as it stands and start a new one?")) && okToLeave(live) && act(newDrawing)
+            act(async (current) => {
+              if (
+                up &&
+                !(await confirm({
+                  title: "Replace the current drawing?",
+                  description: "A drawing is still up. Score it as it stands and start a new one?",
+                  confirmLabel: "Score and replace drawing",
+                }))
+              )
+                return;
+              if (!current() || !(await okToLeave()) || !current()) return;
+              await newDrawing();
+            })
           }
         >
           New drawing, {fmtClock(DRAW_SECONDS * 1000)}
@@ -1531,6 +1772,7 @@ const BONUS_PRESETS = [
 
 /** A player's bonus XP tonight, each with what it was for, and a form to add one: pick a reason or type your own. */
 function Bonuses({ row }: { row: Row }) {
+  const run = useAction();
   const add = useMutation(api.teams.addBonus);
   const remove = useMutation(api.teams.removeBonus);
   const [form, setForm] = useState<{ why: string; xp: number } | null>(null);
@@ -1558,19 +1800,17 @@ function Bonuses({ row }: { row: Row }) {
             void run(add({ attendanceId: row._id, ...form }).then(() => setForm(null)));
           }}
         >
-          <select
-            className="field w-auto py-1 text-sm"
-            value=""
-            onChange={(e) => setForm(presets[Number(e.target.value)])}
-            aria-label={`Bonus reason for ${row.name}`}
-          >
-            <option value="">Pick a reason…</option>
-            {presets.map((p, i) => (
-              <option key={p.why} value={i}>
-                {p.why} (+{p.xp})
-              </option>
-            ))}
-          </select>
+          <SearchPicker
+            className="w-full sm:w-64"
+            value={null}
+            label={`Bonus reason for ${row.name}`}
+            placeholder="Pick a reason…"
+            options={presets.map((preset, i) => ({ value: String(i), label: `${preset.why} (+${preset.xp})` }))}
+            onValueChange={(value) => {
+              const preset = presets.find((_, i) => String(i) === value);
+              if (preset) setForm(preset);
+            }}
+          />
           <input
             className="field w-52 py-1 text-sm"
             placeholder="or type what it’s for"
@@ -1605,10 +1845,13 @@ function Bonuses({ row }: { row: Row }) {
 }
 
 function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sessionId: Id<"sessions"> }) {
+  const run = useAction();
   const move = useMutation(api.teams.move);
   const addPlayer = useMutation(api.teams.addPlayer);
   const removePlayer = useMutation(api.teams.removePlayer);
   const [form, setForm] = useState({ name: "", email: "" });
+  const confirm = useConfirm();
+  const { busy, act } = useGuardedAction(JSON.stringify([sessionId, rows.map((r) => [r._id, r.name, r.teamId])]));
 
   return (
     <Panel title={`Players (${rows.length})`}>
@@ -1634,22 +1877,38 @@ function PlayersPanel({ live, rows, sessionId }: { live: Live; rows: Row[]; sess
                   {r.broughtBy ? ` · brought by ${r.broughtBy}` : ""}
                 </p>
               </div>
-              <select
-                className="field w-auto py-1 text-sm"
+              <SearchPicker
+                className="w-full sm:w-48"
                 value={r.teamId ?? ""}
-                onChange={(e) => run(move({ attendanceId: r._id, teamId: (e.target.value || null) as Id<"teams"> | null }))}
-                aria-label={`Team for ${r.name}`}
-              >
-                <option value="">No team</option>
-                {live.teams.map((t) => (
-                  <option key={t._id} value={t._id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                label={`Team for ${r.name}`}
+                disabled={busy}
+                options={[{ value: "", label: "No team" }, ...live.teams.map((t) => ({ value: t._id, label: t.name }))]}
+                onValueChange={(value) => {
+                  if (value === "") void run(move({ attendanceId: r._id, teamId: null }));
+                  else {
+                    const team = live.teams.find((t) => t._id === value);
+                    if (team) void run(move({ attendanceId: r._id, teamId: team._id }));
+                  }
+                }}
+              />
               <button
                 className="text-sm text-dim underline"
-                onClick={() => confirm(`Remove ${r.name} from tonight?`) && run(removePlayer({ attendanceId: r._id }))}
+                disabled={busy}
+                onClick={() =>
+                  act(async (current) => {
+                    if (
+                      !(await confirm({
+                        title: `Remove ${r.name} from tonight?`,
+                        description: "They will be removed from tonight’s attendance and team.",
+                        confirmLabel: "Remove player",
+                        destructive: true,
+                      })) ||
+                      !current()
+                    )
+                      return;
+                    await removePlayer({ attendanceId: r._id });
+                  })
+                }
               >
                 Remove
               </button>

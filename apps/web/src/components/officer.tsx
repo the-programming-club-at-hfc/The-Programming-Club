@@ -1,19 +1,35 @@
 import { Show, SignInButton, SignOutButton, useAuth } from "@clerk/tanstack-react-start";
 import { useConvex, useConvexAuth, useQuery } from "convex/react";
-import { ConvexError } from "convex/values";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useSchedule } from "#/lib/schedule";
 import { CLUB } from "#/lib/season";
+import { useNotify } from "./feedback";
 
-/** Runs an officer action, with a plain alert if it fails. */
-export async function run(p: Promise<unknown>) {
-  try {
-    await p;
-  } catch (e) {
-    alert(e instanceof ConvexError ? String(e.data) : "That didn’t work. Check your connection and try again.");
-  }
+/** Reports failures without letting operations from a previous mount update the current UI. */
+export function useAction(): (operation: Promise<unknown>) => Promise<boolean> {
+  const notify = useNotify();
+  const lifetime = useRef(new AbortController());
+  useLayoutEffect(() => {
+    if (lifetime.current.signal.aborted) lifetime.current = new AbortController();
+    const controller = lifetime.current;
+    return () => controller.abort();
+  }, []);
+  return useCallback(
+    async (operation: Promise<unknown>) => {
+      const signal = lifetime.current.signal;
+      try {
+        await operation;
+        return true;
+      } catch (error) {
+        if (!signal.aborted) notify.error(error);
+        return false;
+      }
+    },
+    [notify],
+  );
 }
 
 /** True once the signed-in user is confirmed as an officer; false while loading or for everyone else. */
@@ -93,8 +109,14 @@ const csvCell = (v: string | number | boolean) => `"${String(v).replace(/"/g, '"
 export function ExportButton({ sessionId }: { sessionId: Id<"sessions"> }) {
   const convex = useConvex();
   const plan = useSchedule();
-  async function download() {
-    const d = await convex.query(api.sessions.attendanceExport, { sessionId });
+  const run = useAction();
+  const downloadRequest = useRef<AbortController | null>(null);
+  useLayoutEffect(() => () => downloadRequest.current?.abort(), [sessionId]);
+  async function download(signal: AbortSignal) {
+    const d = await convex.query(api.sessions.attendanceExport, { sessionId }).catch((error: unknown) => {
+      if (!signal.aborted) throw error;
+    });
+    if (!d || signal.aborted) return;
     const date = new Date(d.startedAt);
     const lines = [
       ["Date", date.toLocaleDateString("en-US", { timeZone: CLUB.timeZone })],
@@ -114,11 +136,16 @@ export function ExportButton({ sessionId }: { sessionId: Id<"sessions"> }) {
   return (
     <button
       className="btn btn-sm"
-      onClick={() =>
-        download().catch((e: unknown) =>
-          alert(e instanceof ConvexError ? String(e.data) : "That didn’t work. Check your connection and try again."),
-        )
-      }
+      onClick={async () => {
+        if (downloadRequest.current && !downloadRequest.current.signal.aborted) return;
+        const request = new AbortController();
+        downloadRequest.current = request;
+        try {
+          await run(download(request.signal));
+        } finally {
+          if (downloadRequest.current === request) downloadRequest.current = null;
+        }
+      }}
     >
       Attendance CSV
     </button>

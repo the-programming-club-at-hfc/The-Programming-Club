@@ -6,6 +6,7 @@ import { FIXES } from "#/lib/fixes";
 import type { FixTest } from "#/lib/fixes";
 import { TIMEOUT_MS, runTests } from "#/lib/python";
 import type { Python, TestResult } from "#/lib/python";
+import { useConfirm } from "./feedback";
 import { FixHint, LevelChip, fixedLines, fmtElapsed } from "./game";
 import { Code } from "./ui";
 
@@ -31,11 +32,20 @@ interface Props {
 }
 
 export function FixRound({ index, py, revealed, hint, open, fixed, result, saveKey, onFixed }: Props) {
+  const confirm = useConfirm();
+  const resetting = useRef<symbol | null>(null);
   const card = FIXES[index];
   const [code, setCode] = useState(card.code);
   const [busy, setBusy] = useState<"run" | "check" | null>(null);
   const [results, setResults] = useState<{ kind: "run" | "check"; list: TestResult[]; planned: number } | null>(null);
   const [error, setError] = useState("");
+
+  useEffect(
+    () => () => {
+      resetting.current = null;
+    },
+    [],
+  );
 
   useEffect(() => {
     const saved = saveKey && localStorage.getItem(saveKey);
@@ -44,6 +54,23 @@ export function FixRound({ index, py, revealed, hint, open, fixed, result, saveK
   const edit = (c: string) => {
     setCode(c);
     if (saveKey) localStorage.setItem(saveKey, c);
+  };
+
+  const resetCode = async () => {
+    if (code === card.code || resetting.current !== null) return;
+    const request = Symbol();
+    resetting.current = request;
+    try {
+      const yes = await confirm({
+        title: "Start over from the buggy program?",
+        description: "Your changes will be gone.",
+        confirmLabel: "Reset code",
+        destructive: true,
+      });
+      if (yes && resetting.current === request) edit(card.code);
+    } finally {
+      if (resetting.current === request) resetting.current = null;
+    }
   };
 
   const go = async (kind: "run" | "check") => {
@@ -100,12 +127,7 @@ export function FixRound({ index, py, revealed, hint, open, fixed, result, saveK
           <button className="btn btn-primary" disabled={!can || (!open && !fixed)} onClick={() => void go("check")}>
             {busy === "check" ? "Checking…" : "Check my fix"}
           </button>
-          <button
-            className="btn btn-sm ml-auto text-dim"
-            onClick={() =>
-              code !== card.code && confirm("Start over from the buggy program? Your changes will be gone.") && edit(card.code)
-            }
-          >
+          <button className="btn btn-sm ml-auto text-dim" onClick={() => void resetCode()}>
             Reset code
           </button>
         </div>

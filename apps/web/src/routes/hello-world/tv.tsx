@@ -9,7 +9,7 @@ import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
 import { Blanks, Sketch } from "#/components/draw";
 import { InstagramGlyph, InstagramQr } from "#/components/instagram";
-import { OfficerGate, run, useJoinCode } from "#/components/officer";
+import { OfficerGate, useAction, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
 import { GAMES } from "#/lib/content";
 import { heldLabel, roundOf } from "#/lib/flow";
@@ -304,9 +304,10 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
 
 // Kickoff slides: /host moves them, and so do the arrow keys or a clicker on the TV computer.
 function Slides({ screen }: { screen: Live["screen"] }) {
+  const run = useAction();
   const all = kickoffSlides(useSchedule());
   const setScreen = useMutation(api.sessions.setScreen);
-  const go = useCallback((to: number) => void run(setScreen({ screen: { ...screen, slide: to } })), [setScreen, screen]);
+  const go = useCallback((to: number) => void run(setScreen({ screen: { ...screen, slide: to } })), [run, setScreen, screen]);
   const i = Math.min(screen.slide ?? 0, all.length - 1);
   useSlideKeys(i, all.length, go);
   return <SlideStage slides={all} i={i} />;

@@ -1,12 +1,13 @@
 // A puzzle on a laptop: the story, the example, the team's own input, a Python editor, and an answer box per part.
 // Presentational: components/workspace.tsx wires it to Convex, and the officer test page drives it with local state.
 import { ConvexError } from "convex/values";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PUZZLES } from "#/lib/puzzles";
 import { TIMEOUT_MS } from "#/lib/python";
 import type { PyRun, Python } from "#/lib/python";
 import { teamWords } from "#/lib/words";
 import { Editor, PyState, Traceback } from "./fix";
+import { useConfirm, useNotify } from "./feedback";
 import { Hint, LevelChip, PuzzleExample, Rich, fmtElapsed } from "./game";
 import { Code } from "./ui";
 
@@ -45,6 +46,8 @@ print(lines[0])
 `;
 
 export function PuzzleRound({ index, input, py, revealed, hint, open, stars, lockedUntil, result, saveKey, onSubmit, solo }: Props) {
+  const confirm = useConfirm();
+  const resetting = useRef<symbol | null>(null);
   const p = PUZZLES[index];
   const [code, setCode] = useState(STARTER);
   const [busy, setBusy] = useState<"example" | "input" | null>(null);
@@ -54,6 +57,13 @@ export function PuzzleRound({ index, input, py, revealed, hint, open, stars, loc
   const done2 = stars.part2Ms !== null;
   const part: 1 | 2 = done1 ? 2 : 1;
 
+  useEffect(
+    () => () => {
+      resetting.current = null;
+    },
+    [],
+  );
+
   useEffect(() => {
     const saved = saveKey && localStorage.getItem(saveKey);
     if (saved) setCode(saved);
@@ -61,6 +71,23 @@ export function PuzzleRound({ index, input, py, revealed, hint, open, stars, loc
   const edit = (c: string) => {
     setCode(c);
     if (saveKey) localStorage.setItem(saveKey, c);
+  };
+
+  const resetCode = async () => {
+    if (code === STARTER || resetting.current !== null) return;
+    const request = Symbol();
+    resetting.current = request;
+    try {
+      const yes = await confirm({
+        title: "Start over?",
+        description: "Your code will be gone.",
+        confirmLabel: "Reset code",
+        destructive: true,
+      });
+      if (yes && resetting.current === request) edit(STARTER);
+    } finally {
+      if (resetting.current === request) resetting.current = null;
+    }
   };
 
   const go = async (on: "example" | "input") => {
@@ -118,10 +145,7 @@ export function PuzzleRound({ index, input, py, revealed, hint, open, stars, loc
           <button className="btn btn-coin" disabled={!can} onClick={() => void go("input")}>
             {busy === "input" ? "Running…" : "Run on my input"}
           </button>
-          <button
-            className="btn btn-sm ml-auto text-dim"
-            onClick={() => code !== STARTER && confirm("Start over? Your code will be gone.") && edit(STARTER)}
-          >
+          <button className="btn btn-sm ml-auto text-dim" onClick={() => void resetCode()}>
             Reset code
           </button>
         </div>
@@ -280,7 +304,16 @@ export function AnswerBox({
 
 /** The team's own input, to copy into another tool or download as input.txt. */
 export function InputBox({ input, solo }: { input: string; solo?: boolean }) {
+  const notify = useNotify();
   const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(input);
+      setCopied(true);
+    } catch {
+      notify.error("Couldn’t copy. Use Download input.txt instead.");
+    }
+  };
   const download = () => {
     const url = URL.createObjectURL(new Blob([input + "\n"], { type: "text/plain" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: "input.txt" });
@@ -296,15 +329,7 @@ export function InputBox({ input, solo }: { input: string; solo?: boolean }) {
             · {input.split("\n").length} lines, just for {teamWords(solo).you}
           </span>
         </p>
-        <button
-          className="btn btn-sm"
-          onClick={() =>
-            void navigator.clipboard.writeText(input).then(
-              () => setCopied(true),
-              () => alert("Couldn’t copy. Use Download input.txt instead."),
-            )
-          }
-        >
+        <button className="btn btn-sm" onClick={() => void copy()}>
           {copied ? "Copied" : "Copy input"}
         </button>
         <button className="btn btn-sm" onClick={download}>

@@ -1,10 +1,11 @@
+import { Toggle } from "@base-ui/react/toggle";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { FullScreen, Sketch, drawOpen } from "#/components/draw";
 import { fmtClock, useRemaining } from "#/components/game";
-import { OfficerGate, run } from "#/components/officer";
+import { OfficerGate, useAction } from "#/components/officer";
 import { Picto } from "#/components/ui";
 import { CLUB } from "#/lib/season";
 
@@ -47,6 +48,7 @@ function useWakeLock() {
 }
 
 function Pad() {
+  const run = useAction();
   useWakeLock();
   const live = useQuery(api.sessions.live);
   const data = useQuery(api.drawings.host);
@@ -83,13 +85,13 @@ function Pad() {
         <p className="min-w-0 truncate text-2xl font-extrabold">
           {d.drawerName} {d.over ? "drew" : "is drawing"}
         </p>
-        <button
+        <Toggle
           className={`btn min-w-48 text-xl ${show || d.over ? "btn-on" : ""}`}
-          onClick={() => setShown(show ? null : d.word)}
-          aria-pressed={show}
+          onPressedChange={(pressed) => setShown(pressed ? d.word : null)}
+          pressed={show}
         >
           {show || d.over ? d.word : "Tap to show the word"}
-        </button>
+        </Toggle>
         {open && d.got === 0 && (
           <button className="btn btn-sm" onClick={() => run(skip({ drawingId: d._id }).then(() => setShown(null)))}>
             Skip word

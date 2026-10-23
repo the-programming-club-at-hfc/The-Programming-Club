@@ -1,3 +1,5 @@
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { SignInButton, SignOutButton } from "@clerk/tanstack-react-start";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
@@ -624,24 +626,36 @@ function PlayTonight({ token, playing }: { token: string; playing: boolean }) {
   const [error, setError] = useState("");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div role="group" aria-label="Tonight" className="inline-flex rounded-[6px] bg-mist p-1">
+      <ToggleGroup<"true" | "false">
+        aria-label="Tonight"
+        value={[playing ? "true" : "false"]}
+        onValueChange={(values) => {
+          if (values.length === 0) return;
+          const on = values[0] === "true";
+          if (on !== playing) sender(setError)(setPlaying({ token, playing: on }));
+        }}
+        className="inline-flex rounded-[6px] bg-mist p-1"
+      >
         {(
           [
             [true, "Playing"],
             [false, "Just hosting"],
           ] as const
         ).map(([on, label]) => (
-          <button
+          <Toggle
             key={String(on)}
+            value={on ? "true" : "false"}
             className={`min-h-10 rounded-[4px] px-3 font-semibold ${on === playing ? "bg-ink text-paper" : "text-ink"}`}
-            aria-pressed={on === playing}
-            onClick={() => on !== playing && sender(setError)(setPlaying({ token, playing: on }))}
           >
             {label}
-          </button>
+          </Toggle>
         ))}
-      </div>
-      {error && <span className="text-signal">{error}</span>}
+      </ToggleGroup>
+      {error && (
+        <span role="alert" className="text-signal">
+          {error}
+        </span>
+      )}
     </div>
   );
 }

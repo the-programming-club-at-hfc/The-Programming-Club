@@ -8,7 +8,9 @@ import { DECKS, fmtClock, useRemaining } from "./game";
 import type { Screen } from "./game";
 import { drawOpen } from "./draw";
 import { WORD_MAX } from "#/lib/draw";
-import { run } from "./officer";
+import { useAction } from "./officer";
+import { useConfirm, useNotify } from "./feedback";
+import { SearchPicker } from "./search-picker";
 import { BUGS, GAMES, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
 import {
@@ -36,7 +38,53 @@ import { teamWords } from "#/lib/words";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type Live = NonNullable<FunctionReturnType<typeof api.sessions.live>>;
-type Action = { label: string; go: () => Promise<unknown> | undefined; keys?: false };
+type Action = { label: string; go: (current: () => boolean) => Promise<unknown> | undefined; keys?: false };
+
+/** One pending action per component. A dialog approval expires when its context changes or its owner unmounts. */
+export function useGuardedAction(snapshot: string) {
+  const run = useAction();
+  const notify = useNotify();
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  const isMounted = () => mounted.current;
+  const context = useRef({ snapshot, version: 0 });
+  if (context.current.snapshot !== snapshot) context.current = { snapshot, version: context.current.version + 1 };
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      context.current.version++;
+    };
+  }, []);
+  const act = async (go: (current: () => boolean) => Promise<unknown> | undefined) => {
+    if (pending.current || !isMounted()) return;
+    pending.current = true;
+    setBusy(true);
+    const version = context.current.version;
+    let notified = false;
+    const current = () => {
+      if (!mounted.current) return false;
+      if (context.current.version === version) return true;
+      if (!notified) {
+        notified = true;
+        notify.info("Things changed while you were deciding. Check and try again.");
+      }
+      return false;
+    };
+    try {
+      await run(Promise.resolve().then(() => (current() ? go(current) : undefined)));
+    } finally {
+      pending.current = false;
+      if (isMounted()) setBusy(false);
+    }
+  };
+  return { busy, act };
+}
+
+/** Changes that invalidate an approval to replace or finish the current game. */
+export const liveActionKey = (live: Live) =>
+  JSON.stringify([live._id, live.round, live.screen, live.unrevealed, live.scored, live.teamSize, live.double, live.timer]);
 
 /** The Pictionary word, shown to officers only while they press and hold. It never goes on the TV. */
 export function WordPeek({ word }: { word: string }) {
@@ -48,6 +96,8 @@ export function WordPeek({ word }: { word: string }) {
       onPointerDown={() => setPeek(true)}
       onPointerUp={() => setPeek(false)}
       onPointerLeave={() => setPeek(false)}
+      onPointerCancel={() => setPeek(false)}
+      onBlur={() => setPeek(false)}
       onKeyDown={(e) => (e.key === " " || e.key === "Enter") && setPeek(true)}
       onKeyUp={() => setPeek(false)}
     >
@@ -67,22 +117,28 @@ const level = (game: GameId, i: number) =>
  * Before something new goes up over the TV's card (or race) while it has answers in and hasn't been revealed: ask, since
  * those answers only count once it's back and revealed. A drawing scores itself when something else goes up.
  */
-export function okToLeave(live: Live) {
-  const s = live.screen;
-  const key = heldKey(s);
-  if (!key || s.drawing !== undefined || !live.unrevealed.includes(key)) return true;
-  const what = s.wikiFrom
-    ? `this race (${s.wikiFrom} → ${s.wikiTo})`
-    : s.game && s.index !== undefined
-      ? `this ${nounFor(s.game)} (${DECKS[s.game].name} #${s.index + 1})`
-      : "it";
-  return confirm(
-    `Skip ${what} without scoring it? ${
-      s.game === "puzzle"
-        ? "Its stars score when you bring it back and reveal it, or when the night ends."
-        : "Answers on it won’t count unless you bring it back and reveal it."
-    }`,
-  );
+export function useOkToLeave(live: Live) {
+  const confirm = useConfirm();
+  return async () => {
+    const s = live.screen;
+    const key = heldKey(s);
+    if (!key || s.drawing !== undefined || !live.unrevealed.includes(key)) return true;
+    const what = s.wikiFrom
+      ? `this race (${s.wikiFrom} → ${s.wikiTo})`
+      : s.game && s.index !== undefined
+        ? `this ${nounFor(s.game)} (${DECKS[s.game].name} #${s.index + 1})`
+        : "it";
+    return confirm({
+      title: `Skip ${what} without scoring it?`,
+      description: `${
+        s.game === "puzzle"
+          ? "Its stars score when you bring it back and reveal it, or when the night ends."
+          : "Answers on it won’t count unless you bring it back and reveal it."
+      }`,
+      confirmLabel: "Skip without scoring",
+      destructive: true,
+    });
+  };
 }
 
 /** Put a Wiki Race's get-ready screen on the TV, with its clock set but stopped so no old countdown or chime runs on. */
@@ -124,6 +180,7 @@ export function useNewDrawing() {
 
 /** The drawing for officers: who's drawing, the word (press and hold), skip it or hand it to someone else, and who has drawn. */
 export function DrawHost({ live }: { live: Live }) {
+  const run = useAction();
   const data = useQuery(api.drawings.host);
   const skip = useMutation(api.drawings.skip);
   const setScreen = useMutation(api.sessions.setScreen);
@@ -178,22 +235,18 @@ export function DrawHost({ live }: { live: Live }) {
             >
               Skip this word
             </button>
-            <select
-              className="field w-auto py-1 text-sm"
-              value=""
+            <SearchPicker
+              className="w-auto text-sm"
+              value={null}
               disabled={!onTv || d.got > 0}
-              onChange={(e) => e.target.value && handTo(e.target.value as Id<"attendance">)}
-              aria-label="Switch drawer"
-            >
-              <option value="">Switch drawer…</option>
-              {data.players
-                .filter((p) => p._id !== d.drawer)
-                .map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.name}
-                  </option>
-                ))}
-            </select>
+              onValueChange={(value) => {
+                const player = data.players.find((p) => p._id === value && p._id !== d.drawer);
+                if (player) void handTo(player._id);
+              }}
+              label="Switch drawer"
+              placeholder="Switch drawer…"
+              options={data.players.filter((p) => p._id !== d.drawer).map((p) => ({ value: p._id, label: p.name }))}
+            />
           </div>
           {/* A word of the officer's own, e.g. tonight's topic: the drawer gets it on a clean canvas with a fresh clock. */}
           <form
@@ -251,7 +304,10 @@ export function NextPanel({
   const startRace = useStartRace();
   const newDrawing = useNewDrawing();
   const remaining = useRemaining(live.timer);
-  const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
+  const notify = useNotify();
+  const okToLeave = useOkToLeave(live);
+  const { busy, act: guardedAct } = useGuardedAction(JSON.stringify([liveActionKey(live), lineup, live.teams]));
 
   const rounds = lineup.map(roundOf);
   const at = live.round === null || !rounds.length ? null : Math.min(live.round, rounds.length - 1);
@@ -309,14 +365,14 @@ export function NextPanel({
 
   // A clock that ran out stays at "time"; one still running stops so the buzzer doesn't go off over the answer.
   const pause = () => (live.timer.startedAt && remaining > 0 ? timer({ action: "pause" }) : undefined);
-  const startRound = async (x: Round) => {
-    if (!okToLeave(live)) return;
+  const startRound = async (x: Round, current: () => boolean) => {
+    if (!(await okToLeave()) || !current()) return;
     await setRound({ round: x.index, double: x.double, title: roundTitle(x) });
   };
-  const show = async () => {
-    if (!okToLeave(live)) return;
+  const show = async (current: () => boolean) => {
+    if (!(await okToLeave()) || !current()) return;
     if (r?.kind === "deck" && r.game) {
-      if (card === null) return alert(`This deck is out of ${thing}s for tonight. Pick one by hand under Games.`);
+      if (card === null) return notify.info(`This deck is out of ${thing}s for tonight. Pick one by hand under Games.`);
       await setScreen({ screen: { mode: "card", game: r.game, index: card, revealed: false } });
       await timer({ action: "set", seconds: cardSeconds(r.game, card), relay: live.teamSize > 1 && r.game === "relay", autostart: true });
     } else if (r?.kind === "puzzle" && r.puzzle !== undefined) {
@@ -335,11 +391,23 @@ export function NextPanel({
     }
   };
   const onward: Action = after
-    ? { label: `Next round: ${after.label}`, go: () => startRound(after) }
+    ? { label: `Next round: ${after.label}`, go: (current) => startRound(after, current) }
     : {
         label: "End night",
         keys: false,
-        go: () => (confirm("End the night? Place XP goes out from the current standings.") ? end() : undefined),
+        go: async (current) => {
+          if (
+            !(await confirm({
+              title: "End the night?",
+              description: "Place XP goes out from the current standings.",
+              confirmLabel: "End night",
+              destructive: true,
+            })) ||
+            !current()
+          )
+            return;
+          await end();
+        },
       };
 
   const thing = r ? roundNoun(r) : "snippet";
@@ -364,7 +432,7 @@ export function NextPanel({
   let primary: Action | null = null;
   let alt: Action | null = null;
   if (!r) {
-    if (rounds.length) primary = { label: `Start round 1: ${rounds[0].label}`, go: () => startRound(rounds[0]) };
+    if (rounds.length) primary = { label: `Start round 1: ${rounds[0].label}`, go: (current) => startRound(rounds[0], current) };
   } else if (step === "show") {
     const label =
       r.kind === "wiki" && race
@@ -408,14 +476,7 @@ export function NextPanel({
     alt = { label: r.kind === "pictionary" ? `One more drawing: ${drawer}` : `One more ${thing}`, go: show, keys: false };
   } else primary = onward;
 
-  const act = async (a: Action) => {
-    setBusy(true);
-    try {
-      await run(Promise.resolve(a.go()));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const act = (a: Action) => guardedAct(a.go);
 
   // Space or → for the big button, N for the next round. Typing in a field, a control with its own keys, an open menu,
   // and a phone's other panes (where this panel is hidden) are left alone.
@@ -430,7 +491,9 @@ export function NextPanel({
         e.metaKey ||
         e.ctrlKey ||
         e.altKey ||
-        t?.closest("input, textarea, select, summary, details[open], [contenteditable], [data-own-keys]") ||
+        t?.closest(
+          'input, textarea, select, summary, details[open], [contenteditable], [data-own-keys], [role="dialog"], [role="alertdialog"], [role="menu"], [role="combobox"], [role="radio"], [role="switch"], [role="slider"], [role="tab"]',
+        ) ||
         !panel.current?.offsetParent
       )
         return;

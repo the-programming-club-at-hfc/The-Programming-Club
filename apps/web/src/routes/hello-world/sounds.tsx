@@ -1,3 +1,6 @@
+import { Slider } from "@base-ui/react/slider";
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHead, Wrap } from "#/components/ui";
@@ -50,41 +53,50 @@ function Sounds() {
     <>
       <PageHead title="sounds">Every sound the TV makes. Volume and music on game nights are set from the host console.</PageHead>
       <Wrap>
-        <label className="flex max-w-md items-center gap-3 font-bold">
-          Volume
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.1}
-            value={vol}
-            onChange={(e) => {
-              setVol(Number(e.target.value));
-              setVolume(Number(e.target.value));
-            }}
-            className="flex-1 accent-ink"
-          />
-        </label>
+        <Slider.Root
+          name="volume"
+          min={0}
+          max={1}
+          step={0.1}
+          largeStep={0.2}
+          value={vol}
+          format={{ style: "percent" }}
+          onValueChange={(value) => {
+            setVol(value);
+            setVolume(value);
+          }}
+          className="flex max-w-md items-center gap-3 font-bold"
+        >
+          <Slider.Label>Volume</Slider.Label>
+          <Slider.Control className="flex h-11 min-w-0 flex-1 touch-none items-center select-none">
+            <Slider.Track className="relative h-1.5 w-full rounded-full bg-line">
+              <Slider.Indicator className="rounded-full bg-ink" />
+              <Slider.Thumb className="size-5 rounded-full border-2 border-paper bg-ink shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink" />
+            </Slider.Track>
+          </Slider.Control>
+          <Slider.Value className="w-12 text-right text-sm" />
+        </Slider.Root>
 
         <h2 className="mt-10 text-3xl">music</h2>
         <p className="mt-1 text-dim">Put lobby.mp3 or think.mp3 in public/audio to replace a built-in loop.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <ToggleGroup<Music>
+          aria-label="Music"
+          value={music ? [music] : []}
+          onValueChange={(values) => {
+            const next = values[0] ?? null;
+            void unlockAudio().then(() => {
+              playMusic(next);
+              setMusic(next);
+            });
+          }}
+          className="mt-3 flex flex-wrap gap-2"
+        >
           {MUSIC.map(([id, label]) => (
-            <button
-              key={id}
-              className={`btn ${music === id ? "btn-on" : ""}`}
-              onClick={() =>
-                void unlockAudio().then(() => {
-                  const next = music === id ? null : id;
-                  playMusic(next);
-                  setMusic(next);
-                })
-              }
-            >
+            <Toggle key={id} value={id} className={`btn ${music === id ? "btn-on" : ""}`}>
               {music === id ? `Stop ${label.toLowerCase()}` : label}
-            </button>
+            </Toggle>
           ))}
-        </div>
+        </ToggleGroup>
 
         <h2 className="mt-10 text-3xl">effects</h2>
         <ul className="mt-3 grid max-w-3xl gap-[3px] sm:grid-cols-2">
