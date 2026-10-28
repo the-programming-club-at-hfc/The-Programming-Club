@@ -376,7 +376,8 @@ function HostBar({ live }: { live: Live }) {
   const code = useJoinCode();
   const tv = tvNow(live);
   return (
-    <header className="border-b border-line bg-paper/95 backdrop-blur-md lg:sticky lg:top-0 lg:z-40">
+    // Above a phone's sticky command bar (z-30), so the Night menu opens over it.
+    <header className="relative z-40 border-b border-line bg-paper/95 backdrop-blur-md lg:sticky lg:top-0">
       <div className="mx-auto flex h-14 max-w-[100rem] items-center gap-3 px-3 lg:h-16 lg:gap-4 lg:px-5">
         <span className="max-sm:hidden">
           <Brand />
