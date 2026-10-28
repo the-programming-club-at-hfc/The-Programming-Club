@@ -1119,13 +1119,13 @@ export const BUGS: Bug[] = [
     code: "function isAllowedUrl(targetUrl, url, hostname, repoUrl) {\n  const { pathname } = new URL(repoUrl);\n  const [, repoOwner, repoName] = pathname.split('/');\n  if (\n    targetUrl === repoUrl ||\n    targetUrl.startsWith(repoUrl + '/') ||\n    (hostname === 'api.github.com' &&\n      url.pathname\n        .startsWith(`/repos/${repoOwner}/${repoName}`)) ||\n    (hostname === 'raw.githubusercontent.com' &&\n      url.pathname\n        .startsWith(`/${repoOwner}/${repoName}/`)) ||\n    (hostname === 'github.com' &&\n      url.pathname\n        .startsWith(`/${repoOwner}/${repoName}/releases/`))\n  ) {\n    return true;\n  }\n}",
     line: "8 or 9",
     lines: [8, 9],
-    fix: "url.pathname.startsWith(`/repos/${repoOwner}/${repoName}/`)) ||",
+    fix: "(url.pathname === `/repos/${repoOwner}/${repoName}` ||\n  url.pathname.startsWith(`/repos/${repoOwner}/${repoName}/`))) ||",
     wrong: [
       "url.pathname.includes(`/repos/${repoOwner}/${repoName}`)) ||",
       "url.pathname.startsWith(`/repos/${repoOwner}`)) ||",
-      "url.pathname.toLowerCase().startsWith(`/repos/${repoOwner}/${repoName}`)) ||",
+      "(url.pathname === `/repos/${repoOwner}/${repoName}` ||\n  url.pathname.startsWith(`/repos/${repoOwner}/${repoName}`))) ||",
     ],
-    why: "Every other check ends in a slash. Without it, allowing acme/plugin also allows acme/plugin-private, and the server's token reads that private repo.",
+    why: "Lines 5 and 6 show the safe pattern: the exact path, or the path plus a slash. Without the slash, allowing acme/plugin also allows acme/plugin-private, and the server's token reads that private repo.",
     source: {
       project: "Actual Budget",
       blurb: "a personal-finance app, sync server",
@@ -1134,7 +1134,7 @@ export const BUGS: Bug[] = [
       published: "2026-10-07",
       severity: "High (7.1)",
       commit: "https://github.com/actualbudget/actual/commit/0e3991ad62c78db2efef769387f5e4d8f1f78ba9",
-      realFix: "Condensed: the real fix is pathname === '/repos/o/r' || pathname.startsWith('/repos/o/r/').",
+      realFix: "The fix is exactly this: the repo's own path, or anything under it after a slash.",
     },
   },
   {
