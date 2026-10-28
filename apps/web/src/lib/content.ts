@@ -906,8 +906,8 @@ export const BUGS: Bug[] = [
       'packages = ["flask", "requests.py", "rich"]',
       'packages = ["flask", "reqeusts==2.32.3", "rich"]',
     ],
-    why: "reqeusts is misspelled. Attackers upload packages named after common typos, and this script installs it for you, running a stranger's code on your machine.",
-    news: "Tensorlake and SubQuery, October 2026: attackers pushed bad versions of real npm packages that stole passwords and tokens. Misspelled names like this one are the other common trick.",
+    why: "reqeusts is a typo for requests. Attackers can publish packages under misspelled names; installing one can run their code on your machine.",
+    news: "Tensorlake, October 2026: attackers published a malicious version of its real npm package that stole credentials. This made-up Python example shows another package-installation trap: a misspelled name.",
     newsUrl: "https://github.com/tensorlakeai/tensorlake/security/advisories/GHSA-8g63-53c9-65j2",
   },
   {
@@ -925,7 +925,7 @@ export const BUGS: Bug[] = [
       "return pw == PASSWORDS.get(user) and pw == code",
     ],
     why: "Besides the real password, it accepts today's date (28102026 on game night) for any user, and anyone who reads the code knows every day's password. Delete the backdoor. Changing or to and doesn't help: the real password is never today's date, so nobody could log in.",
-    news: "Danfoss fridge controllers had a hidden login whose password is just the date. It's the top suspect in October's attack that heated fridges in hundreds of French supermarkets to 50°C, but investigators haven't confirmed how the attackers got in.",
+    news: "Danfoss fridge controllers had a hidden login with a predictable code generated from the device's date. October attacks heated refrigeration systems in hundreds of French supermarkets, reportedly to 50°C. Investigators have not confirmed whether this flaw was used.",
     newsUrl:
       "https://www.theregister.com/security/2026/10/13/cyberattacks-crank-french-supermarket-refrigeration-systems-up-to-50c/5302784",
   },
@@ -934,11 +934,16 @@ export const BUGS: Bug[] = [
     level: "easy",
     spooky: true,
     lang: "Python",
+    context: "Only read files directly inside graveyard; users choose a file name, not a path.",
     code: 'import os\n\nname = input("Which tombstone? ")\npath = os.path.join("graveyard", name)\nprint(open(path).read())',
     line: "4",
     lines: [4],
     fix: 'path = os.path.join("graveyard", os.path.basename(name))',
-    wrong: ['path = os.path.join("graveyard/", name)', 'path = os.path.join(name, "graveyard")', 'path = "graveyard/" + name'],
+    wrong: [
+      'path = os.path.join("graveyard", os.path.normpath(name))',
+      'path = os.path.join("graveyard", os.path.abspath(name))',
+      'path = os.path.join("graveyard", os.path.expanduser(name))',
+    ],
     why: 'Typing ../crypt/treasure.txt climbs out of the graveyard folder, and /etc/passwd makes os.path.join drop "graveyard" entirely. basename keeps only the file name.',
     news: "Path traversal. Khoj, an AI app, had this exact kind of bug this year: anyone could read files off its server.",
     newsUrl: "https://github.com/advisories/GHSA-62mm-xwmv-crhg",
@@ -955,7 +960,7 @@ export const BUGS: Bug[] = [
     wrong: [
       'age = str(input("How old is your ghost? "))',
       'age = eval(int(input("How old is your ghost? ")))',
-      'age = input(int("How old is your ghost? "))',
+      'age = int(eval(input("How old is your ghost? ")))',
     ],
     why: 'eval runs whatever someone types as Python. Type __import__("os").system("ls") and it lists your files. int() only accepts a number.',
     news: "Remote code execution. PHP2Shell, patched Oct 21, let attackers run code on PHP servers.",
@@ -1168,7 +1173,7 @@ export const BUGS: Bug[] = [
     level: "hard",
     lang: "Go",
     context: "With html.Safelink enabled, this checks links in submitted Markdown. Slicing beyond a slice's capacity panics in Go.",
-    code: 'var Paths = [][]byte{\n\t[]byte("/"),\n\t[]byte("./"),\n\t[]byte("../"),\n}\n// IsSafeURL returns true if url starts with one of the\n// valid schemes or is a relative path.\nfunc IsSafeURL(url []byte) bool {\n\tnLink := len(url)\n\tfor _, path := range Paths {\n\t\tnPath := len(path)\n\t\tlinkPrefix := url[:nPath]\n\t\tif nLink >= nPath && bytes.Equal(linkPrefix, path) {\n\t\t\t// ... a safe relative path returns true ...\n\t\t}\n\t}\n\t// ... then checks the valid schemes ...\n\treturn false\n}',
+    code: 'var Paths = [][]byte{\n  []byte("/"),\n  []byte("./"),\n  []byte("../"),\n}\n// IsSafeURL returns true if url starts with one of the\n// valid schemes or is a relative path.\nfunc IsSafeURL(url []byte) bool {\n  nLink := len(url)\n  for _, path := range Paths {\n    nPath := len(path)\n    linkPrefix := url[:nPath]\n    if nLink >= nPath && bytes.Equal(linkPrefix, path) {\n      // ... a safe relative path returns true ...\n    }\n  }\n  // ... then checks the valid schemes ...\n  return false\n}',
     line: "12 or 13",
     lines: [12, 13],
     fix: "if nLink < nPath { continue }\nlinkPrefix := url[:nPath]",
@@ -1193,8 +1198,8 @@ export const BUGS: Bug[] = [
     name: "tinacms",
     level: "hard",
     lang: "JavaScript",
-    context: "This turns Markdown that content authors write into the page visitors see.",
-    code: "function renderNode(node) {\n  if (node.type === 'text') return renderText(node);\n  if (node.type === 'html' || node.type === 'html_inline') {\n    return DOMPurify.sanitize(node.value,\n      { RETURN_DOM_FRAGMENT: true });\n  }\n  const tag = TAGS[node.type];\n  /** @type {HTMLElement} */\n  const el = document.createElement(tag);\n  if (node.url && node.type === 'a') el.href = node.url;\n  return el;\n}",
+    context: "This renders author-written Markdown. Link URLs are untrusted; javascript: URLs run script when clicked.",
+    code: "function renderNode(node) {\n  if (node.type === 'text') return renderText(node);\n  if (node.type === 'html' || node.type === 'html_inline') {\n    return DOMPurify.sanitize(node.value,\n      { RETURN_DOM_FRAGMENT: true });\n  }\n  const tag = TAGS[node.type];\n  /** @type {HTMLElement} */\n  const el = document.createElement(tag);\n  if (node.url && node.type === 'a') el.href = node.url;\n  // ... render and append node.children ...\n  return el;\n}",
     line: "10",
     lines: [10],
     fix: "if (node.url && node.type === 'a') el.href = sanitizeUrl(node.url);",
@@ -1212,7 +1217,8 @@ export const BUGS: Bug[] = [
       published: "2026-10-09",
       severity: "High (7.6)",
       commit: "https://github.com/tinacms/tinacms/commit/5295e077f0d279c35686a0e481a15e33a4877e3b",
-      realFix: "The fix is exactly this line (sanitizeUrl comes from @tinacms/mdx). It also wrapped the image src the same way.",
+      realFix:
+        "The fix is exactly this line (sanitizeUrl is imported from @tinacms/mdx/sanitize-url). It also wrapped the image src the same way.",
     },
   },
   {
@@ -1225,7 +1231,11 @@ export const BUGS: Bug[] = [
     line: "12",
     lines: [12],
     fix: "'title' => e($field->name),",
-    wrong: ["'title' => trim($field->name),", "'title' => ucfirst($field->name),", "'title' => (string) $field->name,"],
+    wrong: [
+      "'title' => addslashes($field->name),",
+      "'title' => json_encode($field->name),",
+      "'title' => str_replace('<script>', '', $field->name),",
+    ],
     why: "The comment says the names are escaped later. That escaping is undone when the browser reads the attribute, and the table puts the raw name in the header. A user names a field <img src=x onerror=...> and the script runs in an admin's browser. 'escape' => true only covers the cells, not the title. e() escapes HTML.",
     source: {
       project: "Snipe-IT",
@@ -1243,7 +1253,7 @@ export const BUGS: Bug[] = [
     level: "hard",
     lang: "C",
     context:
-      "This runs after every request; zval_ptr_dtor frees a value. The worker then serves the next visitor, and some code reads http_globals ($_GET, $_POST…) before that visit is set up.",
+      "This runs after every request; zval_ptr_dtor releases a value but does not clear its slot. The worker can serve another visitor, and http_globals ($_GET, $_POST…) may be accessed before normal request initialization.",
     code: "static void clear_last_error(void) {\n\tif (PG(last_error_message)) {\n\t\tzend_string_release(PG(last_error_message));\n\t\tPG(last_error_message) = NULL;\n\t}\n}\n// ...\nvoid php_request_shutdown(void *dummy)\n{\n\t// ...\n\t/* 8. Destroy super-globals */\n\tzend_try {\n\t\tint i;\n\t\tfor (i=0; i<NUM_TRACK_VARS; i++) {\n\t\t\tzval_ptr_dtor(&PG(http_globals)[i]);\n\t\t}\n\t} zend_end_try();\n\t// ...\n}",
     line: "15",
     lines: [15],
@@ -1253,7 +1263,7 @@ export const BUGS: Bug[] = [
       "if (Z_TYPE(PG(http_globals)[i]) == IS_ARRAY) zval_ptr_dtor(&PG(http_globals)[i]);",
       "zval_ptr_dtor(&PG(http_globals)[i]); PG(modules_activated) = 0;",
     ],
-    why: "zval_ptr_dtor frees each superglobal but leaves the slot pointing at the freed array. The worker lives on, so the next request can read $_POST before it's refilled, from memory that now belongs to something else. That's a use-after-free, and with the right heap layout it's remote code execution. clear_last_error at the top shows the safe pattern: free it, then set it to NULL. ZVAL_UNDEF is PHP's way of marking the slot empty.",
+    why: "Releasing a superglobal does not mark its slot empty. If later startup code uses that stale value before replacing it, it can access freed memory. ZVAL_UNDEF marks the slot empty after release. The helper above shows the same lifetime rule for a pointer: release it, then clear it. The wider stale-state vulnerability has confirmed remote-code-execution paths; this excerpt illustrates one reset in its patch.",
     source: {
       project: "PHP",
       blurb:
@@ -1264,7 +1274,7 @@ export const BUGS: Bug[] = [
       severity: "Critical (9.2)",
       commit: "https://github.com/php/php-src/commit/31c0ea7d7ff1d1fccb6492e52dab544011628065",
       realFix:
-        "The fix is exactly this line, with the comment /* May be accessed before php_request_startup() */. It's one of several globals the patch now resets after each request (CVE-2026-109619, stale global state). The headline half, CVE-2026-109618, is deeper: running out of memory jumped out of the middle of parsing an upload and left data half-built for this same cleanup to trust. The whole fix is one commit across about 300 files, shipped in PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12.",
+        "The patch adds ZVAL_UNDEF immediately after the destructor, with a comment that these globals may be accessed before php_request_startup(). This is one reset in the wider CVE-2026-109619 fix. Confirmed exploitation uses error/backtrace or session state. The companion CVE-2026-109618 changes out-of-memory handling. Both were fixed in PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12.",
     },
   },
 ];

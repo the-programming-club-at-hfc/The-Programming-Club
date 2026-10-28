@@ -312,7 +312,7 @@ if ok:
     print("Logged in as", viewer_id)
 else:
     print("VK.com authentication failed: invalid auth key")`,
-    why: "The real code only checked the signature “if present.” Leave the key out and you could log in as anyone. The fix checks it every time.",
+    why: "The vk-app backend checked the signature only when auth_key was present. Omitting it could let attackers impersonate a VK user. The fix requires a valid signature before trusting the viewer ID.",
     hint: "Every example passes. What happens when the auth key line is blank?",
     source: {
       project: "python-social-auth",
