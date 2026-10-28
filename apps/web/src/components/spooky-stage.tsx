@@ -214,14 +214,10 @@ export function SpookyBoard({ children }: { children: ReactNode }) {
  * a clock runs). None of it takes a click. Like the TV it moves even with reduced motion on: lab computers often
  * have animation effects off.
  */
-export function JoinNight({ screen, clear, dusk, night }: { screen: string; clear: boolean; dusk: boolean; night: boolean }) {
-  // The last ten seconds of a card: the sun sets behind the pines and the sky goes to dusk, then night for the last
-  // five. Night holds through the reveal and day comes back with the next screen (the scores, or the next card).
+export function JoinNight({ screen, clear }: { screen: string; clear: boolean }) {
   return (
     <>
-      <div className={`haunt join-night ${dusk ? "join-evening" : ""} ${night ? "join-dark" : ""}`} aria-hidden>
-        <div className="haunt-layer join-dusk" />
-        <div className="haunt-layer join-midnight" />
+      <div className="haunt join-night" aria-hidden>
         <div className="haunt-layer join-moon">
           <Art src={SPOOKY_ART.moon} fallback={<div className="haunt-moon-disc" />} />
         </div>

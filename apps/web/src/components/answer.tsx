@@ -280,7 +280,7 @@ function BugRound(p: RoundProps) {
       <div className="mx-auto grid max-w-2xl grid-cols-[minmax(0,1fr)] gap-3 @min-[60rem]:max-w-none @min-[60rem]:grid-cols-[minmax(0,46rem)_minmax(24rem,1fr)] @min-[60rem]:items-start @min-[60rem]:gap-5">
         {/* Wide, the code needs no card around it: the room goes to the code. */}
         <div
-          className={`bug-intro card p-5 @min-[60rem]:bg-transparent @min-[60rem]:p-0 @min-[60rem]:shadow-none ${p.open || p.revealed ? "" : "opacity-60"}`}
+          className={`card p-5 @min-[60rem]:bg-transparent @min-[60rem]:p-0 @min-[60rem]:shadow-none ${p.open || p.revealed ? "" : "opacity-60"}`}
         >
           <p className="text-lg">
             Find the one bug in this {b.lang ?? "Python"}. <span className="pointer-fine:hidden">Tap</span>

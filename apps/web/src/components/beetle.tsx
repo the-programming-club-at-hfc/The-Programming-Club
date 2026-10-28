@@ -360,13 +360,12 @@ export function AskBeetle({
       </p>
     );
   const off = lineLocked || !open;
-  // The buttons keep the day's ink: on the spooky night's dark sky the page's ink turns cream (spooky-stage.css).
   return (
     <div className="mt-4">
       {sure && !off ? (
         <div className="flex gap-2">
           <button
-            className="btn btn-primary flex-1 [--color-ink:#12332b]"
+            className="btn btn-primary flex-1"
             onClick={() => {
               setSure(false);
               onAsk();
@@ -374,12 +373,12 @@ export function AskBeetle({
           >
             Ask, no early bonus
           </button>
-          <button className="btn [--color-ink:#12332b]" onClick={() => setSure(false)}>
+          <button className="btn" onClick={() => setSure(false)}>
             Never mind
           </button>
         </div>
       ) : (
-        <button className="btn w-full [--color-ink:#12332b]" disabled={off} onClick={() => setSure(true)}>
+        <button className="btn w-full" disabled={off} onClick={() => setSure(true)}>
           Ask the beetle
         </button>
       )}
