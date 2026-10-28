@@ -220,6 +220,10 @@
 .join-shift {
   z-index: 40;
 }
+/* Players are reading code: on their laptops the change of screen is the flats alone, no bats. */
+.join-shift .shift-bat {
+  display: none;
+}
 /* Low on the right, risen just over the pines, where the page's columns leave room. */
 .join-moon {
   bottom: calc(min(14cqw, 22cqh) - 1rem);
@@ -253,21 +257,34 @@
   background-size: 100% 100%;
 }
 
-/* The last ten seconds: a storm closing in from the edges, and a lightning flash over the page that takes no clicks. */
+/* The last ten seconds: the sky goes to dusk and the sun sinks behind the pines, slowly; back to day quickly. The
+   dusk stays light enough that the page's own text still reads on it. */
 .join-dusk {
   inset: 0;
-  background: radial-gradient(ellipse at 50% 45%, transparent 40%, rgb(20 30 44 / 0.7) 100%);
+  background: linear-gradient(to bottom, #3b3560 0%, #8f5f7a 45%, #d9935f 100%);
   opacity: 0;
-  transition: opacity 2.5s ease;
+  transition: opacity 1.5s ease;
 }
-.join-storm .join-dusk {
-  opacity: 1;
+.join-evening .join-dusk {
+  opacity: 0.55;
+  transition: opacity 9s ease-in;
 }
-.join-flash {
-  position: fixed;
-  inset: 0;
-  z-index: 45;
-  background: #fffbea;
-  opacity: 0;
-  pointer-events: none;
+.join-moon {
+  transition:
+    translate 1.5s ease,
+    opacity 1.5s ease;
+}
+.join-evening .join-moon {
+  translate: 0 140%;
+  opacity: 0.35;
+  transition:
+    translate 9s ease-in,
+    opacity 9s ease-in;
+}
+.join-pines {
+  transition: opacity 1.5s ease;
+}
+.join-evening .join-pines {
+  opacity: 0.32;
+  transition: opacity 9s ease-in;
 }

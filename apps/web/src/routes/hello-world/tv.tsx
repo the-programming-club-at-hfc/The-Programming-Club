@@ -10,7 +10,7 @@ import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRema
 import { Blanks, Sketch } from "#/components/draw";
 import { Graveyard } from "#/components/graveyard";
 import { HauntedHunt, useLocks } from "#/components/haunted";
-import { SpookyBoard, SpookyMessage, SpookyShift, screenKey } from "#/components/spooky-stage";
+import { SpookyBoard, SpookyMessage, SpookyShift, clockRunning, screenKey } from "#/components/spooky-stage";
 import { InstagramGlyph, InstagramQr } from "#/components/instagram";
 import { OfficerGate, useAction, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
@@ -75,7 +75,12 @@ function TvScreen() {
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
       {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <AfterNight spooky={spooky} /> : null}
-      {spooky && <SpookyShift screen={live ? screenKey(live.screen) : "after"} clear={!!live?.timer.startedAt} />}
+      {spooky && (
+        <SpookyShift
+          screen={live ? screenKey(live.screen) : "after"}
+          clear={!!live && clockRunning(live.screen, live.timer, live.scored)}
+        />
+      )}
     </div>
   );
 }

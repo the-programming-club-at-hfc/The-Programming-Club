@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Art, BatFrames, Title } from "./haunted";
+import { heldKey } from "#/lib/flow";
+import type { ScreenState } from "#/lib/flow";
 import { SPOOKY_ART } from "#/lib/spooky";
 import "./spooky-stage.css";
 
@@ -21,6 +23,25 @@ export const screenKey = (s: {
   wikiReady?: boolean;
   slide?: number;
 }) => [s.mode, s.game, s.index, s.message, s.drawing, s.wikiFrom, s.wikiReady, s.slide].join("|");
+
+/**
+ * Whether the screen's own clock is counting right now: it's this card's (race's, drawing's) run, not revealed or
+ * scored, with time left. A clock that ran out keeps its `startedAt` until another replaces it, so that alone would
+ * call the scores or the next card "running" and send the bats-only change of screen.
+ */
+export function clockRunning(s: ScreenState, t: { startedAt?: number; remainingMs: number; card?: string }, scored: readonly string[]) {
+  if (t.startedAt === undefined || t.remainingMs <= Date.now() - t.startedAt) return false;
+  if (s.mode === "timer") return true;
+  const key = heldKey(s);
+  return (
+    (s.mode === "card" || s.mode === "draw" || s.mode === "wiki") &&
+    key !== null &&
+    t.card === key &&
+    !s.revealed &&
+    !s.wikiReady &&
+    !scored.includes(key)
+  );
+}
 
 // The flats, back to front: art, and whether it's flipped. Each waits a little longer than the one behind it, so they
 // come up and go down in turn.
@@ -56,9 +77,20 @@ export function SpookyShift({ screen, clear }: { screen: string; clear: boolean 
   useEffect(() => {
     if (last.current === screen) return;
     last.current = screen;
+    // A page in the background has nothing to show it to, and its timers may run late.
+    if (document.visibilityState !== "visible") {
+      setRun(null);
+      return;
+    }
     const at = Date.now();
-    setRun((r) => (r && !r.clear && !clear && at - r.at < COVERED ? r : { n: (r?.n ?? 0) + 1, clear, at }));
+    // Screens that come close together (a race's start changes it twice) share one change of screen.
+    setRun((r) => (r && at - r.at < COVERED ? r : { n: (r?.n ?? 0) + 1, clear, at }));
   }, [screen, clear]);
+  useEffect(() => {
+    const cancel = () => setRun(null);
+    document.addEventListener("visibilitychange", cancel);
+    return () => document.removeEventListener("visibilitychange", cancel);
+  }, []);
   // Gone once they're down, so nothing is left over the screen however the animations went.
   useEffect(() => {
     if (!run) return;
@@ -182,20 +214,12 @@ export function SpookyBoard({ children }: { children: ReactNode }) {
  * a clock runs). None of it takes a click. Like the TV it moves even with reduced motion on: lab computers often
  * have animation effects off.
  */
-export function JoinNight({ screen, clear, storm }: { screen: string; clear: boolean; storm: boolean }) {
-  // The TV's last ten seconds, softer: the edges darken (the middle, where the code is, stays light) and one flash
-  // of lightning, once per card.
-  const flash = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!storm) return;
-    flash.current?.animate(
-      [{ opacity: 0 }, { opacity: 0.55, offset: 0.06 }, { opacity: 0.1, offset: 0.2 }, { opacity: 0.4, offset: 0.28 }, { opacity: 0 }],
-      { duration: 1100, easing: "ease-out" },
-    );
-  }, [storm]);
+export function JoinNight({ screen, clear, dusk }: { screen: string; clear: boolean; dusk: boolean }) {
+  // The last ten seconds of a card: the sun sets behind the pines and the sky goes to dusk. It stays dusk through the
+  // reveal and comes back to day with the next screen (the scores, or the next card).
   return (
     <>
-      <div className={`haunt join-night ${storm ? "join-storm" : ""}`} aria-hidden>
+      <div className={`haunt join-night ${dusk ? "join-evening" : ""}`} aria-hidden>
         <div className="haunt-layer join-dusk" />
         <div className="haunt-layer join-moon">
           <Art src={SPOOKY_ART.moon} fallback={<div className="haunt-moon-disc" />} />
@@ -220,7 +244,6 @@ export function JoinNight({ screen, clear, storm }: { screen: string; clear: boo
       <div className="join-shift">
         <SpookyShift screen={screen} clear={clear} />
       </div>
-      <div ref={flash} className="join-flash" aria-hidden />
     </>
   );
 }
