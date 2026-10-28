@@ -83,7 +83,7 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
           <p className="mt-[0.2cqw] text-[2.3cqw] leading-tight font-bold">On your computer, go to</p>
           <p
             className="leading-[1.1] font-extrabold tracking-[-0.03em] whitespace-nowrap"
-            style={{ fontSize: `min(4.4cqw, ${(50 / (address.length * 0.56)).toFixed(2)}cqw)` }}
+            style={{ fontSize: `min(4.4cqw, ${(48 / (address.length * 0.56)).toFixed(2)}cqw)` }}
           >
             {address}
           </p>
@@ -104,7 +104,7 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
       {/* One list, wrapped into rows `per` stones wide, so a stone keeps its place in the DOM when the rows reflow. */}
       <ul className="grave-yard" style={{ "--w": `${width}cqw`, "--per": per } as CSSProperties}>
         {players.length === 0 ? (
-          <Stone name="your name here" firstTime={false} delay={0} empty />
+          <Stone name="waiting…" firstTime={false} delay={0} empty />
         ) : (
           shown.map((p, i) => (
             <Stone key={p.key} name={p.name} firstTime={p.firstTime} delay={opened ? 0 : Math.min(i, 30) * 90} back={i >= per} />
