@@ -308,3 +308,11 @@
   --color-ink: #12332b;
   --color-dim: #4f6862;
 }
+/* Bug Hunt's code column is a card on a phone but has no card behind it wide (answer.tsx), so there its words are the
+   page's: cream at night. */
+@container (min-width: 60rem) {
+  .join-night-text .bug-intro {
+    --color-ink: #f6efe0;
+    --color-dim: #cfc6b4;
+  }
+}
