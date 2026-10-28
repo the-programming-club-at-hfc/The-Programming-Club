@@ -455,7 +455,15 @@ function BugSteps({ index, pick, onPick, onLock, solo }: RoundProps) {
       />
       {pick.lineLocked ? (
         <div className="mt-5 border-t-2 border-dashed border-line pt-4 @min-[60rem]:mt-3 @min-[60rem]:pt-3">
-          <p className="text-lg font-bold">Now pick the fix for line {pick.line}.</p>
+          {/* The fixes all rewrite the bug's line, so they'd give it away: say so plainly, and the fix still scores. */}
+          {pick.line !== undefined && BUGS[index].lines.includes(pick.line) ? (
+            <p className="text-lg font-bold">Line {pick.line} is right. Now pick its fix.</p>
+          ) : (
+            <p className="text-lg font-bold">
+              <span className="text-signal">Line {pick.line} isn’t the bug.</span> These fixes are for the real one: the right fix still
+              gets +1.
+            </p>
+          )}
           <ChoiceList
             options={choices("bug", index)}
             pick={pick}
