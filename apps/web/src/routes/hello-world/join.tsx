@@ -423,6 +423,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     (s.mode === "message" && !!s.message);
   // Bug Hunt puts its code beside the steps, so on a wide screen it takes the player card's room too and keeps the bar.
   const bugHunt = s.mode === "card" && s.game === "bug" && !!me.team;
+  // Fix it for real's workspace needs the whole screen too, so it trades the player card and big clock for the bar.
+  const slim = bugHunt || (wide && s.game === "fix");
   const split = !wide && !bugHunt && game;
   // No clock once it has run out (each game says time's up its own way), or once the card on screen is revealed.
   const done = (remaining === 0 && !!live.timer.startedAt) || (!!card && (!!s.revealed || live.scored.includes(card)));
@@ -483,8 +485,8 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     >
       <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
         {/* On a phone on its side, a drawing takes the bar beside it instead. */}
-        {game && bar(`sticky top-2 z-20 flex ${bugHunt ? "" : "lg:hidden"} ${drawing ? "short:hidden" : ""}`)}
-        <div className={`${split ? "lg:sticky lg:top-5" : ""} ${bugHunt ? "hidden" : game ? "hidden lg:block" : ""}`}>
+        {game && bar(`sticky top-2 z-20 flex ${slim ? "" : "lg:hidden"} ${drawing ? "short:hidden" : ""}`)}
+        <div className={`${split ? "lg:sticky lg:top-5" : ""} ${slim ? "hidden" : game ? "hidden lg:block" : ""}`}>
           <p className="text-sm text-dim">
             Week {live.week}: {wk.title}
           </p>

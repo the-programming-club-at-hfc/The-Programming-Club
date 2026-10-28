@@ -6,6 +6,7 @@ import { FIXES } from "#/lib/fixes";
 import type { FixTest } from "#/lib/fixes";
 import { TIMEOUT_MS, runTests } from "#/lib/python";
 import type { Python, TestResult } from "#/lib/python";
+import { RealBug } from "./answer";
 import { useConfirm } from "./feedback";
 import { FixHint, LevelChip, fixedLines, fmtElapsed } from "./game";
 import { Code } from "./ui";
@@ -95,48 +96,54 @@ export function FixRound({ index, py, revealed, hint, open, fixed, result, saveK
 
   const hidden = card.tests.filter((t) => !t.show).length;
   const can = py.status === "ready" && !busy;
+  // A laptop gets one screen with no scrolling: the task and examples on the left with the results under them, and
+  // the editor (sized to fit the whole program) with Run and Check on the right. Narrower screens stack it all.
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-      <div className="card space-y-4 p-5">
-        <p className="text-xl leading-snug">
-          {card.task}
-          <LevelChip level={card.level} />
-        </p>
-        <Examples tests={card.tests.filter((t) => t.show)} />
-        <p className="text-sm text-dim">
-          {hidden} more hidden test{hidden === 1 ? "" : "s"} check your fix too.
-        </p>
-        {hint && !revealed && <FixHint card={card} />}
-        {revealed && (
-          <div className="border-t-2 border-dashed border-line pt-4">
-            <p>
-              <strong className="font-extrabold">The fix.</strong> {card.why}
-            </p>
-            <Code code={card.fix} mark={fixedLines(card)} className="mt-2" />
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        <Status revealed={revealed} open={open} fixed={fixed} result={result} />
-        <Editor value={code} onChange={edit} />
-        <div className="flex flex-wrap items-center gap-1">
-          <button className="btn btn-coin" disabled={!can} onClick={() => void go("run")}>
-            {busy === "run" ? "Running…" : "Run"}
-          </button>
-          <button className="btn btn-primary" disabled={!can || (!open && !fixed)} onClick={() => void go("check")}>
-            {busy === "check" ? "Checking…" : "Check my fix"}
-          </button>
-          <button className="btn btn-sm ml-auto text-dim" onClick={() => void resetCode()}>
-            Reset code
-          </button>
-        </div>
-        <PyState status={py.status} />
-        {error && (
-          <p role="alert" className="rounded-[6px] bg-signal/10 px-4 py-3 font-semibold text-signal">
-            {error}
+    <div className="@container">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 @min-[56rem]:grid-cols-[minmax(0,1fr)_minmax(34rem,1.15fr)] @min-[56rem]:grid-rows-[auto_1fr] @min-[56rem]:items-start @min-[56rem]:gap-x-5 @min-[56rem]:gap-y-3">
+        <div className="card space-y-4 p-5 @min-[56rem]:space-y-2 @min-[56rem]:p-4">
+          <p className="text-xl leading-snug @min-[56rem]:text-lg">
+            {card.task}
+            <LevelChip level={card.level} />
           </p>
-        )}
+          <Examples tests={card.tests.filter((t) => t.show)} />
+          <p className="text-sm text-dim">
+            {hidden} more hidden test{hidden === 1 ? "" : "s"} check your fix too.
+          </p>
+          {hint && !revealed && <FixHint card={card} />}
+          {revealed && (
+            <div className="border-t-2 border-dashed border-line pt-4">
+              <p>
+                <strong className="font-extrabold">The fix.</strong> {card.why}
+              </p>
+              <Code code={card.fix} mark={fixedLines(card)} className="mt-2" />
+              {card.source && <RealBug source={card.source} className="mt-3" />}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3 @container @min-[56rem]:row-span-2">
+          <Status revealed={revealed} open={open} fixed={fixed} result={result} />
+          <Editor value={code} onChange={edit} fit={card.code} />
+          <div className="flex flex-wrap items-center gap-1">
+            <button className="btn btn-coin" disabled={!can} onClick={() => void go("run")}>
+              {busy === "run" ? "Running…" : "Run"}
+            </button>
+            <button className="btn btn-primary" disabled={!can || (!open && !fixed)} onClick={() => void go("check")}>
+              {busy === "check" ? "Checking…" : "Check my fix"}
+            </button>
+            <button className="btn ml-auto" onClick={() => void resetCode()}>
+              Reset code
+            </button>
+          </div>
+          <PyState status={py.status} />
+          {error && (
+            <p role="alert" className="rounded-[6px] bg-signal/10 px-4 py-3 font-semibold text-signal">
+              {error}
+            </p>
+          )}
+        </div>
+
         {results && <Results {...results} total={card.tests.length} />}
       </div>
     </div>
@@ -188,19 +195,21 @@ function Status({ revealed, open, fixed, result }: Pick<Props, "revealed" | "ope
 }
 
 const lines = (s: string) => s || "(nothing)";
+// Inputs and outputs wrap (a long hash breaks anywhere) rather than scroll sideways.
+const WRAP = "px-3 py-1.5 text-sm whitespace-pre-wrap wrap-anywhere";
 
 function Examples({ tests }: { tests: FixTest[] }) {
   return (
     <div className="space-y-2">
       {tests.map((t, i) => (
-        <div key={i} className="grid grid-cols-2 gap-2 text-sm">
+        <div key={i} className="space-y-2 text-sm">
           <div>
             <p className="font-bold text-dim">{tests.length > 1 ? `Example ${i + 1} input` : "Example input"}</p>
-            <pre className="code mt-1 text-sm">{t.input || "(no input)"}</pre>
+            <pre className={`code mt-1 ${WRAP}`}>{t.input || "(no input)"}</pre>
           </div>
           <div>
             <p className="font-bold text-dim">Should print</p>
-            <pre className="code mt-1 text-sm">{lines(t.output)}</pre>
+            <pre className={`code mt-1 ${WRAP}`}>{lines(t.output)}</pre>
           </div>
         </div>
       ))}
@@ -209,11 +218,11 @@ function Examples({ tests }: { tests: FixTest[] }) {
 }
 
 /** A plain editor: line numbers, Tab adds 4 spaces (Esc, then Tab, moves on). */
-export function Editor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function Editor({ value, onChange, fit }: { value: string; onChange: (v: string) => void; fit?: string }) {
   const n = value.split("\n").length;
   const escaped = useRef(false);
   return (
-    <div className="code flex p-0 focus-within:shadow-[inset_0_0_0_3px_var(--color-sun)]">
+    <div className="code flex p-0 focus-within:shadow-[inset_0_0_0_3px_var(--color-sun)]" style={fit ? fitted(fit) : undefined}>
       <pre aria-hidden className="py-4 pr-3 pl-4 text-right text-[#7d9a92] select-none">
         {Array.from({ length: n }, (_, i) => i + 1).join("\n")}
       </pre>
@@ -246,15 +255,30 @@ export function Editor({ value, onChange }: { value: string; onChange: (v: strin
   );
 }
 
+/**
+ * A font size that shows every line of the starter code: its longest line fits the width of the nearest @container,
+ * and on a laptop every row fits the height left under the bar, Run and Check. Never under 13px.
+ */
+function fitted(code: string) {
+  const rows = code.split("\n");
+  // Characters across: the longest line, the line numbers, and a spare one for the cursor. A mono character is 0.6em.
+  const cols = Math.max(...rows.map((l) => l.length)) + String(rows.length).length + 1;
+  return {
+    fontSize: `clamp(13px, min((100cqw - 3rem) / ${cols * 0.6}, (100dvh - 15rem) / ${(rows.length + 1) * 1.5}), 18px)`,
+    lineHeight: 1.5,
+  };
+}
+
 /** What Run or Check found: examples in full; hidden tests only pass or fail, never their input or output. */
 function Results({ kind, list, planned, total }: { kind: "run" | "check"; list: TestResult[]; planned: number; total: number }) {
   const passed = list.filter((r) => r.pass).length;
   const all = kind === "check" && passed === total;
   let ex = 0;
   let hid = 0;
+  // On a laptop the hidden tests sit side by side, so everything fits under the task.
   return (
-    <div className="space-y-3">
-      <p className={`text-xl font-extrabold ${all ? "text-pine" : ""}`}>
+    <div className="space-y-3 @min-[56rem]:flex @min-[56rem]:flex-wrap @min-[56rem]:gap-x-5 @min-[56rem]:gap-y-1.5 @min-[56rem]:space-y-0">
+      <p className={`text-xl font-extrabold @min-[56rem]:w-full @min-[56rem]:text-lg ${all ? "text-pine" : ""}`}>
         {all
           ? "Every test passes!"
           : kind === "run"
@@ -265,24 +289,24 @@ function Results({ kind, list, planned, total }: { kind: "run" | "check"; list: 
         const label = r.test.show ? `Example ${++ex}` : `Hidden test ${++hid}`;
         if (!r.test.show)
           return (
-            <p key={r.i} className="font-semibold">
+            <p key={r.i} className="font-semibold @min-[56rem]:text-sm">
               {r.pass ? "✓" : "✗"} {label}
               {!r.pass && <span className="font-normal text-dim">: {problem(r)}</span>}
             </p>
           );
         return (
-          <div key={r.i} className="card p-4">
+          <div key={r.i} className="card p-4 @min-[56rem]:w-full @min-[56rem]:p-3">
             <p className="font-bold">
               {r.pass ? "✓" : "✗"} {label}
             </p>
-            <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2 @min-[56rem]:mt-1">
               <div>
                 <p className="font-bold text-dim">Should print</p>
-                <pre className="code mt-1 text-sm">{lines(r.test.output)}</pre>
+                <pre className={`code mt-1 ${WRAP}`}>{lines(r.test.output)}</pre>
               </div>
               <div>
                 <p className="font-bold text-dim">Your program printed</p>
-                <pre className={`code mt-1 text-sm ${r.pass ? "" : "shadow-[inset_4px_0_0_var(--color-signal)]"}`}>
+                <pre className={`code mt-1 ${WRAP} ${r.pass ? "" : "shadow-[inset_4px_0_0_var(--color-signal)]"}`}>
                   {lines(r.run.stdout.replace(/\n+$/, ""))}
                 </pre>
               </div>
@@ -292,7 +316,7 @@ function Results({ kind, list, planned, total }: { kind: "run" | "check"; list: 
           </div>
         );
       })}
-      {list.length < planned && <p className="text-sm text-dim">The other tests didn’t run. Fix the loop, then try again.</p>}
+      {list.length < planned && <p className="text-sm text-dim @min-[56rem]:w-full">The other tests didn’t run. Fix the loop, then try again.</p>}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { useRef } from "react";
 import type { ReactNode, RefObject } from "react";
 import { BUGS, LANGS } from "#/lib/content";
-import type { Bug } from "#/lib/types";
+import type { Bug, BugSource } from "#/lib/types";
 import { choices, hintWindow, placeOf } from "#/lib/grading";
 import type { AnswerGame } from "#/lib/grading";
 import { teamWords } from "#/lib/words";
@@ -496,7 +496,6 @@ function BugSteps({ index, pick, onPick, onLock, solo }: RoundProps) {
 
 /** The answer's line and why (the fix is under the code), then the news a made-up card is based on, or the real bug's credit. */
 function BugReveal({ b }: { b: Bug }) {
-  const url = b.source?.url ?? b.newsUrl;
   return (
     <div className="card p-5">
       <p>
@@ -507,23 +506,36 @@ function BugReveal({ b }: { b: Bug }) {
           <strong className="text-ink">What happened.</strong> {b.news}
         </p>
       )}
-      {b.source && (
-        <p className="mt-3 text-sm text-dim">
-          <strong className="text-ink">Real bug:</strong>{" "}
-          <a href={b.source.url} target="_blank" rel="noopener noreferrer" className="link text-ink">
-            {b.source.project}, {b.source.cve}
-          </a>
-          . {b.source.realFix}
-        </p>
-      )}
-      {url && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="link mt-2 inline-block text-sm whitespace-nowrap text-ink">
-          Read more ↗
-        </a>
+      {b.source ? (
+        <RealBug source={b.source} className="mt-3" />
+      ) : (
+        b.newsUrl && <ReadMore url={b.newsUrl} />
       )}
     </div>
   );
 }
+
+/** A real bug's credit on the reveal: the project, CVE and severity, what the real fix changed, and the advisory. */
+export function RealBug({ source, className = "" }: { source: BugSource; className?: string }) {
+  return (
+    <>
+      <p className={`text-sm text-dim ${className}`}>
+        <strong className="text-ink">Real bug:</strong>{" "}
+        <a href={source.url} target="_blank" rel="noopener noreferrer" className="link text-ink">
+          {source.project}, {source.cve}
+        </a>{" "}
+        · {source.severity}. {source.realFix}
+      </p>
+      <ReadMore url={source.url} />
+    </>
+  );
+}
+
+const ReadMore = ({ url }: { url: string }) => (
+  <a href={url} target="_blank" rel="noopener noreferrer" className="link mt-2 inline-block text-sm whitespace-nowrap text-ink">
+    Read more ↗
+  </a>
+);
 
 /** Four big language buttons, then the lock that names the pick. */
 function LangAnswer({ index, pick, onPick, onLock, solo }: RoundProps) {

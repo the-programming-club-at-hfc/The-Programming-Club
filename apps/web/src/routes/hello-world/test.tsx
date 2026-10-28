@@ -370,7 +370,7 @@ function FixPlay({ index, tv, py }: { index: number; tv: boolean; py: Python }) 
     <>
       <div className="w-full">
         {timed && !revealed && (
-          <p className={`narrow mb-3 text-6xl leading-none font-extrabold ${remaining <= 10_000 ? "text-signal" : ""}`}>
+          <p className={`narrow mb-3 text-4xl leading-none font-extrabold ${remaining <= 10_000 ? "text-signal" : ""}`}>
             {remaining === 0 ? "time" : fmtClock(remaining)}
           </p>
         )}
