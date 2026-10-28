@@ -165,7 +165,9 @@ function LockStep({
     );
   return (
     <div className="mt-4">
-      <p className="text-center font-semibold">{what ? `${w.who(by)} picked ${what}.` : w.nobodyPicked}</p>
+      <p className={`text-center font-semibold ${compact ? "@min-[60rem]:hidden" : ""}`}>
+        {what ? `${w.who(by)} picked ${what}.` : w.nobodyPicked}
+      </p>
       <button
         className={`btn btn-primary mt-3 w-full text-lg ${compact ? "@min-[60rem]:mt-2 @min-[60rem]:text-base" : ""}`}
         disabled={!what}
@@ -506,11 +508,7 @@ function BugReveal({ b }: { b: Bug }) {
           <strong className="text-ink">What happened.</strong> {b.news}
         </p>
       )}
-      {b.source ? (
-        <RealBug source={b.source} className="mt-3" />
-      ) : (
-        b.newsUrl && <ReadMore url={b.newsUrl} />
-      )}
+      {b.source ? <RealBug source={b.source} className="mt-3" /> : b.newsUrl && <ReadMore url={b.newsUrl} />}
     </div>
   );
 }

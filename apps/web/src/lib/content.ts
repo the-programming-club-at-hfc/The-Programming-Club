@@ -1066,8 +1066,8 @@ export const BUGS: Bug[] = [
     name: "homer",
     level: "medium",
     lang: "Go",
-    context: "This middleware guards every API route. Out of the box, jwtSecret is empty.",
-    code: 'func (h *AuthHandler) JWTMiddleware() echo.MiddlewareFunc {\n\treturn func(next echo.HandlerFunc) echo.HandlerFunc {\n\t\treturn func(c echo.Context) error {\n\t\t\t// Skip if no secret configured\n\t\t\tif h.jwtSecret == "" {\n\t\t\t\treturn next(c)\n\t\t\t}\n\t\t\tif h.authenticateWithAuthTokenHeader(c) {\n\t\t\t\treturn next(c)\n\t\t\t}\n\t\t\ttoken, claims, src, err := h.parseAuthToken(c)\n\t\t\t// ... checks the token ...\n\t\t\treturn next(c)\n\t\t}\n\t}\n}',
+    context: "This is the API's JWT guard. jwtSecret defaults to empty. next(c) continues the request.",
+    code: 'func (h *AuthHandler) JWTMiddleware() echo.MiddlewareFunc {\n\treturn func(next echo.HandlerFunc) echo.HandlerFunc {\n\t\treturn func(c echo.Context) error {\n\t\t\t// Skip if no secret configured\n\t\t\tif h.jwtSecret == "" {\n\t\t\t\treturn next(c)\n\t\t\t}\n\t\t\tif h.authenticateWithAuthTokenHeader(c) {\n\t\t\t\treturn next(c)\n\t\t\t}\n\t\t\t// ... parse the token; reject bad ones ...\n\t\t\treturn next(c)\n\t\t}\n\t}\n}',
     line: "5 or 6",
     lines: [5, 6],
     fix: 'return c.JSON(http.StatusInternalServerError, "JWT authentication is not configured")',
@@ -1093,7 +1093,7 @@ export const BUGS: Bug[] = [
     name: "openc3 cosmos",
     level: "medium",
     lang: "Ruby",
-    context: "Any logged-in user can change the pypi_url setting. Backticks run a shell command.",
+    context: "In the open-source edition, logged-in users can change pypi_url before plugin installation. Backticks run a shell command.",
     code: "pypi_url = get_setting('pypi_url', scope: scope)\nif pypi_url\n  pypi_url += '/simple'\nelse\n  pypi_url = 'https://pypi.org/simple'\nend\n# ...\npip_args = \"-i #{pypi_url} -r #{requirements_path}\"\noutput = `/openc3/bin/pipinstall #{pip_args}`\nputs output",
     line: "8 or 9",
     lines: [8, 9],
@@ -1113,7 +1113,7 @@ export const BUGS: Bug[] = [
       severity: "High (8.8)",
       commit: "https://github.com/OpenC3/cosmos/commit/be70d1d836c83c3b084e768e31a399312d4cbe0b",
       realFix:
-        'The real fix builds pip_args as an array and calls Open3.capture2e("/openc3/bin/pipinstall", *pip_args). The answer here does the same thing without needing a new require.',
+        'The real fix builds pip_args as an array and calls Open3.capture2e("/openc3/bin/pipinstall", *pip_args). This answer shows the no-shell part with IO.popen. Upstream also validates pypi_url as an HTTP(S) URL and checks exit status.',
     },
   },
   {
