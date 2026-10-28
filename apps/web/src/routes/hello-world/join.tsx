@@ -22,6 +22,7 @@ import type { AnswerGame } from "#/lib/grading";
 import { IDEA_MAX } from "#/lib/ideas";
 import { gamesIn, useJustEnded, useSchedule, usesTeamComputer } from "#/lib/schedule";
 import { CLUB, isHfcEmail } from "#/lib/season";
+import { SPOOKY_ART } from "#/lib/spooky";
 import { teamWords } from "#/lib/words";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -50,6 +51,7 @@ function Join() {
   const sessionId = live ? live._id : (last?._id ?? null);
   const [token, setToken] = useState<string | null>(null);
   const me = useQuery(api.players.me, token ? { token } : "skip");
+  const plan = useSchedule();
 
   useEffect(() => {
     setToken(sessionId ? localStorage.getItem(tokenKey(sessionId)) : null);
@@ -102,7 +104,40 @@ function Join() {
       />
     );
   }
-  return <JoinForm initialCode={codeFromQr ?? ""} sessionId={live._id} onJoined={setToken} />;
+  return (
+    <ComputerNudge spooky={plan[live.week - 1].theme === "spooky"}>
+      <JoinForm initialCode={codeFromQr ?? ""} sessionId={live._id} onJoined={setToken} />
+    </ComputerNudge>
+  );
+}
+
+/** The spooky night is played on computers: a phone-width screen says so first, and can carry on anyway. */
+function ComputerNudge({ spooky, children }: { spooky: boolean; children: React.ReactNode }) {
+  const [anyway, setAnyway] = useState(false);
+  const [host, setHost] = useState(CLUB.url);
+  useEffect(() => setHost(window.location.host), []);
+  if (!spooky || anyway) return children;
+  // By CSS, not a media query hook, so a phone never flashes the form first.
+  return (
+    <>
+      <div className="sm:hidden">
+        <Center>
+          <div className="mx-auto mb-8 w-28">
+            <img src={SPOOKY_ART.gravestone} alt="" className="w-full" />
+          </div>
+          <h1 className="text-[clamp(2.2rem,9vw,3rem)] leading-[1] lowercase">tonight’s game is on a computer</h1>
+          <p className="mx-auto mt-4 max-w-[34ch] text-lg text-dim">
+            Grab a seat at a classroom computer and go to <strong className="text-ink wrap-anywhere">{host}/join</strong>. The Bug Hunt
+            needs a real screen and keyboard.
+          </p>
+          <button className="btn mt-8" onClick={() => setAnyway(true)}>
+            Continue on this phone anyway
+          </button>
+        </Center>
+      </div>
+      <div className="max-sm:hidden">{children}</div>
+    </>
+  );
 }
 
 /** After End night: what tonight earned, and the season board. */
@@ -386,7 +421,9 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
     (s.mode === "wiki" && (!!s.wikiReady || (!!s.wikiFrom && !!s.wikiTo))) ||
     drawing ||
     (s.mode === "message" && !!s.message);
-  const split = !wide && game;
+  // Bug Hunt puts its code beside the steps, so on a wide screen it takes the player card's room too and keeps the bar.
+  const bugHunt = s.mode === "card" && s.game === "bug" && !!me.team;
+  const split = !wide && !bugHunt && game;
   // No clock once it has run out (each game says time's up its own way), or once the card on screen is revealed.
   const done = (remaining === 0 && !!live.timer.startedAt) || (!!card && (!!s.revealed || live.scored.includes(card)));
   const timed = (!!live.timer.startedAt || s.mode === "timer") && !done;
@@ -442,12 +479,12 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   );
   return (
     <Wrap
-      className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"} ${drawing ? "short:max-w-none" : ""}`}
+      className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split || bugHunt ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"} ${drawing ? "short:max-w-none" : ""}`}
     >
       <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
         {/* On a phone on its side, a drawing takes the bar beside it instead. */}
-        {game && bar(`sticky top-2 z-20 flex lg:hidden ${drawing ? "short:hidden" : ""}`)}
-        <div className={`${split ? "lg:sticky lg:top-5" : ""} ${game ? "hidden lg:block" : ""}`}>
+        {game && bar(`sticky top-2 z-20 flex ${bugHunt ? "" : "lg:hidden"} ${drawing ? "short:hidden" : ""}`)}
+        <div className={`${split ? "lg:sticky lg:top-5" : ""} ${bugHunt ? "hidden" : game ? "hidden lg:block" : ""}`}>
           <p className="text-sm text-dim">
             Week {live.week}: {wk.title}
           </p>
@@ -741,6 +778,7 @@ function TeamAnswer({
   const mine = useQuery(api.answers.mine, { token });
   const pick = useMutation(api.answers.pick);
   const lock = useMutation(api.answers.lock);
+  const ask = useMutation(api.answers.askBeetle);
   const [error, setError] = useState("");
   const key = cardKey(game, index);
   const current = mine?.card === key ? mine : null;
@@ -761,6 +799,7 @@ function TeamAnswer({
       error={error}
       onPick={(p) => send(pick({ token, card: key, ...p }))}
       onLock={(step) => send(lock({ token, card: key, step }))}
+      onAsk={() => send(ask({ token, card: key }))}
       solo={live.teamSize === 1}
       teams={live.teams}
       teamId={teamId}

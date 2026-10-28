@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { BUGS, WIKI_RACES } from "./content";
+import { FIXES } from "./fixes";
 import { DEFAULT_PLAN } from "./schedule";
 import {
   countLabel,
   countOf,
   deckFor,
+  filtersFor,
   freshLeft,
   heldKey,
   heldLabel,
@@ -103,6 +105,71 @@ describe("the next card", () => {
   test("counts the fresh cards left", () => {
     expect(freshLeft(r, [], [])).toBe(new Set([...spooky, ...easy]).size);
     expect(freshLeft(round("Wiki Race"), [], [])).toBe(0);
+  });
+});
+
+describe("CVE rounds", () => {
+  const real = (level: string) => BUGS.flatMap((b, i) => (b.source && b.level === level ? [i] : []));
+  // Plays a round through: each card goes up tonight, so the next pick skips it.
+  const draw = (label: string, n: number, tonight: string[] = []) => {
+    const r = round(label);
+    const picks: number[] = [];
+    for (let k = 0; k < n; k++) {
+      const i = nextCard(r, [], [...tonight, ...picks.map((p) => `${r.game}:${p}`)]);
+      if (i === null) break;
+      picks.push(i);
+    }
+    return picks;
+  };
+
+  test("the real bugs are the cards with a source, and only those", () => {
+    expect(deckFor("bug", "cve")).toEqual(BUGS.flatMap((b, i) => (b.source ? [i] : [])));
+    expect([real("medium").length, real("hard").length]).toEqual([6, 6]);
+  });
+
+  test("a CVE round with a level plays the real bugs at that level in deck order", () => {
+    const medium = round("Bug Hunt: CVEs, medium");
+    expect([medium.game, medium.filters]).toEqual(["bug", ["medium", "cve"]]);
+    expect(draw("Bug Hunt: CVEs, medium", 6)).toEqual(real("medium"));
+    expect(draw("Bug Hunt: CVEs, hard", 6)).toEqual(real("hard"));
+    expect(freshLeft(medium, [], [])).toBe(6);
+  });
+
+  test("then any real bug, then any card at its level", () => {
+    const tonight = real("medium").map((i) => `bug:${i}`);
+    expect(draw("Bug Hunt: CVEs, medium", 1, tonight)).toEqual([real("hard")[0]]);
+    const allReal = deckFor("bug", "cve").map((i) => `bug:${i}`);
+    expect(BUGS[draw("Bug Hunt: CVEs, medium", 1, allReal)[0]].level).toBe("medium");
+    expect(draw("Bug Hunt: CVEs", 2)).toEqual(deckFor("bug", "cve").slice(0, 2));
+  });
+
+  test("Spooky Bugs night plays the cards written for it", () => {
+    const night = DEFAULT_PLAN.find((w) => w.title === "Spooky Bugs")!.lineup.map((g, i) => roundOf(g, i));
+    expect(night.map((r) => [r.game, r.filters, r.double])).toEqual([
+      ["output", [], false],
+      ["bug", ["spooky", "easy"], false],
+      ["bug", ["medium", "cve"], false],
+      ["bug", ["hard", "cve"], false],
+      ["fix", ["spooky"], true],
+    ]);
+    const spooky = BUGS.flatMap((b, i) => (b.spooky ? [i] : []));
+    expect(spooky).toHaveLength(5);
+    expect(draw("Bug Hunt: easy & spooky", 5)).toEqual(spooky);
+    expect(nextCard(night[4], [], [])).toBe(FIXES.length - 1);
+    expect(FIXES.filter((f) => f.spooky)).toEqual([FIXES[FIXES.length - 1]]);
+  });
+
+  test('labels without CVEs pick the same cards as before; "Fix it for real" isn\'t a real-bug filter', () => {
+    expect(["Bug Hunt: easy & spooky", "Bug Hunt: medium", "Bug Hunt: hard", "Fix it for real"].map(filtersFor)).toEqual([
+      ["spooky", "easy"],
+      ["medium"],
+      ["hard"],
+      [],
+    ]);
+    expect(draw("Bug Hunt: medium", 3)).toEqual(deckFor("bug", "medium").slice(0, 3));
+    expect(deckFor("bug", "medium").slice(0, 3)).toEqual([7, 8, 9]);
+    expect(nextCard(round("Fix it for real"), [], [])).toBe(0);
+    expect(nextCard(round("Final round, double points: Fix it for real"), [], [])).toBe(0);
   });
 });
 
@@ -214,6 +281,18 @@ describe("round lengths", () => {
     expect([roundLength(round("Wiki Race: Classic")), roundLength(round("Tech Pictionary"))]).toEqual([2, 6]);
     expect(roundLength(round("Puzzle 1: easy, played as a relay"))).toBeNull();
     expect(roundLength(round("Meet the officers"))).toBeNull();
+  });
+
+  test("the spooky final plays its one spooky problem; every other Fix it for real round still plays 2", () => {
+    const fix = DEFAULT_PLAN.flatMap((w) => w.lineup.map((g, i) => roundOf(g, i))).filter((r) => r.game === "fix");
+    expect(fix.map((r) => [r.label, roundLength(r)])).toEqual([
+      ["Fix it for real, spooky", 1],
+      ["Fix it for real", 2],
+    ]);
+    const final = fix[0];
+    expect(countLabel(final, 1)).toBe("Problem 1 of 1");
+    const scores = { mode: "scoreboard", game: "fix", index: FIXES.length - 1, revealed: true };
+    expect(stepFor({ round: final, screen: scores, teams: 3, played: 1 })).toBe("done");
   });
 
   test("players never see the word card", () => {

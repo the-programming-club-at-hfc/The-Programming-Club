@@ -8,10 +8,13 @@ import { api } from "../../../convex/_generated/api";
 import { SlideStage, kickoffSlides, useSlideKeys } from "#/components/kickoff";
 import { CardView, DECKS, fmtClock, fmtElapsed, isSwapMoment, useChimes, useRemaining } from "#/components/game";
 import { Blanks, Sketch } from "#/components/draw";
+import { Graveyard } from "#/components/graveyard";
+import { HauntedHunt, useLocks } from "#/components/haunted";
+import { SpookyBoard, SpookyMessage, SpookyShift, screenKey } from "#/components/spooky-stage";
 import { InstagramGlyph, InstagramQr } from "#/components/instagram";
 import { OfficerGate, useAction, useJoinCode } from "#/components/officer";
 import { GAME_TILE, Picto, ordinal, weekTile } from "#/components/ui";
-import { GAMES } from "#/lib/content";
+import { BUGS, GAMES } from "#/lib/content";
 import { heldLabel, roundOf } from "#/lib/flow";
 import { cardKey, drawKey, isAnswerGame, placeOf, wikiKey } from "#/lib/grading";
 import { nextMeeting, useJustEnded, useSchedule } from "#/lib/schedule";
@@ -54,15 +57,28 @@ function TvScreen() {
   const live = useQuery(api.sessions.live);
   const code = useJoinCode();
   const [sound, setSound] = useState(false);
+  // The spooky night, live or just ended, changes screens with a sweep of bats.
+  const plan = useSchedule();
+  const last = useJustEnded(live !== null);
+  // The night's week, kept while the one that just ended loads, so the change to its final standings still sweeps.
+  const [seen, setSeen] = useState<number | null>(null);
+  useEffect(() => {
+    if (live) setSeen(live.week);
+  }, [live]);
+  const week = live ? live.week : last ? last.week : last === undefined ? seen : null;
+  const spooky = week !== null && plan[week - 1]?.theme === "spooky";
+  // The haunted Bug Hunt has its big clock in the top corner, so there it waits at the bottom, above the ticker.
+  const night = spooky && live?.screen.mode === "card" && live.screen.game === "bug" && !live.screen.revealed;
   return (
     <div
-      className="theme-pine relative flex h-screen flex-col overflow-hidden"
+      className={`theme-pine relative flex h-screen flex-col overflow-hidden ${live ? "[--shift-under:5vw]" : ""}`}
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
-      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <AfterNight /> : null}
+      {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <AfterNight spooky={spooky} /> : null}
+      {spooky && <SpookyShift screen={live ? screenKey(live.screen) : "after"} clear={!!live?.timer.startedAt} />}
       {!sound && (
         <button
-          className="absolute top-4 right-4 z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim"
+          className={`absolute z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim ${night ? "bottom-[calc(5vw+1rem)] left-1/2 -translate-x-1/2" : "top-4 right-4"}`}
           onClick={(e) => {
             e.stopPropagation();
             void unlockAudio().then(() => setSound(true));
@@ -89,13 +105,21 @@ function CodeSquares({ code, className = "" }: { code: string; className?: strin
 }
 
 /** After End night: the final standings for a while, then the attract screen. */
-function AfterNight() {
+function AfterNight({ spooky }: { spooky: boolean }) {
   const last = useJustEnded();
   if (last === undefined) return null;
   return last ? (
-    <div className="flex-1 overflow-hidden p-[3.5vw]">
-      <Scoreboard teams={last.teams} solo={last.solo} practice={last.practice} final />
-    </div>
+    spooky ? (
+      <div className="relative flex-1 overflow-hidden">
+        <SpookyBoard>
+          <Scoreboard teams={last.teams} solo={last.solo} practice={last.practice} final />
+        </SpookyBoard>
+      </div>
+    ) : (
+      <div className="flex-1 overflow-hidden p-[3.5vw]">
+        <Scoreboard teams={last.teams} solo={last.solo} practice={last.practice} final />
+      </div>
+    )
   ) : (
     <Attract />
   );
@@ -177,20 +201,60 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
   );
   // A card already scored tonight shows as played (answer and results), like it does on phones.
   const done = !!s.revealed || !!board?.results || !!fixBoard?.scored || !!puzzleBoard?.scored;
+  // A night with a theme dresses up: the spooky one's lobby is a graveyard (and since it's played on computers, no QR),
+  // and its round titles and standings are paper scenes at night.
+  const spooky = wk.theme === "spooky";
+  // There Bug Hunt is read on each player's own computer, so the TV hides the code until the reveal: a haunted scene
+  // instead. Other nights show the code, for phones.
+  const hunt = spooky && s.mode === "card" && s.game === "bug" && s.index !== undefined;
+  const locks = useLocks(hunt && !done ? cardKey("bug", s.index!) : null);
+  const graveyard = s.mode === "lobby" && spooky;
+  const scene = hunt || (spooky && (s.mode === "lobby" || s.mode === "message" || s.mode === "scoreboard"));
 
   return (
     <>
-      <div className={s.mode === "slides" ? "flex min-h-0 flex-1" : "flex-1 overflow-hidden p-[3.5vw]"}>
+      <div
+        className={
+          s.mode === "slides" ? "flex min-h-0 flex-1" : scene ? "relative flex-1 overflow-hidden" : "flex-1 overflow-hidden p-[3.5vw]"
+        }
+      >
         {s.mode === "slides" && <Slides screen={s} />}
-        {s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />}
-        {s.mode === "scoreboard" && <Scoreboard teams={live.teams} solo={live.teamSize === 1} practice={live.practice} />}
+        {graveyard ? (
+          <Graveyard address={`${origin.replace(/^https?:\/\//, "")}/join`} code={code} roster={live.roster} />
+        ) : (
+          s.mode === "lobby" && <Lobby live={live} code={code} joinUrl={joinUrl} />
+        )}
+        {s.mode === "scoreboard" &&
+          (spooky ? (
+            <SpookyBoard>
+              <Scoreboard teams={live.teams} solo={live.teamSize === 1} practice={live.practice} />
+            </SpookyBoard>
+          ) : (
+            <Scoreboard teams={live.teams} solo={live.teamSize === 1} practice={live.practice} />
+          ))}
         {s.mode === "timer" && (
           <div className="grid h-full place-items-center">
             <BigTimer remaining={remaining} running={running} swap={isSwapMoment(live.timer, remaining)} size="text-[34vw]" />
           </div>
         )}
-        {s.mode === "card" && s.game && s.index !== undefined && (
-          <div className="mx-auto flex h-full max-w-[90vw] flex-col justify-center">
+        {hunt && (
+          <HauntedHunt
+            card={cardKey("bug", s.index!)}
+            bug={BUGS[s.index!]}
+            kicker={["bug hunt", item && `round ${item.index + 1}`, count].filter(Boolean).join(" · ")}
+            remaining={remaining}
+            durationMs={live.timer.durationMs}
+            running={running}
+            revealed={done}
+            locks={locks}
+            locked={board && board.locked !== null ? { locked: board.locked, teams: board.teams } : null}
+            results={board?.results ?? null}
+            teamsWord={w.teams}
+          />
+        )}
+        {s.mode === "card" && s.game && s.index !== undefined && !hunt && (
+          // Fix it for real fills the screen, so its code can be as big as it fits; other cards sit in the middle.
+          <div className={`mx-auto flex h-full flex-col ${isFix ? "" : "max-w-[90vw] justify-center"}`}>
             <p className="mb-[1.2vw] flex items-center gap-[1vw] text-[1.8vw] font-bold">
               {deckTile && (
                 <span className={`tile ${deckTile.tile} size-[3.6vw]`}>
@@ -215,12 +279,24 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
                 </span>
               )}
             </p>
-            <div className={board?.results || fixBoard || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
-              <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" solo={w.solo} />
-              {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
-              {fixBoard && <FixList board={fixBoard} done={done} />}
-              {puzzleBoard && <StarBoard board={puzzleBoard} done={done} w={w} />}
-            </div>
+            {isFix ? (
+              <div className="min-h-0 flex-1">
+                <CardView
+                  game="fix"
+                  index={s.index}
+                  answer={done}
+                  hint={!!s.hint}
+                  size="xl"
+                  aside={fixBoard && <FixList board={fixBoard} done={done} />}
+                />
+              </div>
+            ) : (
+              <div className={board?.results || puzzleBoard ? "grid grid-cols-[minmax(0,1fr)_26vw] items-start gap-[3vw]" : ""}>
+                <CardView game={s.game} index={s.index} answer={done} hint={!!s.hint} size="xl" solo={w.solo} />
+                {board?.results && <Results results={board.results} bug={s.game === "bug"} />}
+                {puzzleBoard && <StarBoard board={puzzleBoard} done={done} w={w} />}
+              </div>
+            )}
           </div>
         )}
         {s.mode === "wiki" && s.wikiReady && (
@@ -262,7 +338,8 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
           </div>
         )}
         {s.mode === "draw" && s.drawing !== undefined && <DrawView n={s.drawing} live={live} remaining={remaining} w={w} count={count} />}
-        {s.mode === "message" && (
+        {s.mode === "message" && spooky && <SpookyMessage message={s.message ?? ""} />}
+        {s.mode === "message" && !spooky && (
           <div className="grid h-full place-items-center text-center">
             <p className="max-w-[18ch] text-[5.5vw] leading-[1] font-extrabold tracking-[-0.03em] text-balance">{s.message}</p>
           </div>
@@ -270,7 +347,7 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
       </div>
 
       {/* Ticker: late arrivals can always join. */}
-      <footer className="flex items-center gap-[1.6vw] bg-mist pr-[2.5vw] text-[1.4vw]">
+      <footer className={`flex items-center gap-[1.6vw] pr-[2.5vw] text-[1.4vw] ${scene ? "bg-[#262522]" : "bg-mist"}`}>
         <span className={`tile ${wt.tile} size-[5vw] shrink-0`}>
           <Picto id={wt.picto} className="absolute inset-[12%]" />
         </span>
@@ -285,7 +362,8 @@ function LiveTv({ live, code, sound }: { live: Live; code: string; sound: boolea
         <CodeSquares code={code} className="text-[2vw]" />
         {/* A card off the TV mid-play: its clock waits for it. */}
         {s.mode !== "timer" && live.timer.parked && <span className="text-dim">paused</span>}
-        {s.mode !== "timer" && (running || remaining !== live.timer.durationMs) && (
+        {/* The haunted Bug Hunt has its own clock. */}
+        {s.mode !== "timer" && !hunt && (running || remaining !== live.timer.durationMs) && (
           <span
             className={`narrow min-w-[4ch] text-right text-[2.8vw] leading-none font-extrabold ${remaining <= 10_000 && running ? "text-signal" : ""}`}
           >
@@ -324,10 +402,10 @@ function useCountSound(card: string | undefined, n: number | null) {
   }, [card, n]);
 }
 
-/** One row per team beside the card. Solo nights make that one per player, so past 7 they go to one tight line each,
- *  and past 12 the rest are counted instead of listed. */
-function TeamRows<T>({ rows, row }: { rows: T[]; row: (r: T, tight: boolean) => ReactNode }) {
-  const tight = rows.length > 7;
+/** One row per team beside the card. Solo nights make that one per player, so past `roomy` (7) they go to one tight
+ *  line each, and past 12 the rest are counted instead of listed. */
+function TeamRows<T>({ rows, row, roomy = 7 }: { rows: T[]; row: (r: T, tight: boolean) => ReactNode; roomy?: number }) {
+  const tight = rows.length > roomy;
   return (
     <>
       <ol className={`mt-[1vw] flex flex-col ${tight ? "gap-[0.3vw]" : "gap-[0.5vw]"}`}>{rows.slice(0, 12).map((r) => row(r, tight))}</ol>
@@ -345,13 +423,13 @@ const END = (tight: boolean) => (tight ? "text-[1.8vw]" : "text-[2.6vw]");
 function FixList({ board, done }: { board: FixBoard; done: boolean }) {
   return (
     <div>
-      {!done && (
-        <p className="truncate text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on a laptop, on the join page</p>
-      )}
+      {!done && <p className="text-[1.6vw] leading-tight font-extrabold tracking-[-0.03em]">Fix it on a laptop, on the join page</p>}
       {board.fixed.length === 0 ? (
         <p className="mt-[1vw] text-[1.6vw] text-dim">{done ? "Nobody fixed it this time." : "No fixes yet."}</p>
       ) : (
         <TeamRows
+          // Beside a Fix it for real program as big as fits, 12 tight lines fit and 7 full ones don't.
+          roomy={5}
           rows={board.fixed.map((f, i) => ({ ...f, i }))}
           row={(f, tight) => (
             <li

@@ -1,7 +1,7 @@
 // "Fix it for real": the double-points final on Bug Hunt nights.
 // Each team gets one buggy Python program in an in-browser editor, runs it, edits it,
 // and is marked "Fixed!" once every test passes. Plain data; every card has exactly one bug.
-import type { Level } from "./types";
+import type { BugSource, Level } from "./types";
 
 export interface FixTest {
   /** stdin, one value per line (may be empty). */
@@ -27,13 +27,14 @@ export interface FixCard {
   why: string;
   /** Nudge for stuck teams, without giving the fix away. */
   hint: string;
+  /** For a card cut from a real bug: the advisory, credited on reveal. */
+  source?: BugSource;
 }
 
 export const FIXES: FixCard[] = [
   {
     name: "pumpkin patch",
     level: "easy",
-    spooky: true,
     task: "Read how many pumpkins you have, then how many more you picked, and print the new total. More than 10 pumpkins means pie.",
     code: `print("Welcome to the pumpkin patch!")
 pumpkins = input()
@@ -61,7 +62,6 @@ if total > 10:
   {
     name: "candy haul",
     level: "medium",
-    spooky: true,
     task: "The first line is how many houses you visited, then one line per house with how many candies you got. Print the total candy.",
     code: `houses = int(input())
 for house in range(houses):
@@ -88,7 +88,6 @@ print("Total candy:", total)`,
   {
     name: "scariest costume",
     level: "hard",
-    spooky: true,
     task: "The first line is how many costumes, then each costume’s name and scream score on their own lines. Print the costume with the highest score; on a tie, the first one wins.",
     code: `count = int(input())
 best_name = input()
@@ -263,5 +262,67 @@ if streak > best:
 print("Longest winning streak:", best)`,
     why: "The streak only gets checked when a win run ends with an L or D, so a run still going at the end of the line is never counted. Check once more after the loop.",
     hint: "Try a team that wins its last few games. When does the code compare streak to best?",
+  },
+  {
+    name: "the optional signature",
+    level: "medium",
+    spooky: true,
+    task: "Read a viewer ID, then an auth key (it may be blank). Log in only if the key is the right signature for that ID.",
+    code: `import hashlib
+
+SECRET = "pumpkin"
+
+viewer_id = input()
+auth_key = input()
+
+ok = True
+# Verify signature, if present
+if auth_key:
+    signed = f"app_{viewer_id}_{SECRET}"
+    check_key = hashlib.md5(signed.encode()).hexdigest()
+    if check_key != auth_key:
+        ok = False
+
+if ok:
+    print("Logged in as", viewer_id)
+else:
+    print("VK.com authentication failed: invalid auth key")`,
+    tests: [
+      { input: "42\n6807382ee13fa65303f2d156ac7b2405", output: "Logged in as 42", show: true },
+      { input: "42\nnot-a-real-key", output: "VK.com authentication failed: invalid auth key" },
+      { input: "7\n\n", output: "VK.com authentication failed: invalid auth key" },
+      { input: "13\n6807382ee13fa65303f2d156ac7b2405", output: "VK.com authentication failed: invalid auth key" },
+      { input: "7\n2a77c6e9222687704dee5785325c05c4", output: "Logged in as 7" },
+    ],
+    fix: `import hashlib
+
+SECRET = "pumpkin"
+
+viewer_id = input()
+auth_key = input()
+
+ok = True
+# Verify signature, always
+signed = f"app_{viewer_id}_{SECRET}"
+check_key = hashlib.md5(signed.encode()).hexdigest()
+if check_key != auth_key:
+    ok = False
+
+if ok:
+    print("Logged in as", viewer_id)
+else:
+    print("VK.com authentication failed: invalid auth key")`,
+    why: "The real code only checked the signature “if present.” Leave the key out and you could log in as anyone. The fix checks it every time.",
+    hint: "Every example passes. What happens when the auth key line is blank?",
+    source: {
+      project: "python-social-auth",
+      blurb: "the login library behind social-auth-app-django",
+      cve: "CVE-2026-57178",
+      url: "https://github.com/advisories/GHSA-3c93-f73f-qc9h",
+      published: "2026-09-24",
+      severity: "High (7.4)",
+      commit: "https://github.com/python-social-auth/social-core/commit/1bfacdd0379e5eb46e169a99ab648b835e9bb6a2",
+      realFix: "Checks the signature every time, not only “if present.”",
+    },
   },
 ];

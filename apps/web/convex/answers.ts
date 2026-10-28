@@ -58,6 +58,8 @@ const view = (r: Doc<"answers"> | null) =>
     choiceBy: r.choiceBy,
     locked: r.lockedAt !== undefined,
     lockedBy: r.lockedBy,
+    hint: r.hintAt !== undefined,
+    hintBy: r.hintBy,
   };
 
 /** The player behind a phone, checked against the card on the TV and the answer window. */
@@ -110,6 +112,20 @@ export const lock = mutation({
       if (row?.choice === undefined) throw new ConvexError("Pick an answer first.");
       if (row.lockedAt === undefined) await ctx.db.patch(row._id, { lockedAt: Date.now(), lockedBy: name });
     }
+  },
+});
+
+/** Ask the Bug Hunt beetle which lines to look at, for the whole team. Only before the line is locked; costs the early bonus. */
+export const askBeetle = mutation({
+  args: { token: v.string(), card: v.string() },
+  handler: async (ctx, { token, card }) => {
+    const { s, c, teamId, name, row } = await teamAnswer(ctx, token, card);
+    if (c.game !== "bug") throw new ConvexError("The beetle only helps with Bug Hunt.");
+    if (row?.lineLockedAt !== undefined) throw new ConvexError("Your team already locked in a line.");
+    if (row?.hintAt !== undefined) return;
+    const patch = { hintAt: Date.now(), hintBy: name };
+    if (row) await ctx.db.patch(row._id, patch);
+    else await ctx.db.insert("answers", { sessionId: s._id, teamId, card, ...patch });
   },
 });
 

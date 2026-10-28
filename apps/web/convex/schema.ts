@@ -177,6 +177,9 @@ export default defineSchema({
     choiceBy: v.optional(v.string()),
     lockedAt: v.optional(v.number()),
     lockedBy: v.optional(v.string()),
+    // Bug Hunt: when the team asked the beetle for a hint, and who. Costs the early bonus.
+    hintAt: v.optional(v.number()),
+    hintBy: v.optional(v.string()),
     // Set when the card is revealed. `points` includes double points.
     result: v.optional(
       v.object({

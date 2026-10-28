@@ -9,6 +9,9 @@ export interface Week {
   note?: string;
   /** XP for showing up that week. */
   showXp: number;
+  /** A night dressed up: "spooky" turns the TV's lobby into a graveyard. It's played on computers, so no QR code, and
+   *  phones get a nudge toward one. */
+  theme?: "spooky";
 }
 
 export interface Agenda {
@@ -55,6 +58,32 @@ export interface Bug {
   /** Three plausible wrong fixes, shown with `fix` as phone choices. */
   wrong: [string, string, string];
   why: string;
+  /** The card's title on screen, e.g. "quart" or "key in the logs". */
+  name?: string;
+  /** The language the code is in. Python when unset. */
+  lang?: string;
+  /** One line under the title on what the code does, so players know what "working" means. */
+  context?: string;
+  /** For a made-up card: the real news it's based on, shown on reveal. */
+  news?: string;
+  /** For a real bug: the advisory it was cut from. The code is the project's own, just before the fix. */
+  source?: BugSource;
+}
+
+export interface BugSource {
+  project: string;
+  /** What the project is, in a few words. */
+  blurb: string;
+  cve: string;
+  /** The advisory page. */
+  url: string;
+  /** YYYY-MM-DD. */
+  published: string;
+  severity: string;
+  /** The fix commit. */
+  commit: string;
+  /** What the real fix changed, shown on reveal. */
+  realFix: string;
 }
 
 export interface OutputQ {

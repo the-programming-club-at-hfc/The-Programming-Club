@@ -1,0 +1,188 @@
+/* The Bug Hunt beetle (components/beetle.tsx): it lives in the code's line-number gutter, never over the code. */
+.beetle-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.beetle-layer * {
+  pointer-events: none;
+}
+
+.beetle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--beetle);
+  height: var(--beetle);
+  will-change: transform;
+  transition: opacity 0.3s;
+}
+.beetle[data-act="gone"] {
+  opacity: 0;
+}
+
+/* Faces right at rest. Crawling, it turns to face up or down the gutter with its legs on the left edge, like
+   walking on a wall; the scaleX flip on the way up reads as a paper cutout turning over. */
+.beetle-turn {
+  width: 100%;
+  height: 100%;
+  transition: transform 0.18s ease-out;
+}
+.beetle[data-face="down"] .beetle-turn {
+  transform: rotate(90deg) scaleX(1);
+}
+.beetle[data-face="up"] .beetle-turn {
+  transform: rotate(90deg) scaleX(-1);
+}
+
+.beetle-pose {
+  width: 100%;
+  height: 100%;
+  transform-origin: 30% 85%;
+}
+.beetle[data-act="walk"] .beetle-pose,
+.beetle[data-act="scurry"] .beetle-pose {
+  animation: beetle-bob 0.28s ease-in-out infinite alternate;
+}
+.beetle[data-act="sniff"] .beetle-pose {
+  animation: beetle-sniff 1.3s ease-in-out;
+}
+.beetle[data-act="hold"] .beetle-pose {
+  animation: beetle-hold 2.4s ease-in-out infinite;
+  transform: rotate(-9deg) translateY(-2px) scale(1.06);
+}
+.beetle[data-act="hop"] .beetle-pose {
+  animation: beetle-hop 1.6s ease-out infinite;
+}
+
+/* Two walk frames, stacked. Walking flips between them. */
+.beetle-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+.beetle-frame + .beetle-frame {
+  visibility: hidden;
+}
+:is(.beetle[data-act="walk"], .beetle[data-act="scurry"]) .beetle-frame {
+  animation: beetle-step-off 0.28s steps(1) infinite;
+}
+:is(.beetle[data-act="walk"], .beetle[data-act="scurry"]) .beetle-frame + .beetle-frame {
+  animation-name: beetle-step-on;
+}
+.beetle[data-act="scurry"] :is(.beetle-pose, .beetle-frame) {
+  animation-duration: 0.12s;
+}
+
+/* The beetle's window after a team asks: a soft glow over those rows' gutter, never the code. */
+.beetle-glow {
+  position: absolute;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgb(244 154 29 / 0.38), rgb(244 154 29 / 0.12) 70%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-sun);
+  animation: beetle-glow 2.2s ease-in-out infinite alternate;
+}
+
+.beetle-jar {
+  position: absolute;
+  width: var(--jar);
+  height: var(--jar);
+  animation: beetle-jar 0.7s cubic-bezier(0.45, 0, 0.7, 1) 0.35s both;
+  transform-origin: 50% 100%;
+}
+.beetle-jar img,
+.beetle-jar svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.beetle-jar .beetle-caught {
+  inset: 34% 24% 10%;
+  width: 52%;
+  height: 56%;
+  opacity: 0.9;
+}
+
+@keyframes beetle-step-on {
+  50% {
+    visibility: visible;
+  }
+}
+@keyframes beetle-step-off {
+  50% {
+    visibility: hidden;
+  }
+}
+@keyframes beetle-bob {
+  to {
+    translate: 0 -1.5px;
+  }
+}
+@keyframes beetle-sniff {
+  30%,
+  55% {
+    rotate: -10deg;
+    translate: 2px 0;
+  }
+  42% {
+    rotate: -5deg;
+  }
+}
+@keyframes beetle-hold {
+  50% {
+    translate: 1px -1px;
+  }
+}
+@keyframes beetle-hop {
+  12% {
+    translate: 0 -11px;
+  }
+  24%,
+  100% {
+    translate: 0 0;
+  }
+  36% {
+    translate: 0 -7px;
+  }
+  48% {
+    translate: 0 0;
+  }
+}
+@keyframes beetle-glow {
+  from {
+    opacity: 0.65;
+  }
+}
+@keyframes beetle-jar {
+  from {
+    translate: 0 var(--jar-from);
+  }
+  80% {
+    translate: 0 0;
+    scale: 1.08 0.9;
+  }
+  to {
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+/* Reduced motion: the beetle sits still and the window is a steady glow (the beetle.tsx engine doesn't run). */
+@media (prefers-reduced-motion: reduce) {
+  .beetle,
+  .beetle-turn,
+  .beetle-pose,
+  .beetle-frame,
+  .beetle-glow,
+  .beetle-jar {
+    animation: none !important;
+    transition: none !important;
+  }
+}

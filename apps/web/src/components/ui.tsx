@@ -216,12 +216,41 @@ export function weekTile(w: Pick<Week, "kind" | "games">): { picto: PictoId; til
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const TOKEN =
-  /(#.*$)|("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?)|\b(\d+(?:\.\d+)?)\b|\b(def|return|if|elif|else|for|while|in|not|and|or|True|False|None)\b|\b(print|input|len|range|int|str|round|max)\b(?=\()/g;
+  /(#.*$)|("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?)|\b(\d+(?:\.\d+)?)\b|\b(def|return|if|elif|else|for|while|in|not|and|or|is|True|False|None|import|from|as|try|except|finally|raise|with|yield|await|async|class|pass|lambda)\b|\b(print|input|len|range|int|str|round|max)\b(?=\()/g;
 
-export function highlight(line: string) {
+// The real-bug cards come in other languages: the same five token kinds, with each language's keywords and comments.
+const JS =
+  "const let var function return if else for of in new await async export class constructor typeof instanceof throw try catch true false null undefined this";
+const KEYWORDS: Record<string, string> = {
+  PHP: "public private protected function return if else foreach as new throw try catch true false null array echo isset empty static",
+  JavaScript: JS,
+  TypeScript: `${JS} private string boolean number interface type`,
+  Go: "func return if else for range var const type struct package import nil true false go defer continue break switch case",
+  Ruby: "def end if elsif else unless while do return nil true false begin rescue ensure",
+  C: "static void int char bool return if else for while sizeof NULL struct const unsigned",
+  Rust: "fn let mut if else match return Ok Err Some None self Self impl pub use struct enum",
+};
+const COMMENT: Record<string, string> = { Ruby: "#(?!\\{).*$", PHP: "(?://|#).*$", C: "/\\*.*?\\*/|//.*$" };
+const BACKTICKS = new Set(["JavaScript", "TypeScript", "Go", "Ruby"]);
+const tokens = new Map<string, RegExp>();
+function tokenFor(lang: string) {
+  const kw = KEYWORDS[lang];
+  if (!kw) return TOKEN;
+  let re = tokens.get(lang);
+  if (!re) {
+    const str = `"(?:[^"\\\\]|\\\\.)*"?|'(?:[^'\\\\]|\\\\.)*'?` + (BACKTICKS.has(lang) ? "|`(?:[^`\\\\]|\\\\.)*`?" : "");
+    const com = COMMENT[lang] ?? "//.*$";
+    re = new RegExp(`(${com})|(${str})|\\b(\\d+(?:\\.\\d+)?)\\b|\\b(${kw.split(" ").join("|")})\\b|\\b([A-Za-z_]\\w*)(?=\\()`, "g");
+    tokens.set(lang, re);
+  }
+  return re;
+}
+
+/** One line of code as highlighted HTML. Python unless `lang` names another language. */
+export function highlight(line: string, lang = "Python") {
   let out = "";
   let last = 0;
-  for (const m of line.matchAll(TOKEN)) {
+  for (const m of line.matchAll(tokenFor(lang))) {
     const kind = m[1] ? "com" : m[2] ? "str" : m[3] ? "num" : m[4] ? "kw" : "fn";
     out += esc(line.slice(last, m.index)) + `<span class="t-${kind}">${esc(m[0])}</span>`;
     last = m.index + m[0].length;
@@ -229,11 +258,14 @@ export function highlight(line: string) {
   return out + esc(line.slice(last));
 }
 
+/** Leading tabs as 4 spaces each: a tab stop counts from the row's start, so the line number would eat the first one. */
+const expandTabs = (l: string) => l.replace(/^\t+/, (t) => "    ".repeat(t.length));
+
 /** Columns of leading whitespace (a tab is 4, like the code's tab-size). */
 const indentOf = (l: string) => [...(l.match(/^\s*/)?.[0] ?? "")].reduce((n, c) => n + (c === "\t" ? 4 : 1), 0);
 
 /**
- * Highlighted Python. `mark` lists 1-based lines to call out, like the lines a fix changed. `wrap` wraps long lines
+ * Highlighted code, Python unless `lang` says otherwise. `mark` lists 1-based lines to call out, like the lines a fix changed. `wrap` wraps long lines
  * instead of scrolling: each line keeps its indent, and the rest of it hangs 2 columns further in.
  */
 export function Code({
@@ -241,12 +273,14 @@ export function Code({
   numbered = true,
   mark = [],
   wrap = false,
+  lang,
   className = "",
 }: {
   code: string;
   numbered?: boolean;
   mark?: number[];
   wrap?: boolean;
+  lang?: string;
   className?: string;
 }) {
   return (
@@ -259,7 +293,7 @@ export function Code({
             key={i}
           >
             {numbered && <span className="ln">{i + 1}</span>}
-            <span dangerouslySetInnerHTML={{ __html: highlight(wrap ? l.trimStart() : l) || " " }} />
+            <span dangerouslySetInnerHTML={{ __html: highlight(wrap ? l.trimStart() : expandTabs(l), lang) || " " }} />
           </span>
         ))}
       </code>

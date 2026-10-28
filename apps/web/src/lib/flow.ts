@@ -5,10 +5,12 @@ import { FIXES } from "./fixes";
 import { PUZZLES, puzzleForLabel } from "./puzzles";
 import { cardKey, drawKey, isAnswerGame, wikiKey, wikiPair } from "./grading";
 import type { GameId } from "./grading";
+import type { Level } from "./types";
 import { gamesIn } from "./schedule";
 import type { LineupItem } from "./schedule";
 
-export type Filter = "all" | "easy" | "medium" | "hard" | "spooky";
+/** A deck filter: a difficulty, the spooky cards, or "cve" for the real bugs (cards with a `source`). */
+export type Filter = "all" | "easy" | "medium" | "hard" | "spooky" | "cve";
 
 const SIZE: Record<GameId, number> = {
   bug: BUGS.length,
@@ -19,19 +21,23 @@ const SIZE: Record<GameId, number> = {
   puzzle: PUZZLES.length,
 };
 
+const fits = (card: { level: Level; spooky?: boolean; source?: object }, filter: Filter) =>
+  filter === "spooky" ? !!card.spooky : filter === "cve" ? !!card.source : card.level === filter;
+
 /** The card numbers in a deck that match a difficulty filter. */
 export function deckFor(game: GameId, filter: Filter) {
   const all = Array.from({ length: SIZE[game] }, (_, i) => i);
   if (filter === "all") return all;
-  if (game === "bug") return all.filter((i) => (filter === "spooky" ? BUGS[i].spooky : BUGS[i].level === filter));
-  if (game === "fix") return all.filter((i) => (filter === "spooky" ? FIXES[i].spooky : FIXES[i].level === filter));
-  if (game === "relay") return all.filter((i) => RELAYS[i].level === filter);
-  return all;
+  const deck = game === "bug" ? BUGS : game === "fix" ? FIXES : game === "relay" ? RELAYS : null;
+  return deck ? all.filter((i) => fits(deck[i], filter)) : all;
 }
 
-/** The difficulty words in a lineup entry, most specific first: "Bug Hunt: easy & spooky" is spooky, then easy. */
+/**
+ * The difficulty words in a lineup entry, most specific first: "Bug Hunt: easy & spooky" is spooky, then easy. "CVEs"
+ * comes last; `poolFor` puts a CVE round's real bugs first, and the Games tab opens it on its CVE cards.
+ */
 export const filtersFor = (label: string): Filter[] =>
-  (["spooky", "easy", "medium", "hard"] as const).filter((f) => label.toLowerCase().includes(f));
+  (["spooky", "easy", "medium", "hard", "cve"] as const).filter((f) => label.toLowerCase().includes(f));
 
 /** How a round plays: a card deck, a Wiki Race, a puzzle, Tech Pictionary, or anything else (officers run it, then score). */
 export type Kind = "deck" | "wiki" | "puzzle" | "pictionary" | "other";
@@ -87,8 +93,12 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 // How many cards (races, drawings) a lineup round plays. A puzzle round plays its one puzzle.
 const LENGTH: Partial<Record<string, number>> = { lang: 5, output: 5, bug: 4, fix: 2, relay: 2, wiki: 2, pictionary: 6 };
 
-/** How many cards (races, drawings) a round plays, or null for a round without a set number. */
-export const roundLength = (r: Round) => LENGTH[r.game ?? r.kind] ?? null;
+/**
+ * How many cards (races, drawings) a round plays, or null for a round without a set number. A spooky Fix it for real
+ * round plays just the spooky problems, never a regular one after them.
+ */
+export const roundLength = (r: Round) =>
+  r.game === "fix" && r.filters.includes("spooky") ? deckFor("fix", "spooky").length : (LENGTH[r.game ?? r.kind] ?? null);
 
 /** The key the TV's card, race, or drawing has in `shown`, kept while the scores or join screen are up. */
 export const heldKey = (s: ScreenState) =>
@@ -139,6 +149,19 @@ export const puzzleTitle = (i: number) =>
   );
 
 /**
+ * The cards a round draws from. `want` is its difficulty: each filter's cards in turn ("easy & spooky" is the spooky
+ * cards, then the easy ones), or for a CVE round the real bugs at its level ("CVEs, medium"). `then` is a CVE round's
+ * fallback before the rest of the deck: any real bug, then any card at its level.
+ */
+function poolFor(r: Round, game: GameId): { want: number[][]; then: number[][] } {
+  const plain = r.filters.filter((f) => f !== "cve").map((f) => deckFor(game, f));
+  if (!r.filters.includes("cve")) return { want: plain.length ? plain : [deckFor(game, "all")], then: [] };
+  const cve = deckFor(game, "cve");
+  if (!plain.length) return { want: [cve], then: [] };
+  return { want: plain.map((list) => list.filter((i) => cve.includes(i))), then: [cve, ...plain] };
+}
+
+/**
  * The next card for a round: the first one matching its difficulty that no night has used yet (practice nights
  * don't use cards up), then one that hasn't been up tonight, then any card from the deck not up tonight.
  */
@@ -147,8 +170,8 @@ export function nextCard(r: Round, used: string[], tonight: string[]): number | 
   if (r.kind !== "deck" || !game) return null;
   const fresh = (i: number) => !tonight.includes(cardKey(game, i)) && !used.includes(cardKey(game, i));
   const notTonight = (i: number) => !tonight.includes(cardKey(game, i));
-  const picked = r.filters.length ? r.filters.map((f) => deckFor(game, f)) : [deckFor(game, "all")];
-  for (const lists of [picked, [deckFor(game, "all")]])
+  const { want, then } = poolFor(r, game);
+  for (const lists of [want, then, [deckFor(game, "all")]])
     for (const ok of [fresh, notTonight])
       for (const list of lists) {
         const i = list.find(ok);
@@ -161,8 +184,11 @@ export function nextCard(r: Round, used: string[], tonight: string[]): number | 
 export function freshLeft(r: Round, used: string[], tonight: string[]) {
   const game = r.game;
   if (r.kind !== "deck" || !game) return 0;
-  const lists = r.filters.length ? r.filters.map((f) => deckFor(game, f)) : [deckFor(game, "all")];
-  return new Set(lists.flat().filter((i) => !used.includes(cardKey(game, i)) && !tonight.includes(cardKey(game, i)))).size;
+  return new Set(
+    poolFor(r, game)
+      .want.flat()
+      .filter((i) => !used.includes(cardKey(game, i)) && !tonight.includes(cardKey(game, i))),
+  ).size;
 }
 
 /**

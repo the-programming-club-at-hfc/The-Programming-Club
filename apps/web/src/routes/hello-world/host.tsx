@@ -36,7 +36,7 @@ import { useConfirm } from "#/components/feedback";
 import { SearchPicker } from "#/components/search-picker";
 import { GAME_TILE, Picto, Wrap, ordinal } from "#/components/ui";
 import { GAMES, WIKI_RACES, wikiUrl } from "#/lib/content";
-import { deckFor, filtersFor, heldKey, nounFor, puzzleTitle, revealable, roundOf, roundTitle } from "#/lib/flow";
+import { deckFor, filtersFor, heldKey, nextCard, nounFor, puzzleTitle, revealable, roundOf, roundTitle } from "#/lib/flow";
 import type { Filter, Round } from "#/lib/flow";
 import { DRAW_SECONDS, cardKey, drawKey, isAnswerGame, wikiSeconds } from "#/lib/grading";
 import { PUZZLES, puzzleForLabel } from "#/lib/puzzles";
@@ -279,6 +279,7 @@ function Running({
             live={live}
             rows={rows}
             used={used}
+            shown={shown}
             round={round}
             tool={tool}
             roundTab={roundTab}
@@ -617,6 +618,7 @@ function Stage({
   live,
   rows,
   used,
+  shown,
   round,
   tool,
   roundTab,
@@ -629,6 +631,7 @@ function Stage({
   live: Live;
   rows: Row[];
   used: string[];
+  shown: string[];
   round: Round | null;
   tool: Tab | null;
   roundTab: Tab | null;
@@ -652,6 +655,8 @@ function Stage({
   const id = useId();
   const filter = label && !manual ? filterFor(label) : "all";
   const pick = label && !manual && tool === "puzzle" ? puzzleForLabel(label) : undefined;
+  // A CVE round's preview starts on the card its big button puts up next.
+  const next = round && !manual && round.filters.includes("cve") ? (nextCard(round, used, shown) ?? undefined) : undefined;
   // Getting ready is a short summary, so its card ends where it does; a game's tools fill the space they're given.
   const setup = !tool && !round;
   return (
@@ -682,7 +687,16 @@ function Stage({
         ) : tool === "pictionary" ? (
           <PictionaryTool live={live} round={round} />
         ) : tool ? (
-          <CardTool key={`${tool}:${filter}:${pick}`} game={tool} live={live} used={used} initial={filter} pick={pick} round={round} />
+          <CardTool
+            key={`${tool}:${filter}:${pick}:${next}`}
+            game={tool}
+            live={live}
+            used={used}
+            initial={filter}
+            pick={pick}
+            next={next}
+            round={round}
+          />
         ) : round ? (
           <ActivityStage live={live} round={round} />
         ) : (
@@ -710,6 +724,7 @@ function SetupSteps({
 }) {
   const code = useJoinCode();
   const w = teamWords(live.teamSize === 1);
+  const spooky = useSchedule()[live.week - 1].theme === "spooky";
   const lobby = live.screen.mode === "lobby";
   const teams = live.teams.length > 0;
   const mode = MODES.find(([size]) => size === live.teamSize)?.[1] ?? "Teams";
@@ -719,7 +734,8 @@ function SetupSteps({
       title: lobby ? "Join screen on the TV" : `The TV shows: ${tvNow(live)}`,
       detail: (
         <>
-          Phones: {CLUB.url}/<wbr />
+          {/* The spooky night is played on computers: its TV shows no QR. */}
+          {spooky ? "Computers" : "Phones"}: {CLUB.url}/<wbr />
           join, code {code ?? "…"}
         </>
       ),
@@ -1450,7 +1466,11 @@ const TABS: [Tab, string][] = [
   ["lang", "Guess the Language"],
 ];
 const isTab = (v: unknown): v is Tab => TABS.some(([t]) => t === v);
-const filterFor = (label: string): Filter => filtersFor(label)[0] ?? "all";
+// A CVE round opens on the real bugs, which its big button draws from.
+const filterFor = (label: string): Filter => {
+  const f = filtersFor(label);
+  return f.includes("cve") ? "cve" : (f[0] ?? "all");
+};
 /** The Games tab for a lineup entry, if it has one. */
 const tabFor = (label: string | null) => {
   const id = label && gamesIn(label)[0];
@@ -1463,6 +1483,7 @@ function CardTool({
   used,
   initial,
   pick,
+  next,
   round,
 }: {
   game: GameId;
@@ -1470,6 +1491,8 @@ function CardTool({
   used: string[];
   initial: Filter;
   pick?: number;
+  /** The card the round's big button puts up next, to start on instead of the first fresh one. */
+  next?: number;
   /** The round being played, whose big button reveals its own cards. */
   round: Round | null;
 }) {
@@ -1486,13 +1509,28 @@ function CardTool({
       list.findIndex((i) => !isUsed(i)),
     );
   const filters: Filter[] =
-    game === "bug" || game === "fix" ? ["all", "easy", "medium", "hard", "spooky"] : game === "relay" ? ["all", "easy", "medium"] : [];
-  const [filter, setFilter] = useState<Filter>(() =>
-    filters.includes(initial) && (tvIndex === undefined || deckFor(game, initial).includes(tvIndex)) ? initial : "all",
-  );
-  // Start on the lineup round's puzzle, or the card the TV is showing, or else the first card not shown on any night yet.
+    game === "bug"
+      ? ["all", "easy", "medium", "hard", "spooky", "cve"]
+      : game === "fix"
+        ? ["all", "easy", "medium", "hard", "spooky"]
+        : game === "relay"
+          ? ["all", "easy", "medium"]
+          : [];
+  // The round's filter, unless it hides the card to start on (the TV's, or the next one once the CVEs run out).
+  const [filter, setFilter] = useState<Filter>(() => {
+    const start = tvIndex ?? next;
+    return filters.includes(initial) && (start === undefined || deckFor(game, initial).includes(start)) ? initial : "all";
+  });
+  // Start on the lineup round's puzzle, or the card the TV is showing, or the round's next card, or else the first card
+  // not shown on any night yet.
   const [pos, setPos] = useState(() =>
-    pick !== undefined ? pick : tvIndex !== undefined ? deckFor(game, filter).indexOf(tvIndex) : firstFresh(deckFor(game, filter)),
+    pick !== undefined
+      ? pick
+      : tvIndex !== undefined
+        ? deckFor(game, filter).indexOf(tvIndex)
+        : next !== undefined
+          ? deckFor(game, filter).indexOf(next)
+          : firstFresh(deckFor(game, filter)),
   );
 
   const indexes = useMemo(() => deckFor(game, filter), [game, filter]);
@@ -1633,7 +1671,7 @@ function CardTool({
               render={<button type="button" />}
               className="chip capitalize data-checked:bg-ink data-checked:text-paper"
             >
-              {f}
+              {f === "cve" ? "CVE" : f}
             </Radio.Root>
           ))}
         </RadioGroup>
@@ -1723,6 +1761,8 @@ function AnswerStatus({ live }: { live: Live }) {
                   {status}
                 </span>
                 {t.lockMs !== null && <span className="text-xs text-dim">at {(Math.max(0, t.lockMs) / 1000).toFixed(1)}s</span>}
+                {/* Bug Hunt: the team gave up its early bonus for the beetle's hint. */}
+                {p?.hint && <span className="chip bg-sun/40">Asked the beetle</span>}
                 {firstRight === t._id && <span className="chip bg-gold text-[#12332b]">First right</span>}
                 {data.scored && (
                   <>

@@ -543,6 +543,56 @@ describe("points", () => {
     expect([await score(a._id), await score(b._id), await score(c._id)]).toEqual([2, 6, 4]);
   });
 
+  test("Bug Hunt: asking the beetle costs the early bonus, for the whole team, and only before the line is locked", async () => {
+    const { t, nightWithTeams, show, score } = setup();
+    const { teams } = await nightWithTeams(6);
+    const [a, b, c] = teams;
+    const bug = BUGS[0];
+    const card = "bug:0";
+    // Only on a Bug Hunt card.
+    await show({ mode: "card", game: "output", index: 0 });
+    await expect(t.mutation(api.answers.askBeetle, { token: a.tokens[0], card: "output:0" })).rejects.toThrow("only helps with Bug Hunt");
+    await show({ mode: "card", game: "bug", index: 0 });
+    const answer = async (tokens: string[]) => {
+      await t.mutation(api.answers.pick, { token: tokens[0], card, line: bug.lines[0] });
+      await t.mutation(api.answers.lock, { token: tokens[0], card, step: "line" });
+      await t.mutation(api.answers.pick, { token: tokens[0], card, choice: bug.fix });
+      await t.mutation(api.answers.lock, { token: tokens[0], card, step: "answer" });
+    };
+    later(5);
+    const mine = async (token: string) => (await t.query(api.answers.mine, { token }))!.pick;
+    await t.mutation(api.answers.askBeetle, { token: a.tokens[0], card });
+    // A teammate sees who asked at once; asking again changes nothing.
+    const asker = (await t.run((ctx) =>
+      ctx.db
+        .query("attendance")
+        .withIndex("by_token", (q) => q.eq("token", a.tokens[0]))
+        .unique(),
+    ))!;
+    const name = (await t.run((ctx) => ctx.db.get(asker.playerId)))!.name;
+    const hint = async (token: string) => {
+      const p = await mine(token);
+      return p && { hint: p.hint, hintBy: p.hintBy };
+    };
+    expect(await hint(a.tokens[1])).toEqual({ hint: true, hintBy: name });
+    await t.mutation(api.answers.askBeetle, { token: a.tokens[1], card });
+    expect(await hint(a.tokens[0])).toEqual({ hint: true, hintBy: name });
+    expect(await hint(b.tokens[0])).toBeNull();
+    await answer(a.tokens); // right and early, but asked: 2
+    await answer(b.tokens); // right and early: 3
+    await expect(t.mutation(api.answers.askBeetle, { token: b.tokens[0], card })).rejects.toThrow("already locked in a line");
+    await show({ mode: "card", game: "bug", index: 0, revealed: true });
+    await expect(t.mutation(api.answers.askBeetle, { token: c.tokens[0], card })).rejects.toThrow("closed");
+    expect([await score(a._id), await score(b._id), await score(c._id)]).toEqual([2, 3, 0]);
+    expect((await t.query(api.answers.mine, { token: a.tokens[0] }))!.result).toEqual({
+      points: 2,
+      correct: true,
+      early: false,
+      line: true,
+      fix: true,
+    });
+  });
+
   test("Guess the Language: +1 more for locking in the first 15 seconds", async () => {
     const { t, nightWithTeams, show, score } = setup();
     const { teams } = await nightWithTeams(6);

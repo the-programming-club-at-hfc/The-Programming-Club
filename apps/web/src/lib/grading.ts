@@ -14,9 +14,15 @@ export const cardKey = (game: GameId, index: number) => `${game}:${index}`;
 
 const SECONDS = { output: 30, relay: 720, lang: 45, fix: 240 };
 
-/** Seconds on the clock for a card. */
+/** Seconds on the clock for a card. Hard bugs and real ones (longer, often not Python) get two minutes. */
 export const cardSeconds = (game: GameId, index: number) =>
-  game === "bug" ? (BUGS[index].level === "hard" ? 120 : 90) : game === "puzzle" ? PUZZLES[index].minutes * 60 : SECONDS[game];
+  game === "bug"
+    ? BUGS[index].level === "hard" || BUGS[index].source
+      ? 120
+      : 90
+    : game === "puzzle"
+      ? PUZZLES[index].minutes * 60
+      : SECONDS[game];
 
 /** How long after the card goes up a lock still earns the early bonus. Output? has none. */
 export const earlyMs = (game: AnswerGame, index: number) =>
@@ -47,6 +53,30 @@ export function choices(game: AnswerGame, index: number) {
     [all[i], all[j]] = [all[j], all[i]];
   }
   return all;
+}
+
+/**
+ * The lines the Bug Hunt beetle points at when a team asks it, as [from, to]: three in a row (fewer on a short card,
+ * more if the bug spans more) with every line that counts. Where the bug sits among them comes from the card, so it
+ * isn't always the middle line, and the window never starts or ends on a blank line.
+ */
+export function hintWindow(index: number): [number, number] {
+  const b = BUGS[index];
+  const rows = b.code.split("\n");
+  const blank = (n: number) => !rows[n - 1]?.trim();
+  const lo = Math.min(...b.lines);
+  const hi = Math.max(...b.lines);
+  const size = Math.max(Math.min(3, rows.length), hi - lo + 1);
+  const blanks = (from: number) => Array.from({ length: size }, (_, i) => blank(from + i)).filter(Boolean).length;
+  const starts = [];
+  for (let from = Math.max(1, hi - size + 1); from <= Math.min(lo, rows.length - size + 1); from++) starts.push(from);
+  const fewest = Math.min(...starts.map(blanks));
+  const best = starts.filter((s) => blanks(s) === fewest);
+  let from = best[Math.floor(seeded(`hint:${index}`)() * best.length)];
+  let to = from + size - 1;
+  while (from < lo && blank(from)) from++;
+  while (to > hi && blank(to)) to--;
+  return [from, to];
 }
 
 /** The language names Guess the Language cards may use (answers, answers that also count, decoys), so a typo can't slip in. */
@@ -92,6 +122,8 @@ export interface Pick {
   choice?: string;
   /** When the team locked its answer (Bug Hunt: the fix step, so both steps). */
   lockedAt?: number;
+  /** Bug Hunt: when the team asked the beetle for a hint, which costs the early bonus. */
+  hintAt?: number;
 }
 
 export interface Grade {
@@ -106,7 +138,8 @@ export interface Grade {
 
 /**
  * Points for one team's answer. `start` is when the card's clock started.
- * Bug Hunt: +1 right line, +1 right fix, +1 if both steps were locked before half time and the line is right.
+ * Bug Hunt: +1 right line, +1 right fix, +1 if both steps were locked before half time and the line is right, unless
+ * the team asked the beetle.
  * Output?: +1 if right. Guess the Language: +1 if right, +1 more if locked in the first 15 seconds.
  * An unlocked pick still counts when time runs out, but never earns the early bonus.
  */
@@ -116,7 +149,7 @@ export function grade(game: AnswerGame, index: number, pick: Pick, start: number
     const b = BUGS[index];
     const line = pick.line !== undefined && b.lines.includes(pick.line);
     const fix = pick.choice === b.fix;
-    const early = line && inTime;
+    const early = line && inTime && pick.hintAt === undefined;
     return { points: Number(line) + Number(fix) + Number(early), correct: line && fix, early, line, fix };
   }
   const right =

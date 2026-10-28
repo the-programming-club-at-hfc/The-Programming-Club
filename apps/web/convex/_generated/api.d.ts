@@ -12,6 +12,7 @@ import type * as answers from "../answers.js";
 import type * as dashboard from "../dashboard.js";
 import type * as drawings from "../drawings.js";
 import type * as fixes from "../fixes.js";
+import type * as haunted from "../haunted.js";
 import type * as ideas from "../ideas.js";
 import type * as interest from "../interest.js";
 import type * as lib from "../lib.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   dashboard: typeof dashboard;
   drawings: typeof drawings;
   fixes: typeof fixes;
+  haunted: typeof haunted;
   ideas: typeof ideas;
   interest: typeof interest;
   lib: typeof lib;

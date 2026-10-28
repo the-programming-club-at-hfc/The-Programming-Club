@@ -1,0 +1,162 @@
+/*
+ * The spooky night between its games, and its change of screen. Paper pieces from the haunted Bug Hunt (haunted.css)
+ * at night; only transforms and opacity move.
+ */
+.haunt.night {
+  color: #f6efe0;
+  background:
+    radial-gradient(circle at 84% 14%, rgb(227 182 90 / 0.25) 0%, transparent 20%),
+    radial-gradient(ellipse at 50% 30%, #2d3d4c 0%, transparent 60%), linear-gradient(#1b2734, #111a22 75%);
+}
+.night-moon {
+  top: 2cqw;
+  right: 6cqw;
+  width: 11cqw;
+}
+.night-moon img {
+  width: 100%;
+}
+.night-moon .haunt-moon-disc {
+  aspect-ratio: 1;
+}
+.night-kicker {
+  color: var(--haunt-moon);
+  animation: night-in 0.9s ease-out 0.25s both;
+}
+/* The standings keep only a low ridge, so the rows have the room. */
+.night-low .haunt-ridge {
+  height: 9cqh;
+}
+.night-low .haunt-fog {
+  bottom: 2cqh;
+  height: 9cqh;
+}
+.night-low .haunt-fog.back {
+  bottom: 6cqh;
+}
+
+/* The signboard: it rises out of the pines with the title on it, then sways a little on its post. */
+.night-sign {
+  left: 50%;
+  bottom: -1cqw;
+  width: 70cqw;
+  aspect-ratio: 2;
+  z-index: 5;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  animation:
+    night-rise 1.2s cubic-bezier(0.2, 0.9, 0.3, 1.12) 0.15s both,
+    night-sway 7s ease-in-out 1.4s infinite alternate;
+}
+.night-sign > img,
+.night-plank {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* No sign art: a plain board. */
+.night-plank {
+  bottom: 30%;
+  height: auto;
+  border-radius: 4px;
+  background: #ece3cf;
+}
+.night-face {
+  position: absolute;
+  inset: 10% 7% 33% 6%;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #2a1d12;
+  rotate: 3.6deg;
+}
+
+/* The standings over the night: the theme's tones re-pointed for a navy sky. */
+.night-board {
+  --color-mist: rgb(241 234 219 / 0.12);
+  --color-dim: #c9c1ae;
+  --color-paper: transparent;
+}
+
+/* The change of screen: a veil of night, soft along its trailing edge, and bats ahead of it. It covers the screen
+   from the first frame and sweeps off to the right, so the new screen shows from the left within the second. */
+/* Above the ticker, which keeps the join code and the clock in view. */
+.shift {
+  position: absolute;
+  inset: 0 0 var(--shift-under, 0) 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+  container-type: size;
+}
+.shift-veil {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -50%;
+  width: 200%;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, transparent 0%, #4a5866 22%, #3b4957 60%, #2d3a47 100%);
+  animation: shift-veil 1.25s cubic-bezier(0.55, 0, 0.35, 1) both;
+}
+/* Wisps of fog in it, so it reads as fog and not a wipe. */
+.shift-veil img {
+  width: 37.5%;
+  height: 70%;
+  object-fit: fill;
+  opacity: 0.55;
+}
+/* The first starts where the veil turns solid, fading in so it has no edge. */
+.shift-veil img:first-child {
+  margin-left: 25%;
+  mask-image: linear-gradient(90deg, transparent, #000 45%);
+}
+.shift-lift {
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+.shift-bat {
+  position: absolute;
+  left: 0;
+  animation: shift-bat 1s cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+
+@keyframes shift-veil {
+  to {
+    transform: translateX(75%);
+  }
+}
+@keyframes shift-bat {
+  from {
+    transform: translateX(-10cqw) translateY(4cqh);
+  }
+  50% {
+    transform: translateX(50cqw) translateY(-3cqh);
+  }
+  to {
+    transform: translateX(112cqw) translateY(2cqh);
+  }
+}
+@keyframes night-rise {
+  from {
+    transform: translateY(75%);
+  }
+}
+@keyframes night-sway {
+  from {
+    transform: rotate(-0.6deg);
+  }
+  to {
+    transform: rotate(0.6deg);
+  }
+}
+@keyframes night-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2cqw);
+  }
+}
+
+/* No reduced-motion version, like the haunted Bug Hunt: a shared display, often run with animations off. */

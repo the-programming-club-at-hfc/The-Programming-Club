@@ -1,0 +1,301 @@
+/*
+ * Spooky Bugs: the TV's lobby, a paper graveyard at night. It borrows the haunted Bug Hunt's paper pieces and layers
+ * (.haunt-layer, .haunt-fog, .haunt-flyby, bats) and, like it, moves only transforms and opacity. Sizes are in cqw, so
+ * the scene keeps its shape on a 720p projector and a 1080p TV alike: the card hangs from the top, the ground stands
+ * on the bottom, and a taller screen just gets more sky.
+ */
+.haunt.grave {
+  color: var(--haunt-ink);
+  background:
+    radial-gradient(circle at 80% 13%, rgb(227 182 90 / 0.28) 0%, transparent 22%),
+    radial-gradient(ellipse at 60% 25%, #2d3d4c 0%, transparent 60%), linear-gradient(#1b2734, #111a22 75%);
+}
+
+.grave-moon {
+  top: 1.2cqw;
+  right: 4cqw;
+  width: 13cqw;
+  animation: grave-bob 9s ease-in-out infinite alternate;
+}
+.grave-moon img {
+  width: 100%;
+}
+.grave-moon .haunt-moon-disc {
+  aspect-ratio: 1;
+}
+
+/* The hill the house stands on: the ridge, flipped to rise on the right. */
+.grave-hill {
+  left: -4cqw;
+  right: -4cqw;
+  bottom: 17cqw;
+  height: 21cqw;
+  transform: scaleX(-1);
+}
+.grave-hill img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.grave .haunt-fog.back {
+  bottom: 21cqw;
+  height: 8cqw;
+  opacity: 0.35;
+}
+.grave-fog.haunt-fog {
+  bottom: -1.5cqw;
+  height: 8cqw;
+  opacity: 0.5;
+  z-index: 4;
+}
+
+/* A ghost drifting across the sky, behind the card. */
+.grave-ghost {
+  left: 0;
+  top: 12cqw;
+  width: 7cqw;
+  opacity: 0.92;
+  animation: grave-cross 56s linear -20s infinite;
+}
+.grave-ghost > div {
+  animation: grave-drift 3.2s ease-in-out infinite alternate;
+}
+.grave-ghost img {
+  width: 100%;
+}
+
+/* The graveyard's ground, a low dark hill along the bottom. */
+.grave-ground {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 27cqw;
+  background: linear-gradient(#262522, #1a1917 60%);
+  clip-path: polygon(0 12%, 14% 6%, 30% 10%, 48% 3%, 66% 9%, 82% 4%, 100% 10%, 100% 100%, 0 100%);
+}
+
+.grave-pumpkin {
+  bottom: 0.6cqw;
+  z-index: 5;
+  rotate: var(--tilt, -4deg);
+}
+.grave-pumpkin img {
+  width: 100%;
+}
+
+/* The haunted house on the hill, the moon behind it, and a dead tree at the edge. They stand behind the ground. */
+.grave-house {
+  right: 13cqw;
+  bottom: 23cqw;
+  width: 27cqw;
+}
+.grave-tree {
+  right: -3cqw;
+  bottom: 22cqw;
+  width: 22cqw;
+}
+.grave-house img,
+.grave-tree img {
+  width: 100%;
+}
+.grave-fence {
+  left: 0;
+  right: 0;
+  bottom: 20.5cqw;
+  height: 5.5cqw;
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  z-index: 2;
+}
+
+/* The join sign: its board sits in the sky, its post behind the fence and the stones. The words follow the board's
+   tilt, inside its pale face. */
+.grave-sign {
+  aspect-ratio: 2;
+}
+.grave-sign > img,
+.grave-board {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* No sign art: a plain cream board. */
+.grave-board {
+  bottom: 30%;
+  height: auto;
+  border-radius: 4px;
+  background: #ece3cf;
+}
+.grave-face {
+  position: absolute;
+  inset: 10% 8% 32% 7%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #2a1d12;
+  rotate: 3.6deg;
+}
+.grave-square {
+  display: grid;
+  place-items: center;
+  width: 1.05em;
+  height: 1.3em;
+  border-radius: 3px;
+  background: #2a1d12;
+  color: #f6efe0;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* The stones: rows from the back, each overlapping the one behind it by 30%. --w is a stone's width, --per how many
+   stand in a row. */
+.grave-yard {
+  position: absolute;
+  left: 50%;
+  bottom: 4.4cqw;
+  z-index: 3;
+  width: calc(var(--per) * var(--w) * 1.1);
+  translate: -50% 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: calc(var(--w) * 0.1);
+  pointer-events: none;
+}
+/* Every row but the first tucks under the one behind it. */
+.grave-behind {
+  margin-top: calc(var(--w) * -0.36);
+}
+.grave-plot {
+  position: relative;
+  width: var(--w);
+}
+.grave-dig {
+  position: relative;
+  aspect-ratio: 5 / 6;
+  overflow: hidden;
+}
+.grave-stone {
+  position: relative;
+  height: 100%;
+  animation: grave-rise 1.3s cubic-bezier(0.3, 1.25, 0.4, 1) var(--at) both;
+}
+.grave-stone img {
+  width: 100%;
+  height: 100%;
+}
+/* No gravestone art: a plain grey stone. */
+.grave-blank {
+  height: 100%;
+  border-radius: 50% 50% 4% 4% / 40% 40% 4% 4%;
+  background: #9b968d;
+}
+/* The name sits on the stone's face, left of its shadowed side, up to two lines, clear of the row in front. */
+.grave-name {
+  position: absolute;
+  inset: 24% 15% 31% 8%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #262522;
+  font-size: calc(var(--w) * var(--name, 0.17));
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.grave-name > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+  max-width: 100%;
+}
+.grave-dot {
+  position: absolute;
+  top: 14%;
+  left: 46%;
+  width: calc(var(--w) * 0.12);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% 0;
+}
+.grave-mound {
+  position: absolute;
+  left: -8%;
+  right: -4%;
+  bottom: calc(var(--w) * -0.05);
+  height: calc(var(--w) * 0.14);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: #141311;
+  transform-origin: 50% 100%;
+  animation: grave-mound 0.5s ease-out var(--at) both;
+}
+.grave-puff {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: calc(var(--w) * 0.3);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(207 198 178 / 0.85) 0%, rgb(207 198 178 / 0) 70%);
+  opacity: 0;
+  animation: grave-puff 1.2s ease-out calc(var(--at) + 0.2s) both;
+}
+/* Nobody yet: a faint stone keeping the first place. */
+.grave-empty {
+  opacity: 0.45;
+}
+.grave-empty .grave-name {
+  font-weight: 700;
+}
+
+@keyframes grave-rise {
+  from {
+    transform: translateY(102%) rotate(-5deg);
+  }
+  70% {
+    transform: translateY(-3%) rotate(1.5deg);
+  }
+}
+@keyframes grave-mound {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes grave-puff {
+  from {
+    opacity: 0.9;
+    transform: translate(-50%, 20%) scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx) * var(--w) / 100), -140%) scale(2.2);
+  }
+}
+@keyframes grave-bob {
+  to {
+    transform: translateY(1cqw);
+  }
+}
+@keyframes grave-cross {
+  from {
+    transform: translateX(-10cqw);
+  }
+  to {
+    transform: translateX(110cqw);
+  }
+}
+@keyframes grave-drift {
+  from {
+    transform: translateY(-1cqw) rotate(-4deg);
+  }
+  to {
+    transform: translateY(1.2cqw) rotate(4deg);
+  }
+}
+
+/* No reduced-motion version, like the haunted Bug Hunt: a shared display, often run with animations off. */

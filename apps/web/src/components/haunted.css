@@ -1,0 +1,340 @@
+/*
+ * Spooky Bugs: the TV's haunted Bug Hunt, the event poster come alive. Cream paper, charcoal pines and bats, a
+ * mustard moon that sinks with the clock. Only transforms and opacity move, so a cheap laptop keeps up.
+ */
+.haunt {
+  --haunt-paper: #f1eadb;
+  --haunt-ink: #12332b;
+  --haunt-dim: #4d5f58;
+  --haunt-orange: #e2622a;
+  --haunt-moon: #e3b65a;
+  --haunt-char: #262522;
+  --haunt-dusk: #17212b;
+  container-type: size;
+  color: var(--haunt-ink);
+  background:
+    radial-gradient(ellipse at 30% 20%, #f7f2e7 0%, transparent 60%), radial-gradient(ellipse at 50% 120%, #ddd0b4 0%, transparent 55%),
+    var(--haunt-paper);
+  isolation: isolate;
+  overflow: hidden;
+}
+.haunt-kicker {
+  font-family: var(--font-code);
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+}
+.haunt-layer {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+.haunt-layer img {
+  display: block;
+}
+
+/* The header and clock turn cream when the sky goes dark. */
+.haunt-text {
+  transition: color 1.5s ease;
+}
+.haunt-dark .haunt-text {
+  color: #f6efe0;
+}
+.haunt-dark .haunt-text .haunt-dim {
+  color: #c9c1ae;
+}
+.haunt-chip {
+  background: var(--haunt-ink);
+  color: #f6efe0;
+  transition:
+    background 1.5s ease,
+    color 1.5s ease;
+}
+.haunt-dark .haunt-chip {
+  background: #f6efe0;
+  color: var(--haunt-ink);
+}
+.haunt-dusk {
+  inset: 0;
+  background: radial-gradient(ellipse at 60% 30%, #2a3a48 0%, var(--haunt-dusk) 70%);
+  opacity: 0;
+  transition: opacity 2.5s ease;
+}
+.haunt-dark .haunt-dusk {
+  opacity: 0.85;
+}
+.haunt-flash {
+  inset: 0;
+  background: #fffbea;
+  opacity: 0;
+  z-index: 20;
+}
+
+/* The moon. --p goes 0 to 1 with the clock. Without its art it's a plain paper circle, so it still keeps time. It
+   rises between the header (no wider than 50cqw) and the clock, and sinks behind the pines. */
+.haunt-moon {
+  left: 0;
+  top: 0;
+  width: 15cqw;
+  aspect-ratio: 1;
+  transform: translate(calc(56cqw + var(--p) * 10cqw), calc(4cqh + var(--p) * 66cqh));
+  transition: transform 0.4s linear;
+  will-change: transform;
+}
+.haunt-moon img {
+  width: 100%;
+}
+.haunt-moon-disc {
+  height: 100%;
+  border-radius: 50%;
+  background: var(--haunt-moon);
+}
+
+/* Ground layers rise into place when the card goes up, then sway at different speeds for depth. */
+.haunt-ground {
+  left: -6cqw;
+  right: -6cqw;
+  bottom: 0;
+  animation: haunt-rise 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.haunt-ground > * {
+  animation: haunt-sway var(--sway, 40s) ease-in-out infinite alternate;
+}
+.haunt-ground img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: bottom;
+}
+/* The pines whole, tips and all, across the scene at the art's 4:1. They hold still: bats perch on their tips. */
+.haunt-pines {
+  left: 0;
+  right: 0;
+  height: 25cqw;
+}
+.haunt-pines > * {
+  animation: none;
+}
+.haunt-ridge {
+  height: 17cqh;
+  animation-delay: 0.15s;
+  --sway: 34s;
+  --sway-by: 2.4cqw;
+}
+/* No ridge art: a plain dark hill along the bottom. */
+.haunt-hill {
+  height: 100%;
+  background: var(--haunt-char);
+  clip-path: polygon(0 55%, 18% 40%, 40% 50%, 62% 30%, 84% 46%, 100% 36%, 100% 100%, 0 100%);
+}
+.haunt-fog {
+  left: 0;
+  bottom: 9cqh;
+  height: 16cqh;
+  width: 200cqw;
+  display: flex;
+  opacity: 0.75;
+  animation: haunt-fog 90s linear infinite;
+}
+.haunt-fog img {
+  width: 100cqw;
+  height: 100%;
+  object-fit: fill;
+}
+.haunt-fog.back {
+  bottom: 22cqh;
+  opacity: 0.45;
+  animation-duration: 140s;
+  animation-direction: reverse;
+}
+
+/* Bats: two frames, flapped by swapping which one shows. */
+.haunt-bat {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+.haunt-bat > .frames {
+  position: relative;
+  width: var(--bat, 6cqw);
+  aspect-ratio: 2;
+}
+.haunt-bat .frames img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: haunt-flap var(--flap, 0.34s) steps(1) infinite;
+}
+.haunt-bat .frames img + img {
+  animation-delay: calc(var(--flap, 0.34s) / -2);
+}
+.haunt-perched .frames img {
+  animation: none;
+}
+/* Perched with its wings up, clear against the sky. */
+.haunt-perched .frames img + img {
+  opacity: 0;
+}
+
+/* Ambient bats crossing the sky behind the trees. */
+.haunt-flyby {
+  left: 0;
+  top: var(--y);
+  animation: haunt-cross var(--t) linear var(--d) infinite;
+}
+.haunt-flyby > div {
+  animation: haunt-bob 2.6s ease-in-out infinite alternate;
+}
+
+/* A team's bat: it hovers in a loop until its fix is locked, then sits on the tree line. */
+.haunt-team {
+  z-index: 5;
+}
+.haunt-team > .haunt-bat {
+  translate: -50% -50%;
+}
+.haunt-hover > .haunt-bat {
+  animation: haunt-loop var(--loop, 5s) ease-in-out var(--loop-at, 0s) infinite;
+}
+.haunt-tag {
+  margin-top: -0.4cqw;
+  max-width: 15cqw;
+  padding: 0.15em 0.55em;
+  border-radius: 3px;
+  background: #f6efe0;
+  color: var(--haunt-ink);
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 0.15cqw 0.4cqw rgb(0 0 0 / 0.25);
+  rotate: var(--tilt, 0deg);
+}
+/* Perched, the bat's feet sit on its tree tip and its tag hangs below, --row rows lower by close neighbours. */
+.haunt-perched > .haunt-bat {
+  translate: -50% -74%;
+}
+.haunt-perched .haunt-tag {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  translate: -50% calc(var(--row, 0) * 115%);
+  margin: 0;
+  background: var(--haunt-moon);
+}
+
+/* The first team done: a spider hanging from the clock on a thread. */
+.haunt-spider {
+  top: 27cqh;
+  left: 88cqw;
+  translate: -50% 0;
+  z-index: 6;
+}
+.haunt-spider > div {
+  transform-origin: 50% 0;
+  animation: haunt-swing 4s ease-in-out infinite alternate;
+  display: grid;
+  justify-items: center;
+}
+.haunt-thread {
+  width: 2px;
+  height: 11cqh;
+  background: var(--haunt-char);
+  transform-origin: 50% 0;
+}
+.haunt-spider img {
+  width: 5.5cqw;
+  margin-top: -0.4cqw;
+}
+.haunt-dark .haunt-thread {
+  background: #c9c1ae;
+}
+
+/* The reveal: code big enough for the back row, sized to fit from its longest line and line count. */
+.haunt-codebox {
+  container-type: size;
+}
+.haunt-codebox .code {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  line-height: 1.5;
+  padding: 0.8em 1em;
+  font-size: min(calc(100cqw / (var(--cols) * 0.64 + 4.6)), calc(100cqh / (var(--rows) * 1.5 + 1.7)), 3.4vw);
+}
+/* The fix beside it wraps only where a line may break, never mid-word. */
+.haunt-fix .cl {
+  overflow-wrap: normal;
+}
+.haunt-reveal .code .cl[class*="bg-sun"] {
+  background: rgb(226 98 42 / 0.32);
+  box-shadow: inset 0.25em 0 0 var(--haunt-orange);
+}
+
+@keyframes haunt-flap {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes haunt-rise {
+  from {
+    transform: translateY(40%);
+  }
+}
+@keyframes haunt-sway {
+  from {
+    transform: translateX(calc(var(--sway-by, 1cqw) * -1));
+  }
+  to {
+    transform: translateX(var(--sway-by, 1cqw));
+  }
+}
+@keyframes haunt-fog {
+  to {
+    transform: translateX(-100cqw);
+  }
+}
+@keyframes haunt-cross {
+  from {
+    transform: translateX(-12cqw);
+  }
+  to {
+    transform: translateX(112cqw);
+  }
+}
+@keyframes haunt-bob {
+  to {
+    transform: translateY(3cqh);
+  }
+}
+@keyframes haunt-loop {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(1.6cqw, -1.6cqh);
+  }
+  50% {
+    transform: translate(0, -3.2cqh);
+  }
+  75% {
+    transform: translate(-1.6cqw, -1.6cqh);
+  }
+}
+@keyframes haunt-swing {
+  from {
+    transform: rotate(-2.5deg);
+  }
+  to {
+    transform: rotate(2.5deg);
+  }
+}
+
+/* No reduced-motion version: like the kickoff deck, this is a shared display, run from machines that often have
+   animations off. The beetle on players' own screens still keeps still for them. */

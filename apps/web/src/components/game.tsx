@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { BUGS, LANGS, OUTPUTS, RELAYS } from "#/lib/content";
 import { FIXES } from "#/lib/fixes";
@@ -125,6 +126,21 @@ export function PuzzleExample({ p, part2, big = false }: { p: Puzzle; part2: boo
   );
 }
 
+/** Code as big as its box allows, sized from its longest line and line count, so the TV never scrolls or clips it. */
+function FitCode({ code, mark }: { code: string; mark?: number[] }) {
+  const lines = code.split("\n");
+  const cols = Math.max(...lines.map((l) => l.replace(/\t/g, "    ").length));
+  return (
+    <div className="min-h-0 [container-type:size]" style={{ "--cols": cols, "--rows": lines.length } as CSSProperties}>
+      <Code
+        code={code}
+        mark={mark}
+        className="m-0 h-full overflow-hidden p-[0.8em_1em] text-[length:min(calc(100cqw/(var(--cols)*0.64+4.6)),calc(100cqh/(var(--rows)*1.5+1.7)),2.2vw)] leading-[1.5]"
+      />
+    </div>
+  );
+}
+
 export const LevelChip = ({ level }: { level: keyof typeof LEVEL_STYLE }) => (
   <span className={`ml-2 inline-block rounded-[3px] px-2 py-0.5 align-middle text-xs font-bold capitalize ${LEVEL_STYLE[level]}`}>
     {level}
@@ -142,6 +158,7 @@ export function CardView({
   hint = false,
   size = "md",
   solo = false,
+  aside,
 }: {
   game: GameId;
   index: number;
@@ -150,6 +167,8 @@ export function CardView({
   size?: "md" | "xl";
   /** A solo night: puzzles are solved alone, on your own computer. */
   solo?: boolean;
+  /** On the TV, what goes beside a Fix it for real card's code, like who has fixed it. */
+  aside?: ReactNode;
 }) {
   const big = size === "xl";
   const codeCls = big ? "text-[clamp(1.4rem,2.6vw,3rem)]" : "";
@@ -202,21 +221,42 @@ export function CardView({
   }
   if (game === "fix") {
     const f = FIXES[index];
-    // The TV swaps the buggy program for the fix on reveal, so both fit; the host console shows both.
+    // The TV fills its screen: the task (on reveal, why it broke) over the code, as big as it fits, and `aside` the
+    // full height beside them. On reveal it swaps the buggy program for the fix; the host console shows both.
+    if (big)
+      return (
+        <div className="grid h-full grid-cols-[minmax(0,1fr)_22vw] grid-rows-[auto_minmax(0,1fr)] gap-x-[2.5vw] gap-y-[1vw]">
+          <div className="space-y-[0.8vw] text-[clamp(1.1rem,1.5vw,2rem)] leading-snug">
+            <p>
+              {answer ? (
+                <>
+                  <strong className="font-extrabold">The fix.</strong> {f.why}
+                </>
+              ) : (
+                f.task
+              )}
+              <LevelChip level={f.level} />
+            </p>
+            {hint && !answer && <FixHint card={f} />}
+          </div>
+          <div className="row-span-2 min-h-0 overflow-hidden">{aside}</div>
+          <FitCode code={answer ? f.fix : f.code} mark={answer ? fixedLines(f) : undefined} />
+        </div>
+      );
     return (
       <div>
-        <p className={big ? "text-[clamp(1.5rem,2.2vw,2.4rem)] leading-snug" : "text-lg"}>
+        <p className="text-lg">
           {f.task}
           <LevelChip level={f.level} />
         </p>
-        {!(answer && big) && <Code code={f.code} className={`my-3 ${big ? "text-[clamp(1.2rem,2vw,2.4rem)]" : ""}`} />}
-        {hint && !answer && <FixHint card={f} big={big} />}
+        <Code code={f.code} className="my-3" />
+        {hint && !answer && <FixHint card={f} />}
         {answer && (
-          <div className={big ? "mt-4" : "mt-4 border-t-2 border-dashed border-line pt-4"}>
-            <p className={big ? "text-2xl" : ""}>
+          <div className="mt-4 border-t-2 border-dashed border-line pt-4">
+            <p>
               <strong className="font-extrabold">The fix.</strong> {f.why}
             </p>
-            <Code code={f.fix} mark={fixedLines(f)} className={`mt-2 ${big ? "text-[clamp(1.2rem,2vw,2.4rem)]" : ""}`} />
+            <Code code={f.fix} mark={fixedLines(f)} className="mt-2" />
           </div>
         )}
       </div>
@@ -227,16 +267,16 @@ export function CardView({
     return (
       <div>
         <p className={big ? "text-2xl" : "text-lg"}>
-          Find the one bug in this Python: pick its line on a phone, then the fix.
+          Find the one bug in this {b.lang ?? "Python"}: pick its line, then the fix.
           <LevelChip level={b.level} />
         </p>
-        <Code code={b.code} className={`my-3 ${codeCls}`} />
+        <Code code={b.code} lang={b.lang} className={`my-3 ${codeCls}`} />
         {answer && (
           <div className="mt-4 border-t-2 border-dashed border-line pt-4">
             <p className={big ? "text-2xl" : ""}>
               <strong className="font-extrabold">Line {b.line}.</strong> {b.why}
             </p>
-            <Code code={b.fix} numbered={false} className={`mt-2 ${codeCls}`} />
+            <Code code={b.fix} numbered={false} lang={b.lang} className={`mt-2 ${codeCls}`} />
           </div>
         )}
       </div>

@@ -18,6 +18,7 @@ import {
   clockLeft,
   fixAwardsFor,
   grade,
+  hintWindow,
   isFreshStart,
   parkClock,
   puzzleAwardsFor,
@@ -118,6 +119,32 @@ describe("Bug Hunt", () => {
   test("any of a card's accepted lines counts", () => {
     const j = BUGS.findIndex((x) => x.lines.length > 1);
     for (const line of BUGS[j].lines) expect(grade("bug", j, { line }, T0).line).toBe(true);
+  });
+
+  test("asking the beetle costs the early bonus, and nothing else", () => {
+    const pick = { line: b.lines[0], choice: b.fix, lockedAt: sec(10), hintAt: sec(5) };
+    expect(grade("bug", i, pick, T0)).toEqual({ points: 2, correct: true, early: false, line: true, fix: true });
+    expect(grade("bug", i, { ...pick, choice: badFix }, T0).points).toBe(1);
+  });
+
+  test("the beetle's window: every line that counts, three in a row, on the card, never ending on a blank line", () => {
+    const middles = BUGS.map((x, j) => {
+      const rows = x.code.split("\n");
+      const [from, to] = hintWindow(j);
+      expect(from >= 1 && to <= rows.length).toBe(true);
+      for (const line of x.lines) expect(line >= from && line <= to).toBe(true);
+      expect(rows[from - 1].trim()).not.toBe("");
+      expect(rows[to - 1].trim()).not.toBe("");
+      // Three lines, unless the card is shorter, the bug spans more, or a blank line was trimmed off.
+      const span = Math.max(...x.lines) - Math.min(...x.lines) + 1;
+      const size = Math.max(Math.min(3, rows.length), span);
+      if (rows.every((r) => r.trim())) expect(to - from + 1).toBe(size);
+      else expect(to - from + 1 <= size).toBe(true);
+      expect(hintWindow(j)).toEqual([from, to]);
+      return to - from === 2 && x.lines.length === 1 ? x.lines[0] === from + 1 : null;
+    });
+    // Across the deck, the bug isn't always the middle line.
+    expect(middles.filter((m) => m !== null)).toContain(false);
   });
 
   test("hard cards give 2 minutes, so half time is 60 seconds", () => {
