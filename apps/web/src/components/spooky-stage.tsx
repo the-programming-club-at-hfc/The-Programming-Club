@@ -175,3 +175,47 @@ export function SpookyBoard({ children }: { children: ReactNode }) {
     </Night>
   );
 }
+
+/**
+ * The spooky night on a player's own computer: the haunted Bug Hunt's paper behind the page, with its moon, two bats
+ * crossing and faint hills along the bottom of the window, and the TV's change of screen over it (only the bats while
+ * a clock runs). None of it takes a click. A player's own computer follows reduced motion, unlike the TV: no change
+ * of screen and a still backdrop then.
+ */
+export function JoinNight({ screen, clear }: { screen: string; clear: boolean }) {
+  return (
+    <>
+      <div className="haunt join-night" aria-hidden>
+        <div className="haunt-layer join-moon">
+          <Art src={SPOOKY_ART.moon} fallback={<div className="haunt-moon-disc" />} />
+        </div>
+        {FLYBYS.map((f, i) => (
+          <div
+            key={i}
+            className="haunt-layer haunt-flyby"
+            style={{ "--y": `${f.y + 4}cqh`, "--t": `${f.t}s`, "--d": `${f.d}s` } as CSSProperties}
+          >
+            <div>
+              <div className="haunt-bat" style={{ "--bat": `${f.size}cqw`, "--flap": "0.3s" } as CSSProperties}>
+                <BatFrames />
+              </div>
+            </div>
+          </div>
+        ))}
+        <div className="haunt-layer haunt-ground join-pines">
+          <div className="h-full">
+            <Art src={SPOOKY_ART.pines} />
+          </div>
+        </div>
+        <div className="haunt-layer haunt-ground haunt-ridge join-ridge">
+          <div className="h-full">
+            <Art src={SPOOKY_ART.ridge} fallback={<div className="haunt-hill" />} />
+          </div>
+        </div>
+      </div>
+      <div className="join-shift">
+        <SpookyShift screen={screen} clear={clear} />
+      </div>
+    </>
+  );
+}

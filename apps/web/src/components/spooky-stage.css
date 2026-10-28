@@ -200,3 +200,55 @@
 }
 
 /* No reduced-motion version, like the haunted Bug Hunt: a shared display, often run with animations off. */
+
+/* The join page on the spooky night: the haunted paper fixed behind the page, its hills faint so the text over them
+   still reads, and the change of screen over the whole window. */
+.join-night,
+.join-shift {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+.join-night {
+  z-index: 0;
+}
+.join-shift {
+  z-index: 40;
+}
+/* Low on the right, risen just over the pines, where the page's columns leave room. */
+.join-moon {
+  bottom: calc(min(14cqw, 22cqh) - 1rem);
+  right: 9cqw;
+  width: clamp(4rem, 7cqw, 8rem);
+  opacity: 0.75;
+}
+.join-moon img {
+  width: 100%;
+}
+.join-moon .haunt-moon-disc {
+  aspect-ratio: 1;
+}
+.join-pines {
+  left: 0;
+  right: 0;
+  height: min(14cqw, 22cqh);
+  opacity: 0.16;
+}
+.join-pines > * {
+  animation: none;
+}
+.join-ridge {
+  height: 10cqh;
+  opacity: 0.22;
+}
+@media (prefers-reduced-motion: reduce) {
+  .join-night *,
+  .join-night *::before,
+  .join-night *::after {
+    animation: none !important;
+  }
+  .join-night .haunt-flyby,
+  .join-shift {
+    display: none;
+  }
+}
