@@ -583,12 +583,16 @@ function Picked({ game, pick, result }: { game: AnswerGame; pick: TeamPick; resu
         <p className="text-2xl font-extrabold">
           Line {pick.line} {marked && mark(result?.line)}
         </p>
+        {/* The fix gets its own heading like the line, and its code sits under it in a block, as it did as a choice. */}
         {pick.choice ? (
-          <p className="mt-1">
-            Fix {marked && mark(result?.fix)} <code className="font-code wrap-anywhere">{pick.choice}</code>
-          </p>
+          <>
+            <p className="mt-2 text-2xl font-extrabold">Fix {marked && mark(result?.fix)}</p>
+            <code className="mt-1 block rounded-[6px] bg-pine px-3 py-2 font-code text-sm font-normal whitespace-pre-wrap text-white wrap-anywhere">
+              {pick.choice}
+            </code>
+          </>
         ) : (
-          <p className="mt-1">No fix picked.</p>
+          <p className="mt-2 text-2xl font-extrabold">No fix picked</p>
         )}
       </div>
     );
