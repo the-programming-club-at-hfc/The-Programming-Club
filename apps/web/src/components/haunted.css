@@ -62,12 +62,6 @@
 .haunt-dark .haunt-dusk {
   opacity: 0.85;
 }
-.haunt-flash {
-  inset: 0;
-  background: #fffbea;
-  opacity: 0;
-  z-index: 20;
-}
 
 /* The moon. --p goes 0 to 1 with the clock. Without its art it's a plain paper circle, so it still keeps time. It
    rises between the header (no wider than 50cqw) and the clock, and sinks behind the pines. */

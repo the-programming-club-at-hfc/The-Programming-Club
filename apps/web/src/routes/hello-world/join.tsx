@@ -400,6 +400,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   const hot = remaining <= 10_000 && !!live.timer.startedAt;
   // The spooky night's dusk: this card's own clock in its last ten seconds, and on through its reveal.
   const dusk = s.mode === "card" && s.game !== undefined && s.index !== undefined && live.timer.card === `${s.game}:${s.index}` && hot;
+  const night = dusk && remaining <= 5_000;
   // The team key only matters while a team-computer game is the round being played or the card on the TV.
   const round = live.round !== null && live.round < wk.lineup.length ? wk.lineup[live.round].label : "";
   const teamComputer = gamesIn(round).some(usesTeamComputer) || (s.mode === "card" && !!s.game && usesTeamComputer(s.game));
@@ -486,9 +487,9 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   return (
     <>
       {/* The spooky night's paper and change of screen, behind and over the page; a running clock is never covered. */}
-      {spooky && <JoinNight screen={screenKey(s)} clear={clockRunning(s, live.timer, live.scored)} dusk={dusk} />}
+      {spooky && <JoinNight screen={screenKey(s)} clear={clockRunning(s, live.timer, live.scored)} dusk={dusk} night={night} />}
       <Wrap
-        className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split || bugHunt ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"} ${drawing ? "short:max-w-none" : ""} ${spooky ? "relative isolate" : ""}`}
+        className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split || bugHunt ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"} ${drawing ? "short:max-w-none" : ""} ${spooky ? `join-night-page relative isolate ${night ? "join-night-text" : ""}` : ""}`}
       >
         <div className={split ? `lg:grid lg:items-start lg:justify-center lg:gap-12 ${columns}` : ""}>
           {/* On a phone on its side, a drawing takes the bar beside it instead. */}

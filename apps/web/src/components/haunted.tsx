@@ -210,18 +210,6 @@ function Night({ bug, kicker, remaining, durationMs, running, locks, locked, tea
   const ending = running && remaining <= 10_000;
   const p = durationMs > 0 ? 1 - remaining / durationMs : 0;
 
-  // One lightning flash as the last ten seconds start. The scene is keyed by card, so it's once per card.
-  const flash = useRef<HTMLDivElement>(null);
-  const struck = useRef(false);
-  useEffect(() => {
-    if (!ending || over || struck.current) return;
-    struck.current = true;
-    flash.current?.animate(
-      [{ opacity: 0 }, { opacity: 0.9, offset: 0.06 }, { opacity: 0.15, offset: 0.2 }, { opacity: 0.7, offset: 0.28 }, { opacity: 0 }],
-      { duration: 1100, easing: "ease-out" },
-    );
-  }, [ending, over]);
-
   const total = locks?.length ?? 0;
   const lined = (locks ?? []).filter((l) => l.lineAt !== null).sort((a, b) => a.lineAt! - b.lineAt!);
   const fixed = lined.filter((l) => l.fixAt !== null).sort((a, b) => a.fixAt! - b.fixAt!);
@@ -309,8 +297,6 @@ function Night({ bug, kicker, remaining, durationMs, running, locks, locked, tea
               : ""}
         </p>
       </div>
-
-      <div ref={flash} className="haunt-layer haunt-flash" />
     </div>
   );
 }
