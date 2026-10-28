@@ -228,18 +228,24 @@
 .join-moon .haunt-moon-disc {
   aspect-ratio: 1;
 }
-.join-pines {
+.join-ground {
   left: 0;
   right: 0;
+  bottom: 0;
+  background-repeat: repeat-x;
+  background-position: left bottom;
+  background-size: auto 100%;
+}
+.join-pines {
   height: min(14cqw, 22cqh);
   opacity: 0.16;
 }
-.join-pines > * {
-  animation: none;
-}
+/* The ridge slopes, so tiles would step: one stretched across instead. */
 .join-ridge {
-  height: 10cqh;
+  height: min(7cqw, 11cqh);
   opacity: 0.22;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 @media (prefers-reduced-motion: reduce) {
   .join-night *,

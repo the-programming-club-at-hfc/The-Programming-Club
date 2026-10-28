@@ -202,16 +202,9 @@ export function JoinNight({ screen, clear }: { screen: string; clear: boolean })
             </div>
           </div>
         ))}
-        <div className="haunt-layer haunt-ground join-pines">
-          <div className="h-full">
-            <Art src={SPOOKY_ART.pines} />
-          </div>
-        </div>
-        <div className="haunt-layer haunt-ground haunt-ridge join-ridge">
-          <div className="h-full">
-            <Art src={SPOOKY_ART.ridge} fallback={<div className="haunt-hill" />} />
-          </div>
-        </div>
+        {/* Tiled at their own height, so a low strip still shows whole trees rather than the art's cropped base. */}
+        <div className="haunt-layer join-ground join-pines" style={{ backgroundImage: `url(${SPOOKY_ART.pines})` }} />
+        <div className="haunt-layer join-ground join-ridge" style={{ backgroundImage: `url(${SPOOKY_ART.ridge})` }} />
       </div>
       <div className="join-shift">
         <SpookyShift screen={screen} clear={clear} />
