@@ -179,8 +179,8 @@ export function SpookyBoard({ children }: { children: ReactNode }) {
 /**
  * The spooky night on a player's own computer: the haunted Bug Hunt's paper behind the page, with its moon, two bats
  * crossing and faint hills along the bottom of the window, and the TV's change of screen over it (only the bats while
- * a clock runs). None of it takes a click. A player's own computer follows reduced motion, unlike the TV: no change
- * of screen and a still backdrop then.
+ * a clock runs). None of it takes a click. Like the TV it moves even with reduced motion on: lab computers often
+ * have animation effects off.
  */
 export function JoinNight({ screen, clear }: { screen: string; clear: boolean }) {
   return (

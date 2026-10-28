@@ -247,14 +247,3 @@
   background-repeat: no-repeat;
   background-size: 100% 100%;
 }
-@media (prefers-reduced-motion: reduce) {
-  .join-night *,
-  .join-night *::before,
-  .join-night *::after {
-    animation: none !important;
-  }
-  .join-night .haunt-flyby,
-  .join-shift {
-    display: none;
-  }
-}

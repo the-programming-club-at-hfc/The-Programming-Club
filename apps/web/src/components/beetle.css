@@ -173,16 +173,3 @@
     scale: 1;
   }
 }
-
-/* Reduced motion: the beetle sits still and the window is a steady glow (the beetle.tsx engine doesn't run). */
-@media (prefers-reduced-motion: reduce) {
-  .beetle,
-  .beetle-turn,
-  .beetle-pose,
-  .beetle-frame,
-  .beetle-glow,
-  .beetle-jar {
-    animation: none !important;
-    transition: none !important;
-  }
-}

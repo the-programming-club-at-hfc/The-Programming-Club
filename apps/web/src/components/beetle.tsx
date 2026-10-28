@@ -89,18 +89,6 @@ const randomLine = (from: number, to: number, not?: number) => {
 
 const SPEED = { walk: 70, patrol: 85, go: 120, scurry: 380 };
 
-function usePrefersReducedMotion() {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const on = () => setReduce(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return reduce;
-}
-
 export interface BeetleLayerProps {
   /** The element wrapping the code rows: `position: relative` and `data-bug-code`, rows marked `data-line={n}`. */
   code: RefObject<HTMLElement | null>;
@@ -118,7 +106,6 @@ export interface BeetleLayerProps {
 export function BeetleLayer(props: BeetleLayerProps) {
   const { code, lines, hint, lockedLine, outcome } = props;
   const [layout, setLayout] = useState<Layout | null>(null);
-  const reduce = usePrefersReducedMotion();
   const beetle = useRef<HTMLDivElement>(null);
   const layoutRef = useRef(layout);
   const plan = planOf(props);
@@ -153,7 +140,8 @@ export function BeetleLayer(props: BeetleLayerProps) {
   useEffect(() => {
     planRef.current = plan;
   });
-  const moving = !reduce && layout !== null;
+  // It moves even when the computer asks for reduced motion: lab PCs often have animation effects off, like the TV.
+  const moving = layout !== null;
   useEffect(() => {
     if (!moving) return;
     const el = beetle.current!;
@@ -231,12 +219,6 @@ export function BeetleLayer(props: BeetleLayerProps) {
 
   if (!layout) return null;
   const size = sizeOf(layout);
-  // Reduced motion: no wandering. It sits by the locked line (or the jar, the hint, or line 1); the hint is a steady glow.
-  const still = reduce
-    ? {
-        transform: `translate3d(${layout.left + INSET}px, ${center(layout, plan.kind === "caught" ? beside(plan.line, lines) : (lockedLine ?? hint?.[0] ?? 1)) - size / 2}px, 0)`,
-      }
-    : undefined;
   const glow = hint && plan.kind !== "escaped" && plan.kind !== "caught" && rowsBox(layout, hint[0], hint[1]);
   const jar = outcome === "caught" && lockedLine !== undefined ? rowsBox(layout, lockedLine, lockedLine) : null;
   const jarSize = Math.round(size * 1.15);
@@ -261,10 +243,9 @@ export function BeetleLayer(props: BeetleLayerProps) {
       <div
         ref={beetle}
         className="beetle"
-        key={reduce ? "still" : "moving"}
         data-face="right"
-        data-act={reduce ? (outcome === "escaped" ? "gone" : lockedLine !== undefined ? "hold" : "rest") : "rest"}
-        style={still ?? { transform: `translate3d(${layout.left + INSET}px, ${-size * 1.5}px, 0)` }}
+        data-act="rest"
+        style={{ transform: `translate3d(${layout.left + INSET}px, ${-size * 1.5}px, 0)` }}
       >
         <div className="beetle-turn">
           <div className="beetle-pose">
