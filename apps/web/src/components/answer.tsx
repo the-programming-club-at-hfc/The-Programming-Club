@@ -488,6 +488,7 @@ function BugSteps({ index, pick, onPick, onLock, solo }: RoundProps) {
 
 /** The answer's line and why (the fix is under the code), then the news a made-up card is based on, or the real bug's credit. */
 function BugReveal({ b }: { b: Bug }) {
+  const url = b.source?.url ?? b.newsUrl;
   return (
     <div className="card p-5">
       <p>
@@ -495,17 +496,22 @@ function BugReveal({ b }: { b: Bug }) {
       </p>
       {b.news && (
         <p className="mt-3 text-sm text-dim">
-          <strong className="text-ink">In the news.</strong> {b.news}
+          <strong className="text-ink">What happened.</strong> {b.news}
         </p>
       )}
       {b.source && (
         <p className="mt-3 text-sm text-dim">
           <strong className="text-ink">Real bug:</strong>{" "}
-          <a href={b.source.url} target="_blank" rel="noreferrer" className="link text-ink">
+          <a href={b.source.url} target="_blank" rel="noopener noreferrer" className="link text-ink">
             {b.source.project}, {b.source.cve}
           </a>
           . {b.source.realFix}
         </p>
+      )}
+      {url && (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="link mt-2 inline-block text-sm whitespace-nowrap text-ink">
+          Read more ↗
+        </a>
       )}
     </div>
   );

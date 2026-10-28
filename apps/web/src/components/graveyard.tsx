@@ -104,7 +104,7 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
       {/* One list, wrapped into rows `per` stones wide, so a stone keeps its place in the DOM when the rows reflow. */}
       <ul className="grave-yard" style={{ "--w": `${width}cqw`, "--per": per } as CSSProperties}>
         {players.length === 0 ? (
-          <Stone name="waiting…" firstTime={false} delay={0} empty />
+          <Stone name="waiting" firstTime={false} delay={0} empty />
         ) : (
           shown.map((p, i) => (
             <Stone key={p.key} name={p.name} firstTime={p.firstTime} delay={opened ? 0 : Math.min(i, 30) * 90} back={i >= per} />
@@ -166,18 +166,38 @@ function Stone({
   const ref = useRef<HTMLLIElement>(null);
   const face = useRef<HTMLParagraphElement>(null);
   const last = useRef<{ x: number; y: number } | null>(null);
-  // The guess above runs wide for some letters: step the type down until no word has to break, again once the font has
-  // loaded. It all scales together, so one fit holds at any screen size.
+  // The guess above runs wide for some letters: measure the words in the stone's own font, to the fraction of a pixel
+  // (a box's scrollWidth rounds, so a word a hair too wide still broke), and size the type so each fits on a line and
+  // the name on two, again once the font has loaded. Widths scale with the size, and it all scales together, so one fit
+  // holds at any screen size.
   useLayoutEffect(() => {
     const fit = () => {
       const p = face.current;
       const span = p?.firstElementChild;
-      if (!p || !(span instanceof HTMLElement)) return;
-      span.style.overflowWrap = "normal";
-      let s = size;
-      p.style.setProperty("--name", String(s));
-      while (s > 0.08 && span.scrollWidth > span.clientWidth + 1) p.style.setProperty("--name", String((s -= 0.005)));
-      span.style.overflowWrap = "";
+      const ctx = document.createElement("canvas").getContext("2d");
+      if (!p || !(span instanceof HTMLElement) || !ctx) return;
+      p.style.setProperty("--name", String(size));
+      const style = getComputedStyle(span);
+      ctx.font = style.font;
+      ctx.letterSpacing = style.letterSpacing;
+      const words = name.split(/\s+/).map((w) => ctx.measureText(w).width);
+      const space = ctx.measureText(" ").width;
+      const room = p.clientWidth - 2;
+      // Lines at `k` times this size, wrapping word by word: no more than the two the stone shows.
+      const lines = (k: number) => {
+        let n = 1;
+        let x = 0;
+        for (const w of words) {
+          if (x && x + (space + w) * k > room) {
+            n++;
+            x = w * k;
+          } else x += (x ? space + w : w) * k;
+        }
+        return n;
+      };
+      let s = Math.min(size, (size * room) / Math.max(1, ...words));
+      while (s > 0.08 && lines(s / size) > 2) s -= 0.005;
+      p.style.setProperty("--name", String(Math.max(0.08, s)));
     };
     fit();
     void document.fonts.ready.then(fit);
@@ -208,7 +228,15 @@ function Stone({
           <Art src={SPOOKY_ART.gravestone} fallback={<div className="grave-blank" />} />
           {firstTime && <span className="grave-dot bg-sky" aria-label="First meeting" />}
           <p ref={face} className="grave-name" style={{ "--name": size } as CSSProperties}>
-            <span>{name}</span>
+            <span>
+              {name}
+              {/* The placeholder's ellipsis on a line of its own, under the word. */}
+              {empty && (
+                <>
+                  <br />…
+                </>
+              )}
+            </span>
           </p>
         </div>
       </div>

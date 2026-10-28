@@ -66,6 +66,8 @@ export interface Bug {
   context?: string;
   /** For a made-up card: the real news it's based on, shown on reveal. */
   news?: string;
+  /** The article or advisory behind the news, linked on the player's reveal. */
+  newsUrl?: string;
   /** For a real bug: the advisory it was cut from. The code is the project's own, just before the fix. */
   source?: BugSource;
 }

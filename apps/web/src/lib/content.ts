@@ -890,6 +890,7 @@ export const BUGS: Bug[] = [
     ],
     why: "Line 5 prints the secret key. Logs get screenshotted and pasted into chats, so anyone who sees this one can spend money with your key.",
     news: "OpenCode, October 2026: attackers got users' saved AI keys and ran up charges on them overnight.",
+    newsUrl: "https://www.bleepingcomputer.com/news/security/opencode-hack-exposes-api-keys-amid-ai-distillation-attacks/",
   },
   {
     name: "the fake package",
@@ -907,6 +908,7 @@ export const BUGS: Bug[] = [
     ],
     why: "reqeusts is misspelled. Attackers upload packages named after common typos, and this script installs it for you, running a stranger's code on your machine.",
     news: "Tensorlake and SubQuery, October 2026: attackers pushed bad versions of real npm packages that stole passwords and tokens. Misspelled names like this one are the other common trick.",
+    newsUrl: "https://github.com/tensorlakeai/tensorlake/security/advisories/GHSA-8g63-53c9-65j2",
   },
   {
     name: "haunted fridge",
@@ -924,6 +926,8 @@ export const BUGS: Bug[] = [
     ],
     why: "Besides the real password, it accepts today's date (28102026 on game night) for any user, and anyone who reads the code knows every day's password. Delete the backdoor. Changing or to and doesn't help: the real password is never today's date, so nobody could log in.",
     news: "Danfoss fridge controllers had a hidden login whose password is just the date. It's the top suspect in October's attack that heated fridges in hundreds of French supermarkets to 50°C, but investigators haven't confirmed how the attackers got in.",
+    newsUrl:
+      "https://www.theregister.com/security/2026/10/13/cyberattacks-crank-french-supermarket-refrigeration-systems-up-to-50c/5302784",
   },
   {
     name: "crypt keeper",
@@ -936,7 +940,8 @@ export const BUGS: Bug[] = [
     fix: 'path = os.path.join("graveyard", os.path.basename(name))',
     wrong: ['path = os.path.join("graveyard/", name)', 'path = os.path.join(name, "graveyard")', 'path = "graveyard/" + name'],
     why: 'Typing ../crypt/treasure.txt climbs out of the graveyard folder, and /etc/passwd makes os.path.join drop "graveyard" entirely. basename keeps only the file name.',
-    news: "Path traversal. Khoj, an AI app, disclosed this kind of bug in a September advisory.",
+    news: "Path traversal. Khoj, an AI app, had this exact kind of bug this year: anyone could read files off its server.",
+    newsUrl: "https://github.com/advisories/GHSA-62mm-xwmv-crhg",
   },
   {
     name: "ghost age",
@@ -954,6 +959,7 @@ export const BUGS: Bug[] = [
     ],
     why: 'eval runs whatever someone types as Python. Type __import__("os").system("ls") and it lists your files. int() only accepts a number.',
     news: "Remote code execution. PHP2Shell, patched Oct 21, let attackers run code on PHP servers.",
+    newsUrl: "https://www.php.net/archive/2026.php#2026-10-21-5",
   },
   {
     name: "quart",

@@ -79,9 +79,9 @@
   --color-paper: transparent;
 }
 
-/* The change of screen: a veil of night, soft along its trailing edge, and bats ahead of it. It covers the screen
-   from the first frame and sweeps off to the right, so the new screen shows from the left within the second. */
-/* Above the ticker, which keeps the join code and the clock in view. */
+/* The change of screen: stage flats of torn paper, back to front, rise from below and cover the screen (each a
+   strip of art along its top and solid paper the rest of the way down), then drop away with bats bursting out of the
+   ridge. Above everything but the ticker, which keeps the join code and the clock in view. */
 .shift {
   position: absolute;
   inset: 0 0 var(--shift-under, 0) 0;
@@ -90,28 +90,49 @@
   pointer-events: none;
   container-type: size;
 }
-.shift-veil {
+.shift-flat {
+  --edge: calc(112cqw / 4.8);
+  --ink: #25231f;
   position: absolute;
-  top: 0;
+  left: -6cqw;
+  right: -6cqw;
   bottom: 0;
-  left: -50%;
-  width: 200%;
+  height: calc(100cqh + var(--edge));
   display: flex;
-  align-items: center;
-  background: linear-gradient(90deg, transparent 0%, #4a5866 22%, #3b4957 60%, #2d3a47 100%);
-  animation: shift-veil 1.25s cubic-bezier(0.55, 0, 0.35, 1) both;
+  flex-direction: column;
+  will-change: transform;
+  animation: shift-flat 1s both;
 }
-/* Wisps of fog in it, so it reads as fog and not a wipe. */
-.shift-veil img {
-  width: 37.5%;
-  height: 70%;
+.shift-flat img {
+  display: block;
+  flex: none;
+  width: 100%;
+  height: var(--edge);
   object-fit: fill;
-  opacity: 0.55;
 }
-/* The first starts where the veil turns solid, fading in so it has no edge. */
-.shift-veil img:first-child {
-  margin-left: 25%;
-  mask-image: linear-gradient(90deg, transparent, #000 45%);
+/* The rest of the flat, a hair up under the art so no seam shows. */
+.shift-flat > div {
+  flex: 1;
+  margin-top: -2px;
+  background: radial-gradient(ellipse 80% 60% at 40% 30%, rgb(255 255 255 / 0.05), transparent), var(--ink);
+}
+/* Farther back, lighter, like the poster's layers of paper; each comes up and goes down just after the one behind. */
+.shift-flat.back {
+  --edge: calc(112cqw / 4);
+  --ink: #4c463f;
+}
+.shift-flat.back img {
+  filter: brightness(1.85);
+}
+.shift-flat.mid {
+  --ink: #37342e;
+  animation-delay: 0.04s;
+}
+.shift-flat.mid img {
+  filter: brightness(1.5);
+}
+.shift-flat.front {
+  animation-delay: 0.08s;
 }
 .shift-lift {
   opacity: 0;
@@ -119,24 +140,43 @@
 }
 .shift-bat {
   position: absolute;
-  left: 0;
-  animation: shift-bat 1s cubic-bezier(0.4, 0, 0.6, 1) both;
+  left: var(--x);
+  top: var(--y);
+  animation: shift-burst 0.45s cubic-bezier(0.15, 0.6, 0.35, 1) var(--d) both;
+}
+/* With a clock running there are no flats: the bats come up from the bottom straight away. */
+.shift-clear .shift-bat {
+  top: 92%;
+  animation-duration: 0.9s;
+  animation-delay: calc(var(--d) - 0.57s);
 }
 
-@keyframes shift-veil {
+/* Up fast (the back one covers the screen within 0.1s, the front one by 0.38s), then straight back down, gathering
+   speed. */
+@keyframes shift-flat {
+  from {
+    transform: translateY(100%);
+    animation-timing-function: cubic-bezier(0.2, 0.85, 0.3, 1);
+  }
+  30% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1);
+  }
   to {
-    transform: translateX(75%);
+    transform: translateY(100%);
   }
 }
-@keyframes shift-bat {
+@keyframes shift-burst {
   from {
-    transform: translateX(-10cqw) translateY(4cqh);
+    opacity: 0;
+    transform: translate(-50%, 2cqh) scale(0.6);
   }
-  50% {
-    transform: translateX(50cqw) translateY(-3cqh);
+  15% {
+    opacity: 1;
   }
   to {
-    transform: translateX(112cqw) translateY(2cqh);
+    opacity: 1;
+    transform: translate(calc(var(--dx) - 50%), -80cqh) scale(1.15);
   }
 }
 @keyframes night-rise {

@@ -1,9 +1,18 @@
 import { expect, test } from "bun:test";
-import { WEEKS } from "./content";
+import { BUGS, WEEKS } from "./content";
 import { graveRows } from "./spooky";
 
 test("only Spooky Bugs is the spooky night", () => {
   expect(WEEKS.filter((w) => w.theme === "spooky").map((w) => w.title)).toEqual(["Spooky Bugs"]);
+});
+
+test("verified spooky news cards link to HTTPS sources", () => {
+  // Khoj's advisory was disclosed in June, not September; leave its news unlinked until the copy is reviewed.
+  for (const i of [19, 20, 21, 23]) expect(BUGS[i].newsUrl?.startsWith("https://")).toBe(true);
+  for (const b of BUGS.filter((bug) => bug.newsUrl)) {
+    expect(Boolean(b.news)).toBe(true);
+    expect(new URL(b.newsUrl!).protocol).toBe("https:");
+  }
 });
 
 test("graveRows keeps every stone on the ground, in join order", () => {

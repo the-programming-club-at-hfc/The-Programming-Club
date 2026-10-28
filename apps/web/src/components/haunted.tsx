@@ -513,7 +513,7 @@ function Reveal({ bug, kicker, results }: HuntProps) {
           ) : (
             bug.news && (
               <section>
-                <p className="haunt-kicker text-[0.8em] font-bold text-[var(--haunt-dim)]">in the news</p>
+                <p className="haunt-kicker text-[0.8em] font-bold text-[var(--haunt-dim)]">what happened</p>
                 <p className="mt-[0.15em]">{bug.news}</p>
               </section>
             )
