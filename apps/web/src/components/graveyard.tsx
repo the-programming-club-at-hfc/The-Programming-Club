@@ -11,7 +11,7 @@ import "./graveyard.css";
 // gets a gravestone that rises out of the ground with their name on it. Like the haunted Bug Hunt, it moves even with
 // reduced motion on: it's a shared display.
 
-type Player = { name: string; firstTime: boolean };
+type Player = { name: string };
 
 // Bats crossing the sky: height, seconds per crossing, start, size.
 const FLYBYS = [
@@ -78,7 +78,7 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
       {/* The address is as big as fits on the sign, however long this machine's is. */}
       <div className="grave-sign absolute top-[1.4cqw] left-[2.4cqw] z-[2] w-[63cqw]">
         <Art src={SPOOKY_ART.sign} fallback={<div className="grave-board" />} />
-        <div className="grave-face">
+        <div className="grave-face items-center text-center">
           <p className="haunt-kicker text-[1.5cqw] font-bold text-[#8a3412]">join the game</p>
           <p className="mt-[0.2cqw] text-[2.3cqw] leading-tight font-bold">On your computer, go to</p>
           <p
@@ -87,7 +87,7 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
           >
             {address}
           </p>
-          <div className="mt-[0.7cqw] flex items-center gap-[1.2cqw]">
+          <div className="mt-[0.7cqw] flex items-center justify-center gap-[1.2cqw]">
             <p className="text-[2.3cqw] font-bold">and enter</p>
             <span className="flex gap-[0.4cqw] text-[3.4cqw]" aria-label={`Code ${code.split("").join(" ")}`}>
               {code.split("").map((c, i) => (
@@ -104,11 +104,9 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
       {/* One list, wrapped into rows `per` stones wide, so a stone keeps its place in the DOM when the rows reflow. */}
       <ul className="grave-yard" style={{ "--w": `${width}cqw`, "--per": per } as CSSProperties}>
         {players.length === 0 ? (
-          <Stone name="waiting" firstTime={false} delay={0} empty />
+          <Stone name="waiting" delay={0} empty />
         ) : (
-          shown.map((p, i) => (
-            <Stone key={p.key} name={p.name} firstTime={p.firstTime} delay={opened ? 0 : Math.min(i, 30) * 90} back={i >= per} />
-          ))
+          shown.map((p, i) => <Stone key={p.key} name={p.name} delay={opened ? 0 : Math.min(i, 30) * 90} back={i >= per} />)
         )}
       </ul>
       <div className="haunt-layer haunt-fog grave-fog">
@@ -127,11 +125,6 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
           <span className="narrow text-[2.6cqw] font-extrabold">{roster.length}</span> player{roster.length === 1 ? "" : "s"} here
           {more > 0 && <span className="font-normal text-[#c9c1ae]"> · {more} more than fit</span>}
         </p>
-        {roster.some((p) => p.firstTime) && (
-          <p className="flex items-center gap-[0.6cqw] text-[#c9c1ae]">
-            <span className="size-[0.9cqw] rounded-full bg-sky" aria-hidden /> First meeting. Say hi.
-          </p>
-        )}
         <p className="ml-auto flex items-center gap-[0.6cqw] font-bold">
           <InstagramGlyph className="size-[1.2em]" />
           <span className="underline decoration-sky decoration-[0.2cqw] underline-offset-[0.4cqw]">Follow @{CLUB.instagram}</span>
@@ -145,19 +138,7 @@ export function Graveyard({ address, code, roster }: { address: string; code: st
  * A player's gravestone. It rises out of the ground in a puff of dirt `delay` ms after it mounts. When others join and
  * the rows reflow, it slides to its new place (FLIP: it jumps there and a transform carries it from the old one).
  */
-function Stone({
-  name,
-  firstTime,
-  delay,
-  back = false,
-  empty = false,
-}: {
-  name: string;
-  firstTime: boolean;
-  delay: number;
-  back?: boolean;
-  empty?: boolean;
-}) {
+function Stone({ name, delay, back = false, empty = false }: { name: string; delay: number; back?: boolean; empty?: boolean }) {
   // Its delay as it mounted: one already up never rises again.
   const [at] = useState(delay);
   // Type as big as a stone's face takes, smaller for a long word so it never breaks mid-word.
@@ -226,7 +207,6 @@ function Stone({
       <div className="grave-dig">
         <div className="grave-stone">
           <Art src={SPOOKY_ART.gravestone} fallback={<div className="grave-blank" />} />
-          {firstTime && <span className="grave-dot bg-sky" aria-label="First meeting" />}
           <p ref={face} className="grave-name" style={{ "--name": size } as CSSProperties}>
             <span>
               {name}

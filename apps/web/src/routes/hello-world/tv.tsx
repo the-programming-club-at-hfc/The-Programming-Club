@@ -67,26 +67,15 @@ function TvScreen() {
   }, [live]);
   const week = live ? live.week : last ? last.week : last === undefined ? seen : null;
   const spooky = week !== null && plan[week - 1]?.theme === "spooky";
-  // The haunted Bug Hunt has its big clock in the top corner, so there it waits at the bottom, above the ticker.
-  const night = spooky && live?.screen.mode === "card" && live.screen.game === "bug" && !live.screen.revealed;
   return (
+    // Sound is run from the host's console, so the TV shows no button for it: browsers still need one click on this page
+    // before they'll play anything, and a click anywhere does it.
     <div
       className={`theme-pine relative flex h-screen flex-col overflow-hidden ${live ? "[--shift-under:5vw]" : ""}`}
       onClick={() => !sound && unlockAudio().then(() => setSound(true))}
     >
       {live && code ? <LiveTv live={live} code={code} sound={sound} /> : live === null ? <AfterNight spooky={spooky} /> : null}
       {spooky && <SpookyShift screen={live ? screenKey(live.screen) : "after"} clear={!!live?.timer.startedAt} />}
-      {!sound && (
-        <button
-          className={`absolute z-10 rounded-[6px] bg-mist px-4 py-2 text-sm font-semibold text-dim ${night ? "bottom-[calc(5vw+1rem)] left-1/2 -translate-x-1/2" : "top-4 right-4"}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            void unlockAudio().then(() => setSound(true));
-          }}
-        >
-          Click to turn on sound
-        </button>
-      )}
     </div>
   );
 }
