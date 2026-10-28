@@ -288,25 +288,29 @@
   opacity: 0.32;
   transition: opacity 9s ease-in;
 }
+/* Night is the TV's: the same sky, as dark. */
 .join-midnight {
   inset: 0;
-  background: linear-gradient(to bottom, #0d1524 0%, #1c2740 60%, #2c3048 100%);
+  background: radial-gradient(ellipse at 60% 30%, #2a3a48 0%, var(--haunt-dusk) 70%);
   opacity: 0;
   transition: opacity 1.5s ease;
 }
 .join-dark .join-midnight {
-  opacity: 0.92;
+  opacity: 0.85;
   transition: opacity 4s ease-in-out;
 }
 /* At night the page's own words (not the cards') turn cream, so they still read on the dark sky. */
+/* Plain text inherits the body's colour, already worked out, so the colour is set here as well as the variables. */
 .join-night-text {
   --color-ink: #f6efe0;
   --color-dim: #cfc6b4;
+  color: #f6efe0;
 }
 /* The day theme's own values (styles.css), back inside anything with a light surface. */
 .join-night-text :is(.card, .bg-paper, .bg-mist, .bg-meadow, .bg-sun) {
   --color-ink: #12332b;
   --color-dim: #4f6862;
+  color: #12332b;
 }
 /* Bug Hunt's code column is a card on a phone but has no card behind it wide (answer.tsx), so there its words are the
    page's: cream at night. */
@@ -314,5 +318,6 @@
   .join-night-text .bug-intro {
     --color-ink: #f6efe0;
     --color-dim: #cfc6b4;
+    color: #f6efe0;
   }
 }
