@@ -182,10 +182,21 @@ export function SpookyBoard({ children }: { children: ReactNode }) {
  * a clock runs). None of it takes a click. Like the TV it moves even with reduced motion on: lab computers often
  * have animation effects off.
  */
-export function JoinNight({ screen, clear }: { screen: string; clear: boolean }) {
+export function JoinNight({ screen, clear, storm }: { screen: string; clear: boolean; storm: boolean }) {
+  // The TV's last ten seconds, softer: the edges darken (the middle, where the code is, stays light) and one flash
+  // of lightning, once per card.
+  const flash = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!storm) return;
+    flash.current?.animate(
+      [{ opacity: 0 }, { opacity: 0.55, offset: 0.06 }, { opacity: 0.1, offset: 0.2 }, { opacity: 0.4, offset: 0.28 }, { opacity: 0 }],
+      { duration: 1100, easing: "ease-out" },
+    );
+  }, [storm]);
   return (
     <>
-      <div className="haunt join-night" aria-hidden>
+      <div className={`haunt join-night ${storm ? "join-storm" : ""}`} aria-hidden>
+        <div className="haunt-layer join-dusk" />
         <div className="haunt-layer join-moon">
           <Art src={SPOOKY_ART.moon} fallback={<div className="haunt-moon-disc" />} />
         </div>
@@ -209,6 +220,7 @@ export function JoinNight({ screen, clear }: { screen: string; clear: boolean })
       <div className="join-shift">
         <SpookyShift screen={screen} clear={clear} />
       </div>
+      <div ref={flash} className="join-flash" aria-hidden />
     </>
   );
 }

@@ -166,6 +166,8 @@
     transform: translateY(100%);
   }
 }
+/* They fade as they go: the end state holds (fill both) until the change of screen unmounts, which a throttled timer
+   in a page left in the background can put off, and a still row of bats must not sit on the screen meanwhile. */
 @keyframes shift-burst {
   from {
     opacity: 0;
@@ -174,8 +176,11 @@
   15% {
     opacity: 1;
   }
-  to {
+  75% {
     opacity: 1;
+  }
+  to {
+    opacity: 0;
     transform: translate(calc(var(--dx) - 50%), -80cqh) scale(1.15);
   }
 }
@@ -246,4 +251,23 @@
   opacity: 0.22;
   background-repeat: no-repeat;
   background-size: 100% 100%;
+}
+
+/* The last ten seconds: a storm closing in from the edges, and a lightning flash over the page that takes no clicks. */
+.join-dusk {
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, transparent 40%, rgb(20 30 44 / 0.7) 100%);
+  opacity: 0;
+  transition: opacity 2.5s ease;
+}
+.join-storm .join-dusk {
+  opacity: 1;
+}
+.join-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: #fffbea;
+  opacity: 0;
+  pointer-events: none;
 }

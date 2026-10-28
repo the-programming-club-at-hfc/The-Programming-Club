@@ -93,24 +93,76 @@ function CodeSquares({ code, className = "" }: { code: string; className?: strin
   );
 }
 
-/** After End night: the final standings for a while, then the attract screen. */
+/** After End night: the season scoreboard for a while (tonight's winner up top), then the attract screen. */
 function AfterNight({ spooky }: { spooky: boolean }) {
   const last = useJustEnded();
   if (last === undefined) return null;
-  return last ? (
-    spooky ? (
-      <div className="relative flex-1 overflow-hidden">
-        <SpookyBoard>
-          <Scoreboard teams={last.teams} solo={last.solo} practice={last.practice} final />
-        </SpookyBoard>
-      </div>
-    ) : (
-      <div className="flex-1 overflow-hidden p-[3.5vw]">
-        <Scoreboard teams={last.teams} solo={last.solo} practice={last.practice} final />
-      </div>
-    )
+  if (!last) return <Attract />;
+  const first = last.teams.filter((t) => t.score > 0 && t.score === last.teams[0]?.score);
+  const board = <SeasonBoard winners={first.map((t) => t.name)} practice={last.practice} />;
+  return spooky ? (
+    <div className="relative flex-1 overflow-hidden">
+      <SpookyBoard>{board}</SpookyBoard>
+    </div>
   ) : (
-    <Attract />
+    <div className="flex-1 overflow-hidden p-[3.5vw]">{board}</div>
+  );
+}
+
+/** The season's XP board, as /scores has it, big enough for the room: the top players in columns. */
+function SeasonBoard({ winners, practice }: { winners: string[]; practice: boolean }) {
+  const board = useQuery(api.stats.leaderboard);
+  const shown = (board ?? []).slice(0, PER_COLUMN * 2);
+  const columns = Math.max(1, Math.ceil(shown.length / PER_COLUMN));
+  return (
+    <div className="mx-auto grid h-full max-w-[86vw] grid-cols-[minmax(0,1fr)_auto] gap-[3vw]">
+      <div className="flex min-h-0 flex-col">
+        <h2 className="shrink-0 text-[4vw] leading-none tracking-[-0.04em]">season scoreboard</h2>
+        {winners.length > 0 && (
+          <p className="mt-[1.2vw] shrink-0 truncate text-[2.4vw] font-bold">
+            Tonight:{" "}
+            {winners.length > 2
+              ? `${winners.length}-way tie for 1st`
+              : `${winners.join(" and ")} ${winners.length === 1 ? "won" : "tied for 1st"}`}
+          </p>
+        )}
+        {board === undefined ? null : shown.length === 0 ? (
+          <p className="mt-[6vw] text-[2.2vw] text-dim">Names show up here after the first game night.</p>
+        ) : (
+          // Down each column, then across, so the order reads like standings.
+          <ol
+            className="mt-[2.4vw] grid grid-flow-col gap-x-[3vw] gap-y-[0.8vw]"
+            style={{
+              gridTemplateRows: `repeat(${Math.min(PER_COLUMN, shown.length)}, auto)`,
+              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            }}
+          >
+            {shown.map((p, i) => {
+              // Ties share a place, and the next score is the next place (1st, 2nd, 2nd, 3rd), as on /scores.
+              const rank = 1 + new Set(shown.filter((o) => o.xp > p.xp).map((o) => o.xp)).size;
+              return (
+                <li key={p.name + i} className="grid grid-cols-[1.4vw_3.9vw_1fr_auto] items-center gap-[0.8vw]">
+                  <span className="size-[1.2vw] rounded-full" style={{ background: MEDAL[rank - 1] ?? "transparent" }} aria-hidden />
+                  <span className="narrow text-[1.8vw] leading-none font-extrabold">{ordinal(rank)}</span>
+                  <p className="truncate text-[1.6vw] leading-tight font-extrabold">{p.name}</p>
+                  <span className="text-right whitespace-nowrap">
+                    <span className="narrow text-[2.4vw] leading-none font-extrabold">{p.xp}</span>
+                    <span className="ml-[0.4vw] text-[1.1vw] font-bold text-dim">XP</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {board && board.length > shown.length && <p className="mt-[0.8vw] text-[1.4vw] font-bold">+ {board.length - shown.length} more</p>}
+        <p className="mt-auto pt-[2vw] text-[1.5vw] text-dim">
+          {practice
+            ? "Practice night: nothing tonight counted toward XP."
+            : `Season XP: 3 for coming, +3/2/1 for your place. Everyone's breakdown: ${CLUB.url}/hello-world/scores`}
+        </p>
+      </div>
+      <InstagramQr className="self-end" />
+    </div>
   );
 }
 

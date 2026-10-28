@@ -484,7 +484,7 @@ function MyGame({ token, me, live, onSwitch }: { token: string; me: Me; live: Li
   return (
     <>
       {/* The spooky night's paper and change of screen, behind and over the page; a running clock is never covered. */}
-      {spooky && <JoinNight screen={screenKey(s)} clear={!!live.timer.startedAt} />}
+      {spooky && <JoinNight screen={screenKey(s)} clear={!!live.timer.startedAt} storm={hot && remaining > 0} />}
       <Wrap
         className={`flex min-h-dvh flex-col py-5 ${wide ? "" : split || bugHunt ? "max-w-2xl lg:w-[min(80rem,100%-2.5rem)] lg:max-w-none" : "max-w-2xl"} ${drawing ? "short:max-w-none" : ""} ${spooky ? "relative isolate" : ""}`}
       >
