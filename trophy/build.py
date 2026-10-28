@@ -35,8 +35,8 @@ SLOPE = math.radians(20)  # front face leans back so the plaque faces the viewer
 TOP = BASE_H + BODY_H
 TOP_FRONT_Y = -BODY_D / 2 + BODY_H * math.tan(SLOPE)
 SWITCH_Y = (TOP_FRONT_Y + BODY_D / 2) / 2
-PEG_D, PEG_H = 20, 10
-PEG_Y = 0  # the printed base has its peg at the centre of the footprint, SWITCH_Y in front of the switch's centre
+PEG_D, PEG_H = 16, 10
+PEG_X = 20  # two pegs, left and right of the switch's centre, so it can't turn on the plinth
 
 # Print scale: the base's long side spans the P1S's 256 mm bed, less a 2 mm margin each side.
 SCALE = (256 - 2 * 2) / BASE_W
@@ -200,9 +200,10 @@ def make_base():
     )
     bevel(body, 1.2, 3, lambda e: not at_z(BASE_H - 0.5)(e))
     base = boolean(tier, body, "UNION")
-    peg = cylinder("peg", PEG_D / 2, TOP - 1, TOP + PEG_H - 1, cy=PEG_Y)
-    peg_tip = cylinder("peg_tip", PEG_D / 2, TOP + PEG_H - 1, TOP + PEG_H, cy=PEG_Y, r_top=PEG_D / 2 - 1)
-    boolean(base, boolean(peg, peg_tip, "UNION"), "UNION")
+    for x in (-PEG_X, PEG_X):
+        peg = cylinder("peg", PEG_D / 2, TOP - 1, TOP + PEG_H - 1, x, SWITCH_Y)
+        peg_tip = cylinder("peg_tip", PEG_D / 2, TOP + PEG_H - 1, TOP + PEG_H, x, SWITCH_Y, r_top=PEG_D / 2 - 1)
+        boolean(base, boolean(peg, peg_tip, "UNION"), "UNION")
     # Plaque pocket on the sloped face.
     pocket = box("pocket", PLAQUE_W + 2 * FIT, PLAQUE_H + 2 * FIT, -POCKET, POCKET)
     transform(pocket, plaque_frame())
@@ -230,12 +231,12 @@ def make_switch():
         arm = box("arm", w, d, z - 0.5, z + CROSS_H)
         bevel(arm, 0.6, 1, at_z(z + CROSS_H))
         boolean(switch, arm, "UNION")
-    # Socket for the plinth peg, with a 45° roof so it prints without support. It's off-centre so the switch
-    # sits centred on the plinth's top; the socket side faces the plaque.
-    r, y = PEG_D / 2 + FIT, PEG_Y - SWITCH_Y
-    hole = cylinder("hole", r, -1, PEG_H + 0.5, cy=y)
-    roof = cylinder("roof", r, PEG_H + 0.5, PEG_H + 0.5 + r, cy=y, r_top=0.01)
-    boolean(switch, boolean(hole, roof, "UNION"), "DIFFERENCE")
+    # Sockets for the plinth pegs, with 45° roofs so they print without support.
+    r = PEG_D / 2 + FIT
+    for x in (-PEG_X, PEG_X):
+        hole = cylinder("hole", r, -1, PEG_H + 0.5, x)
+        roof = cylinder("roof", r, PEG_H + 0.5, PEG_H + 0.5 + r, x, r_top=0.01)
+        boolean(switch, boolean(hole, roof, "UNION"), "DIFFERENCE")
     return switch
 
 

@@ -16,9 +16,9 @@ Each black part has a sliced project for the P1S in black PLA, 0.20 mm Standard,
 
 | Part   | Project          | Size (mm)       | Time        | PLA   |
 | ------ | ---------------- | --------------- | ----------- | ----- |
-| Base   | `base-p1s.3mf`   | 252 × 208 × 104 | 10 h 18 min | 768 g |
+| Base   | `base-p1s.3mf`   | 252 × 208 × 104 | 10 h 20 min | 770 g |
 | Keycap | `keycap-p1s.3mf` | 151 × 151 × 79  | 4 h 55 min  | 305 g |
-| Switch | `switch-p1s.3mf` | 131 × 131 × 101 | 3 h 16 min  | 202 g |
+| Switch | `switch-p1s.3mf` | 131 × 131 × 101 | 3 h 19 min  | 202 g |
 
 That's about 18½ hours and 1.3 kg of black PLA, so have more than one 1 kg spool. The base sits back from the front edge to stay clear of the P1S's front-left exclusion zone.
 
@@ -30,7 +30,7 @@ To lay out your own plates, open **`trophy-parts.3mf`** in Bambu Studio. Every p
 
 1. Spray-paint the keycap gold. Mask the engraved arrow first if you want it to stay black, or fill it with a black paint pen afterwards.
 2. Glue the plaque into the pocket on the front of the base. Use CA glue or double-sided tape.
-3. Drop the switch onto the round peg on top of the base. Its socket is off-centre: turn it so the socket side faces the plaque, and the switch sits centred on the top.
+3. Drop the switch onto the two round pegs on top of the base. They sit centred on the top and keep the switch from turning.
 4. Press the keycap onto the cross-shaped stem.
 
 Each joint has 0.25 mm of clearance per side. Add a drop of glue if one feels loose. The finished trophy is about 235 mm tall. Winners sign the keycap with a paint pen.
