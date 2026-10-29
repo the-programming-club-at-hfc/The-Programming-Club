@@ -30,6 +30,8 @@ import { api } from "../../convex/_generated/api";
 // School blue, the club's accent. Magnitude is this one hue from light to dark.
 const BLUE = "#0b4fa3";
 const ramp = (t: number) => `color-mix(in oklab, ${BLUE} ${Math.round(6 + t * 94)}%, #eef2f9)`;
+// Hours at least this share of the busiest one carry their count. The ramp is dark enough there for white text (4.5:1).
+const LABELED = 0.75;
 const SURVEY_URL = `https://${CLUB.url}/survey`;
 
 export function SurveyResults() {
@@ -117,7 +119,7 @@ function Board({ rows, waiting, members }: { rows: SurveyResponse[]; waiting: Wa
   const filtered = active.length + f.free.length > 0;
 
   const counts = heat(cohort);
-  const best = bestSlots(counts, 6);
+  const best = bestSlots(counts, 4);
   const wants = tally(cohort, "interests").sort((a, b) => b.n - a.n);
   const weeklyish = cohort.filter((r) => r.frequency === "weekly" || r.frequency === "biweekly").length;
 
@@ -196,42 +198,44 @@ function Board({ rows, waiting, members }: { rows: SurveyResponse[]; waiting: Wa
           <Heatmap counts={counts} picked={f.free} onPick={toggleSlot} hover={hover} onHover={setHover} />
           <Readout slot={hover ?? f.free.at(-1) ?? null} rows={cohort} />
         </Card>
-        <Card title="Best times" sub={`For the ${cohort.length} selected`}>
-          {best.length === 0 ? (
-            <p className="text-dim">Nobody selected has picked hours.</p>
-          ) : (
-            <ol className="space-y-1">
-              {best.map((b, i) => (
-                <li key={b.slot}>
-                  <button
-                    className={`grid w-full grid-cols-[1.4rem_1fr_auto] items-center gap-x-3 rounded-[6px] px-2 py-2 text-left hover:bg-mist ${f.free.includes(b.slot) ? "bg-mist" : ""}`}
-                    onClick={() => toggleSlot(b.slot)}
-                    onMouseEnter={() => setHover(b.slot)}
-                    onMouseLeave={() => setHover(null)}
-                  >
-                    <span className="narrow font-bold text-dim">{i + 1}</span>
-                    <span className="min-w-0">
-                      <span className="block font-semibold">{slotLabel(b.slot)}</span>
-                      <Meter value={b.n} max={cohort.length} />
-                    </span>
-                    <span className="text-right text-sm">
-                      <strong className="text-base">{b.n}</strong> free
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          )}
-          <p className="mt-3 text-xs text-dim">Availability isn’t an RSVP: confirm a time and room before announcing it.</p>
-        </Card>
+        {/* When, how often, and where, side by side: what picking a meeting comes down to. */}
+        <div className="grid content-start gap-4">
+          <Card title="Best times" sub={`For the ${cohort.length} selected`}>
+            {best.length === 0 ? (
+              <p className="text-dim">Nobody selected has picked hours.</p>
+            ) : (
+              <ol className="space-y-1">
+                {best.map((b, i) => (
+                  <li key={b.slot}>
+                    <button
+                      className={`grid w-full grid-cols-[1.4rem_1fr_auto] items-center gap-x-3 rounded-[6px] px-2 py-2 text-left hover:bg-mist ${f.free.includes(b.slot) ? "bg-mist" : ""}`}
+                      onClick={() => toggleSlot(b.slot)}
+                      onMouseEnter={() => setHover(b.slot)}
+                      onMouseLeave={() => setHover(null)}
+                    >
+                      <span className="narrow font-bold text-dim">{i + 1}</span>
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{slotLabel(b.slot)}</span>
+                        <Meter value={b.n} max={cohort.length} />
+                      </span>
+                      <span className="text-right text-sm">
+                        <strong className="text-base">{b.n}</strong> free
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <p className="mt-3 text-xs text-dim">Availability isn’t an RSVP: confirm a time and room before announcing it.</p>
+          </Card>
+          {chart("frequency", "How often they’d come")}
+          {chart("locations", "Where they’d join in", "On campus, Discord, or Teams: more than one allowed")}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {chart("interests", "What they want", "Pick as many as they like, so bars add up to more than the members", true)}
-        <div className="grid gap-4">
-          {chart("frequency", "How often they’d come")}
-          {chart("locations", "Where they’d join in", "More than one allowed")}
-        </div>
+        {chart("barriers", "What’s made it hard to come", undefined, true)}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -240,10 +244,7 @@ function Board({ rows, waiting, members }: { rows: SurveyResponse[]; waiting: Wa
         {chart("channels", "Where they’ll see club news", undefined, true)}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        {chart("barriers", "What’s made it hard to come", undefined, true)}
-        <Notes rows={cohort} />
-      </div>
+      <Notes rows={cohort} />
 
       <Responses rows={cohort} />
       {waiting.length > 0 && (
@@ -419,15 +420,16 @@ function Heatmap({
                   key={slot}
                   aria-pressed={on}
                   aria-label={`${slotLabel(slot)}: ${n} free`}
-                  className={`narrow h-8 rounded-[3px] text-xs font-bold transition-colors ${on ? "outline-[2.5px] -outline-offset-[2.5px] outline-sun" : ""} ${hover === slot && !on ? "outline-2 -outline-offset-2 outline-ink" : ""}`}
-                  style={{ background: n ? ramp(t) : "#f3f5f9", color: t > 0.55 ? "#fff" : "var(--color-ink)" }}
+                  className={`narrow h-8 rounded-[3px] text-xs font-bold text-white transition-colors ${on ? "outline-[2.5px] -outline-offset-[2.5px] outline-sun" : ""} ${hover === slot && !on ? "outline-2 -outline-offset-2 outline-ink" : ""}`}
+                  style={{ background: n ? ramp(t) : "#f3f5f9" }}
                   onClick={() => onPick(slot)}
                   onMouseEnter={() => onHover(slot)}
                   onFocus={() => onHover(slot)}
                   onBlur={() => onHover(null)}
                 >
-                  {/* Only the busier hours get a number; hovering any hour shows its count below. */}
-                  {n > 0 && t >= 0.5 ? n : ""}
+                  {/* Only the busiest hours get a number, in white on a fill dark enough for it; hovering any hour shows its
+                      count below. */}
+                  {n > 0 && t >= LABELED ? n : ""}
                 </button>
               );
             })}
