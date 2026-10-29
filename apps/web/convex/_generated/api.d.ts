@@ -23,6 +23,7 @@ import type * as schedule from "../schedule.js";
 import type * as seed from "../seed.js";
 import type * as sessions from "../sessions.js";
 import type * as stats from "../stats.js";
+import type * as survey from "../survey.js";
 import type * as teamNames from "../teamNames.js";
 import type * as teams from "../teams.js";
 import type * as wiki from "../wiki.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   sessions: typeof sessions;
   stats: typeof stats;
+  survey: typeof survey;
   teamNames: typeof teamNames;
   teams: typeof teams;
   wiki: typeof wiki;

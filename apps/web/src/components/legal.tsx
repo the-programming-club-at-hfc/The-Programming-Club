@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ClubLogo, Disclaimer } from "#/components/site";
 import { CLUB } from "#/lib/season";
 
-export const UPDATED = "October 9, 2026";
+export const UPDATED = "October 29, 2026";
 
 export function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   return (

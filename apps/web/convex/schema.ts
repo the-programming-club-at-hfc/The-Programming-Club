@@ -302,6 +302,25 @@ export default defineSchema({
     .index("by_team_card", ["teamId", "card"])
     .index("by_attendance_card", ["attendanceId", "card"]),
 
+  // The member survey (/survey): one row per HawkMail, signed in, so members can come back and change their answers.
+  // Option ids and slots are in src/lib/survey.ts.
+  survey: defineTable({
+    email: v.string(),
+    name: v.string(),
+    interests: v.array(v.string()),
+    experience: v.string(),
+    languages: v.array(v.string()),
+    frequency: v.string(),
+    locations: v.array(v.string()),
+    // Hours they're free in a typical week, as day * 24 + hour (Monday is day 0).
+    free: v.array(v.number()),
+    barriers: v.array(v.string()),
+    channels: v.array(v.string()),
+    note: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_email", ["email"]),
+
   // Anonymous "I'm interested" hearts on events, one per browser (a random id kept in localStorage).
   interest: defineTable({
     event: v.string(),

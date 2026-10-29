@@ -42,6 +42,8 @@ import { Route as HelloWorldTestRouteImport } from './routes/hello-world/test'
 import { Route as HelloWorldTvRouteImport } from './routes/hello-world/tv'
 import { Route as HelloWorldWikiRouteImport } from './routes/hello-world/wiki'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
+import { Route as SurveyIndexRouteImport } from './routes/survey/index'
+import { Route as SurveyResultsRouteImport } from './routes/survey/results'
 
 const DesktopRoute = DesktopRouteImport.update({
   id: '/_desktop',
@@ -208,6 +210,16 @@ const SignInSplatRoute = SignInSplatRouteImport.update({
   path: '/sign-in/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SurveyIndexRoute = SurveyIndexRouteImport.update({
+  id: '/survey/',
+  path: '/survey/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SurveyResultsRoute = SurveyResultsRouteImport.update({
+  id: '/survey/results',
+  path: '/survey/results',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/hello-world': typeof HelloWorldRouteRouteWithChildren
@@ -241,7 +253,9 @@ export interface FileRoutesByFullPath {
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/hello-world/wiki': typeof HelloWorldWikiRoute
   '/sign-in/$': typeof SignInSplatRoute
+  '/survey/results': typeof SurveyResultsRoute
   '/hello-world/': typeof HelloWorldIndexRoute
+  '/survey/': typeof SurveyIndexRoute
 }
 export interface FileRoutesByTo {
   '/join': typeof JoinRoute
@@ -273,8 +287,10 @@ export interface FileRoutesByTo {
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/hello-world/wiki': typeof HelloWorldWikiRoute
   '/sign-in/$': typeof SignInSplatRoute
+  '/survey/results': typeof SurveyResultsRoute
   '/': typeof DesktopIndexRoute
   '/hello-world': typeof HelloWorldIndexRoute
+  '/survey': typeof SurveyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -309,8 +325,10 @@ export interface FileRoutesById {
   '/hello-world/tv': typeof HelloWorldTvRoute
   '/hello-world/wiki': typeof HelloWorldWikiRoute
   '/sign-in/$': typeof SignInSplatRoute
+  '/survey/results': typeof SurveyResultsRoute
   '/_desktop/': typeof DesktopIndexRoute
   '/hello-world/': typeof HelloWorldIndexRoute
+  '/survey/': typeof SurveyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -346,7 +364,9 @@ export interface FileRouteTypes {
     | '/hello-world/tv'
     | '/hello-world/wiki'
     | '/sign-in/$'
+    | '/survey/results'
     | '/hello-world/'
+    | '/survey/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/join'
@@ -378,8 +398,10 @@ export interface FileRouteTypes {
     | '/hello-world/tv'
     | '/hello-world/wiki'
     | '/sign-in/$'
+    | '/survey/results'
     | '/'
     | '/hello-world'
+    | '/survey'
   id:
     | '__root__'
     | '/hello-world'
@@ -413,8 +435,10 @@ export interface FileRouteTypes {
     | '/hello-world/tv'
     | '/hello-world/wiki'
     | '/sign-in/$'
+    | '/survey/results'
     | '/_desktop/'
     | '/hello-world/'
+    | '/survey/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -425,6 +449,8 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   WikiRoute: typeof WikiRoute
   SignInSplatRoute: typeof SignInSplatRoute
+  SurveyResultsRoute: typeof SurveyResultsRoute
+  SurveyIndexRoute: typeof SurveyIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -660,6 +686,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/survey/': {
+      id: '/survey/'
+      path: '/survey'
+      fullPath: '/survey/'
+      preLoaderRoute: typeof SurveyIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/survey/results': {
+      id: '/survey/results'
+      path: '/survey/results'
+      fullPath: '/survey/results'
+      preLoaderRoute: typeof SurveyResultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -742,7 +782,19 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   WikiRoute: WikiRoute,
   SignInSplatRoute: SignInSplatRoute,
+  SurveyResultsRoute: SurveyResultsRoute,
+  SurveyIndexRoute: SurveyIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

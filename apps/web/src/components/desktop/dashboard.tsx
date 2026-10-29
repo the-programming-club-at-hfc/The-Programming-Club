@@ -99,6 +99,20 @@ function Overview() {
         ))}
       </dl>
 
+      <Section
+        title="Member survey"
+        action={
+          <Link to="/survey/results" className="link text-sm">
+            See results
+          </Link>
+        }
+      >
+        <p className="text-sm">
+          What members want, how often, where, and when they’re free. Send them <strong>{CLUB.url}/survey</strong>; they sign in with
+          HawkMail and can change their answers anytime.
+        </p>
+      </Section>
+
       <Section title="Still to figure out">
         <p className="text-sm">
           <strong>Costume XP (+3 at Spooky Bugs):</strong> we need a way to confirm who actually wore a costume. Until then, give it by hand
