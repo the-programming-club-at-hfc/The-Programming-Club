@@ -23,8 +23,20 @@
 .spook img {
   display: block;
 }
-.spook :is(.spook-moon, .spook-ghost, .spook-house, .spook-tree, .spook-stone, .spook-pumpkin) img {
+.spook :is(.spook-moon, .spook-ghost, .spook-house, .spook-tree, .spook-stone, .spook-tufts, .spook-pumpkin) img {
   width: 100%;
+}
+
+/* Stars over the sky, down to just above the hill (40u up), each twinkling at its own pace. */
+.spook-star {
+  left: calc(var(--x) * 100%);
+  top: calc(var(--y) * (100% - 40 * var(--u)));
+  width: max(1.5px, calc(var(--s) * var(--u)));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #f6efe0;
+  box-shadow: 0 0 calc(0.3 * var(--u)) rgb(246 239 224 / 0.6);
+  animation: spook-twinkle var(--t) ease-in-out var(--d) infinite alternate;
 }
 
 /* The moon, with its glow, bobbing over the house. */
@@ -63,6 +75,38 @@
   bottom: calc(23 * var(--u));
   width: calc(27 * var(--u));
 }
+/* Over the house's windows. The candle's glow spills past its frame; the walker is a shadow crossing inside one. */
+.spook-window {
+  position: absolute;
+}
+.spook-candle {
+  margin: -1.5%;
+  padding: 1.5%;
+  box-sizing: content-box;
+  border-radius: 30%;
+  background: radial-gradient(rgb(255 214 120 / 0.85), rgb(255 170 60 / 0.35) 55%, transparent 75%);
+  mix-blend-mode: screen;
+  animation: spook-candle 3.1s steps(1) infinite;
+}
+.spook-out {
+  background: #2b2620;
+  opacity: 0;
+  animation: spook-out 17s ease-in-out -5s infinite;
+}
+.spook-walker {
+  overflow: hidden;
+}
+.spook-walker > span {
+  position: absolute;
+  bottom: -8%;
+  left: 0;
+  width: 70%;
+  height: 85%;
+  border-radius: 45% 45% 12% 12% / 30% 30% 8% 8%;
+  background: radial-gradient(circle at 50% 22%, #2b2620 0 21%, transparent 22%), linear-gradient(transparent 38%, #2b2620 38%);
+  opacity: 0.88;
+  animation: spook-walk 23s linear -9s infinite;
+}
 .spook-tree {
   right: calc(-3 * var(--u));
   bottom: calc(22 * var(--u));
@@ -99,14 +143,15 @@
   animation: spook-drift 3.2s ease-in-out infinite alternate;
 }
 
-/* The graveyard's ground, a low dark hill that runs on under the taskbar. */
+/* The graveyard's ground: the yard's torn-paper bands, tiled across and 28u tall, then solid on under the taskbar. */
 .spook-ground {
   left: 0;
   right: 0;
   bottom: -3rem;
-  height: calc(27 * var(--u) + 3rem);
-  background: linear-gradient(#262522, #1a1917 60%);
-  clip-path: polygon(0 12%, 14% 6%, 30% 10%, 48% 3%, 66% 9%, 82% 4%, 100% 10%, 100% 100%, 0 100%);
+  height: calc(28 * var(--u) + 3rem);
+  background:
+    var(--yard) 0 0 / auto calc(28 * var(--u)) repeat-x,
+    linear-gradient(transparent calc(22 * var(--u)), #1a1917 calc(22 * var(--u)));
 }
 .spook-fence {
   left: 0;
@@ -142,6 +187,35 @@
   letter-spacing: -0.04em;
 }
 
+/* The beetle: off stage most of the time, then walking across the front of the yard in step. */
+.spook-beetle {
+  left: 0;
+  bottom: calc(1.2 * var(--u));
+  width: calc(8 * var(--u));
+  animation: spook-wander 70s linear -38s infinite;
+}
+.spook-beetle > div {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  animation: spook-bump 0.28s ease-in-out infinite alternate;
+}
+.spook-beetle img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  animation: haunt-flap 0.56s steps(1) infinite;
+}
+.spook-beetle img + img {
+  animation-delay: -0.28s;
+}
+
+/* Grass at a stone's foot, a little wider than the stone and in front of it. */
+.spook-tufts {
+  right: calc((var(--r) - var(--w) * 0.3) * var(--u));
+  bottom: calc((var(--up) - 0.6) * var(--u));
+  width: calc(var(--w) * 1.6 * var(--u));
+}
+
 /* Pumpkins on the ground, each flickering like a candle inside. */
 .spook-pumpkin {
   bottom: calc(1 * var(--u));
@@ -159,6 +233,73 @@
   animation-duration: 1.7s;
 }
 
+@keyframes spook-twinkle {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 0.95;
+  }
+}
+@keyframes spook-candle {
+  0% {
+    opacity: 0.7;
+  }
+  13% {
+    opacity: 1;
+  }
+  21% {
+    opacity: 0.55;
+  }
+  34% {
+    opacity: 0.9;
+  }
+  48% {
+    opacity: 0.65;
+  }
+  62% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.75;
+  }
+}
+@keyframes spook-out {
+  0%,
+  60%,
+  100% {
+    opacity: 0;
+  }
+  64%,
+  84% {
+    opacity: 0.92;
+  }
+}
+/* Across the window and out of sight for most of the loop. */
+@keyframes spook-walk {
+  0% {
+    transform: translateX(-110%);
+  }
+  22%,
+  100% {
+    transform: translateX(160%);
+  }
+}
+/* It takes about a quarter of the loop to cross; the rest it waits off the left edge. */
+@keyframes spook-wander {
+  0% {
+    transform: translateX(calc(-8 * var(--u)));
+  }
+  40%,
+  100% {
+    transform: translateX(calc(100cqw + 2 * var(--u)));
+  }
+}
+@keyframes spook-bump {
+  to {
+    transform: translateY(calc(-0.15 * var(--u)));
+  }
+}
 @keyframes spook-bob {
   to {
     transform: translateY(var(--u));
@@ -211,7 +352,9 @@
     animation: none !important;
   }
   .spook-flyby,
-  .spook-ghost {
+  .spook-ghost,
+  .spook-beetle,
+  .spook-walker {
     display: none;
   }
 }

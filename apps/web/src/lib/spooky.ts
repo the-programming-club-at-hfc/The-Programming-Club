@@ -11,6 +11,10 @@ export const SPOOKY_ART = {
   pines: "/spooky/pines.webp",
   /** A wide dark hill, flat along the bottom, in front of the pines. */
   ridge: "/spooky/ridge.webp",
+  /** The graveyard's ground from the front: torn-paper bands, tiling left to right, solid along the bottom quarter. 3:1. */
+  yard: "/spooky/yard.webp",
+  /** A few paper grass tufts on a low mound, flat along the bottom, for the foot of a gravestone. 5:2. */
+  tufts: "/spooky/tufts.webp",
   /** A wide wisp of fog that tiles left to right. */
   fog: "/spooky/fog.webp",
   /** The beetle with the magnifying glass, side view facing right, legs in step one. */
