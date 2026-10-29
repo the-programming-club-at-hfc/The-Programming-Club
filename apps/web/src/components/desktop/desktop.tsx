@@ -13,6 +13,7 @@ import { nextMeeting, useSchedule } from "#/lib/schedule";
 import { CLUB, INSTAGRAM_URL, isHalloweenMonth } from "#/lib/season";
 import { APPS, appFor, countdown } from "./apps";
 import { Scene } from "./scene";
+import { SpookyScene } from "./spooky-scene";
 import type { App, AppId } from "./apps";
 
 type Pt = { x: number; y: number };
@@ -159,7 +160,7 @@ export function Desktop() {
     <div ref={root} className="theme-club desk-wallpaper fixed inset-0 overflow-hidden text-ink" data-october={october || undefined}>
       <div aria-hidden className={`absolute inset-0 ${boot ? "boot-wallpaper" : ""}`}>
         <div className="desk-aerial" />
-        <Scene october={october} />
+        {october ? <SpookyScene /> : <Scene />}
       </div>
 
       {/* Desktop (tablets and up) */}

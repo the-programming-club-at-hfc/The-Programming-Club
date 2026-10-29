@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Box = [number, number, number, number];
-type Layer = { id: string; depth: number; desk: Box; phone: Box; low?: boolean; kind?: "clouds" | "moon" | "shimmer" | "bats" };
+type Layer = { id: string; depth: number; desk: Box; phone: Box; low?: boolean; kind?: "clouds" | "moon" | "shimmer" };
 
 const CLOUDS: Box = [-5.02, 5.84, 110.05, 48.14];
 const CLOUDS_PHONE: Box = [-65, 5.5, 180, 46];
@@ -18,24 +18,20 @@ const MOON_PHONE: Box = [76, 11, 20, 9.24];
 const PATH: Box = [64.59, 53.13, 20.93, 44.63];
 const PATH_PHONE: Box = [53.5, 55.4, 65, 30];
 
-const layers = (october: boolean): Layer[] => [
-  { id: october ? "sky-october" : "sky", low: true, depth: 0, desk: [-5.02, 0, 110.05, 106.27], phone: [-100, 0, 210, 108] },
+const LAYERS: Layer[] = [
+  { id: "sky", low: true, depth: 0, desk: [-5.02, 0, 110.05, 106.27], phone: [-100, 0, 210, 108] },
   { id: "clouds-far", depth: 0.08, desk: CLOUDS, phone: CLOUDS_PHONE, kind: "clouds" },
   { id: "clouds-near", depth: 0.16, desk: CLOUDS, phone: CLOUDS_PHONE, kind: "clouds" },
-  { id: october ? "moon-october" : "moon", depth: 0.025, desk: MOON, phone: MOON_PHONE, kind: "moon" },
-  ...(october
-    ? [{ id: "bats", depth: 0.045, desk: [68.48, 21.47, 12.56, 4.36], phone: [76.9, 16, 18.7, 1.7], kind: "bats" } satisfies Layer]
-    : []),
+  { id: "moon", depth: 0.025, desk: MOON, phone: MOON_PHONE, kind: "moon" },
   { id: "cliffs", low: true, depth: 0.12, desk: [-5.02, 26.57, 110.05, 28.06], phone: [-80, 41.45, 200, 15] },
   { id: "sea", low: true, depth: 0.25, desk: [-5.02, 53.13, 110.05, 53.13], phone: [-90, 55.4, 200, 50] },
-  { id: october ? "moonpath-october" : "moonpath", low: true, depth: 0.25, desk: PATH, phone: PATH_PHONE, kind: "shimmer" },
+  { id: "moonpath", low: true, depth: 0.25, desk: PATH, phone: PATH_PHONE, kind: "shimmer" },
   { id: "shore", low: true, depth: 1, desk: [38.88, 54.2, 66.99, 53.13], phone: [-37, 62.07, 155, 44] },
 ];
 
 const vars = ([l, t, w, h]: Box, p: string) => ({ [`--${p}l`]: `${l}%`, [`--${p}t`]: `${t}%`, [`--${p}w`]: `${w}%`, [`--${p}h`]: `${h}%` });
 
-export function Scene({ october }: { october: boolean }) {
-  const all = layers(october);
+export function Scene() {
   const [loaded, setLoaded] = useState(0);
   // Browser-only, so every image's load event is caught (server-rendered images can finish before hydration).
   const [mounted, setMounted] = useState(false);
@@ -44,8 +40,8 @@ export function Scene({ october }: { october: boolean }) {
   if (!mounted) return null;
   return (
     // The flat painting underneath stays until every layer has loaded, then the scene fades in over it.
-    <div aria-hidden className={`scene ${loaded >= all.length ? "scene-ready" : ""}`}>
-      {all.map((l) => {
+    <div aria-hidden className={`scene ${loaded >= LAYERS.length ? "scene-ready" : ""}`}>
+      {LAYERS.map((l) => {
         const src = `/wallpaper/layers/${l.id}.webp`;
         const style = { ...vars(l.desk, ""), ...vars(l.phone, "p"), "--depth": l.depth } as CSSProperties;
         return (

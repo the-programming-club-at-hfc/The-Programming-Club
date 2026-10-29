@@ -508,8 +508,9 @@
   inset: 0;
   background: url("/wallpaper/desk.webp") center / cover no-repeat;
 }
+/* October's night sky, under the paper graveyard (components/desktop/spooky-scene.tsx). */
 .desk-wallpaper[data-october] .desk-aerial {
-  background-image: url("/wallpaper/desk-october.webp");
+  background: radial-gradient(ellipse at 60% 25%, #2d3d4c 0%, transparent 60%), linear-gradient(#1b2734, #111a22 75%);
 }
 
 /* Layered wallpaper (components/desktop/scene.tsx). A 16:9 stage covers the screen, keeping the moon and
@@ -593,14 +594,6 @@
   to {
     opacity: 1;
     transform: scaleX(1.05);
-  }
-}
-.scene-bats {
-  animation: scene-bats 3.2s ease-in-out infinite alternate;
-}
-@keyframes scene-bats {
-  to {
-    transform: translate3d(4%, -10%, 0);
   }
 }
 @container (max-aspect-ratio: 5 / 8) {

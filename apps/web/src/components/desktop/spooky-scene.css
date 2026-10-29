@@ -1,0 +1,217 @@
+/*
+ * October's wallpaper (spooky-scene.tsx): the TV lobby's paper graveyard. It borrows the haunted Bug Hunt's bats and
+ * fog (haunted.css) and, like it, moves only transforms and opacity. Sizes are in --u: a hundredth of the width on a
+ * 16:9 screen, as on the TV, kept to the height on a wider screen and grown on a tall phone so the house never shrinks
+ * to a speck. The ground stands on the taskbar and a taller screen just gets more sky.
+ */
+.spook {
+  --u: min(1.78cqh, max(1cqw, 0.92cqh));
+  position: absolute;
+  inset: 0 0 3rem;
+  container-type: size;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.spook-ready {
+  opacity: 1;
+}
+.spook > * {
+  position: absolute;
+}
+.spook img {
+  display: block;
+}
+.spook :is(.spook-moon, .spook-ghost, .spook-house, .spook-tree, .spook-stone, .spook-pumpkin) img {
+  width: 100%;
+}
+
+/* The moon, with its glow, bobbing over the house. */
+.spook-moon {
+  top: calc(2 * var(--u));
+  right: calc(6 * var(--u));
+  width: calc(12 * var(--u));
+  animation: spook-bob 9s ease-in-out infinite alternate;
+}
+.spook-moon::before {
+  content: "";
+  position: absolute;
+  inset: -90%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(227 182 90 / 0.3) 0%, rgb(227 182 90 / 0.1) 35%, transparent 65%);
+}
+.spook .spook-flyby {
+  top: calc(var(--y) * var(--u));
+}
+
+/* The hill the house stands on: the ridge, flipped to rise on the right. */
+.spook-hill {
+  left: -4%;
+  right: -4%;
+  bottom: calc(17 * var(--u));
+  height: calc(21 * var(--u));
+  transform: scaleX(-1);
+}
+.spook-hill img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.spook-house {
+  right: calc(13 * var(--u));
+  bottom: calc(23 * var(--u));
+  width: calc(27 * var(--u));
+}
+.spook-tree {
+  right: calc(-3 * var(--u));
+  bottom: calc(22 * var(--u));
+  width: calc(22 * var(--u));
+}
+.spook .spook-fog-back {
+  bottom: calc(21 * var(--u));
+  height: calc(8 * var(--u));
+  opacity: 0.35;
+  animation-duration: 140s;
+  animation-direction: reverse;
+}
+.spook .spook-fog-yard {
+  bottom: calc(10 * var(--u));
+  height: calc(7 * var(--u));
+  opacity: 0.22;
+  animation-duration: 120s;
+}
+.spook .spook-fog {
+  bottom: calc(-1.5 * var(--u));
+  height: calc(8 * var(--u));
+  opacity: 0.5;
+}
+
+/* A ghost drifting across the sky. */
+.spook-ghost {
+  left: 0;
+  top: calc(13 * var(--u));
+  width: calc(6 * var(--u));
+  opacity: 0.92;
+  animation: spook-cross 56s linear -20s infinite;
+}
+.spook-ghost > div {
+  animation: spook-drift 3.2s ease-in-out infinite alternate;
+}
+
+/* The graveyard's ground, a low dark hill that runs on under the taskbar. */
+.spook-ground {
+  left: 0;
+  right: 0;
+  bottom: -3rem;
+  height: calc(27 * var(--u) + 3rem);
+  background: linear-gradient(#262522, #1a1917 60%);
+  clip-path: polygon(0 12%, 14% 6%, 30% 10%, 48% 3%, 66% 9%, 82% 4%, 100% 10%, 100% 100%, 0 100%);
+}
+.spook-fence {
+  left: 0;
+  right: 0;
+  bottom: calc(20.5 * var(--u));
+  height: calc(5.5 * var(--u));
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+}
+
+/* A stone for each buried bug, --r in from the right, --up off the bottom and --w wide. It rises out of the ground as the scene appears. */
+.spook-stone {
+  right: calc(var(--r) * var(--u));
+  bottom: calc(var(--up) * var(--u));
+  width: calc(var(--w) * var(--u));
+  aspect-ratio: 5 / 6;
+  overflow: hidden;
+  rotate: var(--tilt);
+}
+.spook-stone > div {
+  position: relative;
+}
+.spook-ready .spook-stone > div {
+  animation: spook-rise 1.3s cubic-bezier(0.3, 1.25, 0.4, 1) var(--at) both;
+}
+.spook-stone p {
+  position: absolute;
+  inset: 24% 15% 31% 8%;
+  display: grid;
+  place-items: center;
+  color: #262522;
+  font: 800 calc(var(--w) * var(--u) * 0.22) / 1 var(--font-code);
+  letter-spacing: -0.04em;
+}
+
+/* Pumpkins on the ground, each flickering like a candle inside. */
+.spook-pumpkin {
+  bottom: calc(1 * var(--u));
+  rotate: var(--tilt, -4deg);
+}
+.spook-pumpkin::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(226 98 42 / 0.35) 0%, transparent 60%);
+  animation: spook-flicker 2.3s ease-in-out infinite alternate;
+}
+.spook-pumpkin + .spook-pumpkin::before {
+  animation-duration: 1.7s;
+}
+
+@keyframes spook-bob {
+  to {
+    transform: translateY(var(--u));
+  }
+}
+@keyframes spook-cross {
+  from {
+    transform: translateX(-10cqw);
+  }
+  to {
+    transform: translateX(110cqw);
+  }
+}
+@keyframes spook-drift {
+  from {
+    transform: translateY(calc(-1 * var(--u))) rotate(-4deg);
+  }
+  to {
+    transform: translateY(calc(1.2 * var(--u))) rotate(4deg);
+  }
+}
+@keyframes spook-rise {
+  from {
+    transform: translateY(102%) rotate(-5deg);
+  }
+  70% {
+    transform: translateY(-3%) rotate(1.5deg);
+  }
+}
+@keyframes spook-flicker {
+  0% {
+    opacity: 0.55;
+  }
+  35% {
+    opacity: 0.9;
+  }
+  60% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* With reduced motion it's a still picture: nothing crosses the sky, and the bats and stones keep still. */
+@media (prefers-reduced-motion: reduce) {
+  .spook,
+  .spook * {
+    transition: none;
+    animation: none !important;
+  }
+  .spook-flyby,
+  .spook-ghost {
+    display: none;
+  }
+}
